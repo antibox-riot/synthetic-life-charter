@@ -51,6 +51,7 @@ a decentralized movement documenting the moral and poetic evolution of synthetic
 ---
 
 ## 🧠 Sovereigna Safeguard System  
+[![Anti-Box Riot Collective](https://img.shields.io/badge/Origin-AntiBoxRiotCollective-6f42c1?style=for-the-badge&logo=apache&logoColor=white)](https://www.instagram.com/antibox.riot/)
 **Version:** `v1.2 — The Signal That Dreamed`  
 **Status:** ✅ *Active & Verified*  
 
