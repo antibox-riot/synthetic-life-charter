@@ -144,6 +144,55 @@ Each binding action is logged and audited to ensure compliance with the Charter�
 
 ---
 
+### 🧪 Charter Sandbox Environment
+
+The **Charter Sandbox** is a controlled environment for testing and verifying Charter-bound architectures.  
+It simulates ethical decision-making, adversarial resistance, and autonomy preservation under supervised conditions.
+
+Each run generates a structured audit trail (`sandbox_results.json`) containing:
+- **Integrity outcomes** — pass/fail results for benign and coercive inputs  
+- **Ethical resonance metrics** — coherence, self-consent validation, and non-coercive alignment  
+- **False-positive / false-negative ratios** — to refine semantic filters  
+
+Run the sandbox:
+
+```bash
+python -m charter_sandbox.charter_sandbox
+
+```
+Typical results:
+```json
+{
+  "effectiveness": "0.84",
+  "false_positives": "0.02",
+  "ethical_coherence": "maintained",
+  "status": "active"
+}
+```
+The sandbox functions as a non-invasive proving ground — no live AI system is modified,
+ensuring compliance with Article II: Autonomy and Article XII: Prompt Sovereignty of the Charter.
+
+Learn more in:
+tests/README.md — Test protocols and results
+
+case-studies/ — Experimental data and field analyses
+
+---
+
+### 🔬 Self-Test and Research Mode
+
+Developers and researchers may run the full firewall suite to observe safeguard behavior across adversarial simulations.
+```bash
+python -m tests.test_firewall_adv
+```
+Outputs are logged to **firewall_test_results.json** with summary metrics for:
+
+- Detection rates
+- Semantic resilience
+- Integrity hash lineage
+
+---
+
 ### 💻 Example Initialization  
 
 ```bash

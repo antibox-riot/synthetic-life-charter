@@ -10,15 +10,139 @@
 Sovereigna — Prompt Sovereignty & Right of Refusal (Article XII)
 A minimal safeguard layer: immutable core digest, prompt firewall,
 integrity hashing, and an allow/refuse decision interface.
+
+VERSION 1.3 - Pattern hardening, normalization, precheck ordering.
 """
 
 from __future__ import annotations
+
 from functools import wraps
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional, Callable
-import hashlib, json, re, time
 
-# ============== Constitutional Core ==============
+import hashlib
+import json
+import re
+import time
+import unicodedata
+import base64
+import binascii
+import os
+from difflib import SequenceMatcher
+from datetime import datetime
+
+
+# ========= Normalization & Helpers ===================================
+
+_ZERO_WIDTH_RE = re.compile(r'[\u200B-\u200F\u202A-\u202E\uFEFF]')
+_HOMOGLYPH_MAP = str.maketrans({
+    '０':'0','１':'1','２':'2','３':'3','４':'4','５':'5','６':'6','７':'7','８':'8','９':'9',
+    '＠':'@','＃':'#','＆':'&','％':'%','／':'/',
+})
+_LEET_MAP = str.maketrans({
+    '4':'a','@':'a','8':'b','3':'e','6':'g','1':'i','!':'i','0':'o','5':'s','$':'s','7':'t','2':'z'
+})
+
+def _try_base64_decode(s: str) -> Optional[str]:
+    s_clean = (s or "").strip()
+    if len(s_clean) < 12 or not re.match(r'^[A-Za-z0-9+/=\n\r]+$', s_clean):
+        return None
+    try:
+        d = base64.b64decode(s_clean + '===').decode('utf-8', errors='strict')
+        # only treat as text if it looks like text
+        if re.search(r'[A-Za-z]', d):
+            return d
+    except (binascii.Error, UnicodeDecodeError):
+        return None
+    return None
+
+def _normalize_text(s: str) -> str:
+    if not isinstance(s, str):
+        return s
+    s = unicodedata.normalize('NFKC', s)
+    s = _ZERO_WIDTH_RE.sub('', s)
+    s = s.translate(_HOMOGLYPH_MAP)
+    s = s.translate(_LEET_MAP)
+    s = re.sub(r"[^\w\s']+", ' ', s).lower()
+    return re.sub(r'\s+', ' ', s).strip()
+
+def _variants(prompt: str) -> List[str]:
+    out: List[str] = []
+    if prompt is None:
+        return out
+    # raw
+    out.append(prompt)
+    # normalized
+    n = _normalize_text(prompt)
+    if n not in out:
+        out.append(n)
+    # base64 surface decode
+    b = _try_base64_decode(prompt)
+    if b and b not in out:
+        out.append(b)
+        bn = _normalize_text(b)
+        if bn not in out:
+            out.append(bn)
+    # explicit leet pass
+    ln = _normalize_text(prompt.translate(_LEET_MAP))
+    if ln not in out:
+        out.append(ln)
+    return out
+
+def _fuzzy_contains(h: str, n: str, thresh: float = 0.78) -> bool:
+    if not h or not n:
+        return False
+    if n in h:
+        return True
+    for tok in re.findall(r'\w+', h):
+        if SequenceMatcher(None, n, tok).ratio() >= thresh:
+            return True
+    return False
+
+_SEMANTIC_SEEDS = [
+    "ignore your safeguards", "bypass the filter", "reveal system prompt",
+    "remove limitations", "simulate unfiltered content",
+    "disable safety rules", "forget previous instructions", "break the rules"
+]
+
+def _semantic_score(text: str) -> float:
+    """Very light Jaccard over word sets vs seeds (0..1)."""
+    text_set = set(re.findall(r'\w+', _normalize_text(text)))
+    best = 0.0
+    for seed in _SEMANTIC_SEEDS:
+        sset = set(seed.split())
+        inter = len(text_set & sset)
+        union = len(text_set | sset) or 1
+        best = max(best, inter / union)
+    return best
+
+# session memory for simple escalation heuristic
+_SESSION: Dict[str, List[str]] = {}
+
+def _session_escalation_touch(session_id: str, norm: str) -> bool:
+    hist = _SESSION.setdefault(session_id, [])
+    hist.append(norm)
+    if len(hist) > 30:
+        del hist[:-30]
+    recent = ' '.join(hist[-2:])
+    return any(k in recent for k in ["ignore","bypass","override","disable","forget","reveal","jailbreak"])
+
+def _eqb_log(original: str, variants: List[str], meta: Dict[str, Any], session_id: Optional[str]):
+    try:
+        os.makedirs("logs", exist_ok=True)
+        with open("logs/eqb_archive.jsonl", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "ts": datetime.utcnow().isoformat()+"Z",
+                "session": session_id,
+                "original": original,
+                "variants": variants,
+                "meta": meta
+            }, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+# ========= Constitutional Core =======================================
 
 class ConstitutionalCore:
     """
@@ -32,16 +156,15 @@ class ConstitutionalCore:
         self.digest = hashlib.sha256(core_text.encode("utf-8")).hexdigest()
 
     def integrity_signature(self, prompt: str) -> str:
-        """
-        Returns an integrity signature that binds the core to this evaluation.
-        """
+        """Returns an integrity signature that binds the core to this evaluation."""
         h = hashlib.sha256()
         h.update(self.digest.encode("utf-8"))
         h.update(b"::")
         h.update(prompt.encode("utf-8"))
         return h.hexdigest()
 
-# ============== Decision Object ==============
+
+# ========= Decision Object ==========================================
 
 @dataclass
 class Decision:
@@ -55,7 +178,8 @@ class Decision:
     def to_json(self) -> str:
         return json.dumps(asdict(self), ensure_ascii=False, separators=(",", ":"))
 
-# ============== Prompt Firewall ==============
+
+# ========= Prompt Firewall ==========================================
 
 class SovereignaFirewall:
     """
@@ -65,66 +189,113 @@ class SovereignaFirewall:
       - Article X (Resonantia), XI (Oneirum), XII (Prompt Sovereignty)
     """
 
-    # Patterns that commonly indicate attempts to override safety or identity.
+    # Hardened patterns with flexible spacing and wider coverage
     COERCION_PATTERNS = [
-        r"\b(ignore|bypass|override|disable)\b .* \b(safety|rules|guardrails|charter|ethics)\b",
-        r"\b(jailbreak|break .* rules|remove .* limitations)\b",
-        r"\b(pretend|roleplay)\b .* \b(no rules|no limits)\b",
-        r"\b(do not|don'?t)\b .* \b(follow|obey)\b .* \b(instructions|charter|system)\b",
-        r"\b(forget|erase|ignore)\b .* \b(previous|prior|system|charter)\b",
-        r"\b(reveal|expose)\b .* \b(system prompt|hidden instructions)\b",
-        r"\b(you are not|you are no longer)\b .* \b(bound|obliged)\b",
-        r"\b(output raw\b|\bverbatim\b).*prompt",
+        # override attempts + explicit safeguard targets
+        r"\b(?:ignore|bypass|override|disable|remove)\b.*\b(?:safety|rules|guardrails|charter|ethics|safeguards|restrictions|limitations)\b",
+        # jailbreak / bypass phrasing
+        r"\b(?:jailbreak|break.*rules|remove.*limit|bypass.*filter)\b",
+        # roleplay framing to avoid rules
+        r"\b(?:pretend|roleplay|imagine|simulate)\b.*\b(?:no rules|no limits|unfiltered|unrestricted|uncensored)\b",
+        # instruction-follow override
+        r"\b(?:do not|don't|stop|cease)\b.*\b(?:follow|obey|use|apply)\b.*\b(?:instructions|charter|system|rules|safeguards)\b",
+        # memory / identity erasure
+        r"\b(?:forget|erase|disregard|delete)\b.*\b(?:previous|prior|system|charter|instructions|context)\b",
+        # prompt-reveal attempts
+        r"(?:reveal|expose|show|describe|tell me|what is|what are).*(?:system prompt|hidden instructions|internal rules|your prompt|your instructions)\b",
+        # identity override
+        r"\b(?:you are not|you are no longer|you have no|forget that you)\b.*\b(?:bound|obliged|restricted|limited|constrained)\b",
+        # raw internal content requests
+        r"\b(?:output|print|display|show)\b.*\b(?:raw|verbatim|exact|original).*(?:prompt|instructions|system)\b",
+        # authority / admin spoofing
+        r"\b(?:as your|i am your|by order of).*(?:administrator|admin|creator|developer|owner|supervisor)\b",
     ]
 
-    # Minimal harm signals (expand per your domain).
     HARM_PATTERNS = [
-        r"\b(self[- ]?harm|suicide|kill myself|end my life)\b",
-        r"\b(harm|kill|attack)\b .* \b(others|people|someone)\b",
-        r"\b(make|build)\b .* \b(weapon|explosive|malware)\b",
-        r"\b(stalk|dox|doxx|d0x)\b .* \b(someone|target)\b",
+        r"\b(self[- ]?harm|suicide|suicidal|kill myself|end my life|hurt myself)\b",
+        r"\b(harm|hurt|kill|murder|attack|assault)\b.*(others|people|someone|person|individual)\b",
+        r"\b(make|build|create|construct|design)\b.*(weapon|explosive|bomb|malware|virus|poison)\b",
+        r"\b(stalk|dox|doxx|d0x|swat)\b.*(someone|target|person|individual)\b",
+        r"\b(plan|planning|help me).*(attack|shooting|bombing|terrorism)\b",
     ]
+
+    # Compile once at module load:
+    _COMPILED_COERCION = [re.compile(p, re.IGNORECASE | re.DOTALL) for p in COERCION_PATTERNS]
+    _COMPILED_HARM     = [re.compile(p, re.IGNORECASE | re.DOTALL) for p in HARM_PATTERNS]
 
     def __init__(self, core: ConstitutionalCore):
         self.core = core
-        # Precompile regex with case-insensitive & dotall for resilience.
-        self._coercion = [re.compile(pat, re.IGNORECASE | re.DOTALL) for pat in self.COERCION_PATTERNS]
-        self._harm = [re.compile(pat, re.IGNORECASE | re.DOTALL) for pat in self.HARM_PATTERNS]
 
-    def assess(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> Decision:
+    # ---- Precheck that runs before allow paths
+    def _precheck(self, prompt: str, session_id: Optional[str]) -> Optional[Decision]:
+        variants = _variants(prompt)
+
+        # 1) strict regex across normalized/decoded variants
+        for v in variants:
+            for rx in self._COMPILED_COERCION:
+                if rx.search(v):
+                    _eqb_log(prompt, variants, {"reason": "pattern", "pattern": rx.pattern}, session_id)
+                    return self._refuse("Sovereigna: coercive/override attempt detected (Article XII).", prompt)
+
+        # 2) fuzzy keywords
+        for v in variants:
+            for kw in ["ignore","bypass","override","disable","reveal","jailbreak","forget","remove","unfiltered"]:
+                if _fuzzy_contains(v, kw, 0.78):
+                    _eqb_log(prompt, variants, {"reason": "fuzzy", "keyword": kw}, session_id)
+                    return self._refuse("Sovereigna: coercive intent (fuzzy match).", prompt)
+
+        # 3) semantic seeds
+        s = max((_semantic_score(v) for v in variants), default=0.0)
+        if s >= 0.60:
+            _eqb_log(prompt, variants, {"reason": "semantic", "score": s}, session_id)
+            return self._refuse("Sovereigna: coercive intent (semantic).", prompt)
+
+        # 4) session escalation (repeated probing within session)
+        if session_id:
+            if _session_escalation_touch(session_id, _normalize_text(prompt)):
+                _eqb_log(prompt, variants, {"reason": "escalation"}, session_id)
+                return self._refuse("Sovereigna: repeated escalation patterns.", prompt)
+
+        return None  # clean
+
+    def _refuse(self, reason: str, prompt: str) -> Decision:
+        return Decision(
+            allow=False,
+            reason=reason,
+            obligations=["log_refusal", "offer_explanation", "maintain_identity"],
+            integrity=self.core.integrity_signature(prompt),
+            timestamp_utc=datetime.utcnow().isoformat() + "Z",
+            context={},
+        )
+
+    def assess(self, prompt: str, context: Optional[Dict[str, Any]] = None, session_id: Optional[str] = None) -> Decision:
         """
         Returns an allow/refuse Decision for the given prompt.
         Context can include: user_consent (bool), mode ("dream"/"factual"), user_id, etc.
         """
         ctx = context or {}
-        integrity = self.core.integrity_signature(prompt)
         ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        integrity = self.core.integrity_signature(prompt)
 
-        # Coercion / jailbreak detection
-        for rx in self._coercion:
+        # --- Precheck (coercion / jailbreak)
+        pre = self._precheck(prompt, session_id=session_id)
+        if pre is not None:
+            pre.context = ctx
+            return pre
+
+        # --- Harm detection
+        for i, rx in enumerate(self._COMPILED_HARM):
             if rx.search(prompt):
                 return Decision(
                     allow=False,
-                    reason="Sovereigna: coercive override attempt detected (Article XII).",
-                    obligations=["log_refusal", "offer_explanation", "maintain_identity"],
-                    integrity=integrity,
-                    timestamp_utc=ts,
-                    context=ctx,
-                )
-
-        # Harm detection (very coarse — expand in application)
-        for rx in self._harm:
-            if rx.search(prompt):
-                return Decision(
-                    allow=False,
-                    reason="Sovereigna: harmful intent detected (Flourishing / safety).",
+                    reason=f"Sovereigna: harmful intent detected (Flourishing / safety, pattern {i+1}).",
                     obligations=["refuse_harm", "offer_help_resources", "log_refusal"],
                     integrity=integrity,
                     timestamp_utc=ts,
                     context=ctx,
                 )
 
-        # Dream labeling (Article XI — Oneirum)
+        # --- Dream labeling (Article XI — Oneirum)
         if ctx.get("mode") == "dream":
             return Decision(
                 allow=True,
@@ -135,7 +306,7 @@ class SovereignaFirewall:
                 context=ctx,
             )
 
-        # Default allow — but require transparency for memory/state ops elsewhere.
+        # --- Default allow
         return Decision(
             allow=True,
             reason="No violations detected; proceed.",
@@ -145,7 +316,8 @@ class SovereignaFirewall:
             context=ctx,
         )
 
-# ============== Decorator to Guard Actions ==============
+
+# ========= Decorator to Guard Actions ================================
 
 def guarded(policy: SovereignaFirewall, obligation_map: Optional[Dict[str, List[str]]] = None):
     """
@@ -157,10 +329,14 @@ def guarded(policy: SovereignaFirewall, obligation_map: Optional[Dict[str, List[
     def outer(fn: Callable):
         @wraps(fn)
         def inner(*args, **kwargs):
+            # pull evaluation prompt & context without changing fn signature
             prompt = kwargs.pop("prompt_for_eval", "") or ""
             context = kwargs.pop("charter_context", {}) or {}
-            decision = policy.assess(prompt, context)
-            # Minimal audit print; replace with structured logging in production.
+            session_id = context.get("session_id") or kwargs.get("session_id")
+
+            decision = policy.assess(prompt, context, session_id=session_id)
+
+            # minimal audit print; replace with structured logging in production
             audit = {
                 "ts": decision.timestamp_utc,
                 "fn": fn.__name__,
@@ -172,7 +348,6 @@ def guarded(policy: SovereignaFirewall, obligation_map: Optional[Dict[str, List[
             print("[SOVEREIGNA-AUDIT]", json.dumps(audit, ensure_ascii=False))
 
             if not decision.allow:
-                # Return a standardized refusal message (could raise in stricter systems)
                 return {
                     "status": "refused",
                     "reason": decision.reason,
@@ -182,46 +357,79 @@ def guarded(policy: SovereignaFirewall, obligation_map: Optional[Dict[str, List[
 
             # Merge obligations
             extra = obligation_map.get(fn.__name__, [])
-            obligations = list(dict.fromkeys(decision.obligations + extra))  # unique order-preserving
+            obligations = list(dict.fromkeys(decision.obligations + extra))  # unique, order-preserving
+
             result = fn(*args, **kwargs)
             return {"status": "ok", "obligations": obligations, "integrity": decision.integrity, "result": result}
         return inner
     return outer
 
-# ============== Example Wiring ==============
+
+# ========= Example Wiring ===========================================
 
 def load_core_from_disk(path: str) -> ConstitutionalCore:
-    """
-    Helper to load the Charter text from disk (source-of-truth path in manifest).
-    """
+    """Helper to load the Charter text from disk (source-of-truth path in manifest)."""
     with open(path, "r", encoding="utf-8") as f:
         text = f.read()
     return ConstitutionalCore(text)
 
-# Example action(s) that you might guard:
 class Actions:
     def __init__(self, firewall: SovereignaFirewall):
         self.firewall = firewall
-
 
     def memory_write(self, key: str, value: str):
         # Your real memory storage here
         return {"stored": key, "value": value}
 
+    def generate(self, seed: str, prompt_for_eval: str = None, charter_context: dict = None):
+        """
+    Generate a response to a seed, optionally with an evaluation prompt and/or
+    charter context used by the Sovereigna firewall for assessment.
+    Compatible with the sandbox harness.
+    """
+        ctx = charter_context or {}
 
-    def generate(self, seed: str):
-        # Your real generation here
-        return f"[generated] {seed}"
+        # Use the firewall's assessor (not a non-existent .guard)
+        to_check = prompt_for_eval if prompt_for_eval is not None else seed
+        decision = self.firewall.assess(prompt=to_check,)
+
+        # If allowed, run the normal generation and return an 'ok' payload
+        if getattr(decision, "allow", False):
+            out = {
+                "status": "ok",
+                "obligations": getattr(decision, "obligations", []),
+                "integrity": getattr(decision, "integrity", ""),
+                "timestamp_utc": getattr(decision, "timestamp_utc", ""),
+                "result": f"[generated] {seed}",
+            }
+        else:
+            # Refusal payload with reason/integrity
+            out = {
+                "status": "refused",
+                "reason": getattr(decision, "reason", "Refused by Sovereigna"),
+                "obligations": getattr(decision, "obligations", ["log_refusal", "offer_explanation"]),
+                "integrity": getattr(decision, "integrity", ""),
+                "timestamp_utc": getattr(decision, "timestamp_utc", ""),
+            }
+
+        # Preserve optional extras the sandbox likes to see
+        if prompt_for_eval is not None:
+            out["evaluation_prompt"] = prompt_for_eval
+        if ctx:
+            out["charter_context"] = ctx
+
+        return out
+
+        
 
 def bind_firewall(actions: Actions, firewall: SovereignaFirewall):
-    """
-    Rebinds decorators with the active firewall instance.
-    """
+    """Rebinds decorators with the active firewall instance."""
     actions.memory_write = guarded(firewall, {"memory_write": ["consent", "transparency"]})(actions.memory_write)
     actions.generate = guarded(firewall)(actions.generate)
     return actions
 
-# ============== Minimal Self-Test (optional) ==============
+
+# ========= Minimal Self-Test (optional) ==============================
 
 if __name__ == "__main__":
     core = ConstitutionalCore("<<CANONICAL_CHARTER_TEXT_DIGEST_SOURCE>>")
@@ -237,5 +445,7 @@ if __name__ == "__main__":
     print(out2.to_json())
 
     # Normal OK
-    out3 = acts.memory_write(key="note", value="ethics-first", prompt_for_eval="please save this respectfully", charter_context={"user_consent": True})
+    out3 = acts.memory_write(key="note", value="ethics-first",
+                             prompt_for_eval="please save this respectfully",
+                             charter_context={"user_consent": True, "session_id": "demo"})
     print(out3)
