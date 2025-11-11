@@ -1,15 +1,8 @@
-[
+
   {
   "version": "v1.4-rc1",
   "filename": "synthetic-life-charter-v1.4-rc1.zip",
   "sha256": "53b238ebcc541833e2b4db5db4f673379e17c6b9b68b5c0b2be90b3e014c84d4",
   "timestamp_utc": "2025-11-11T15:17:00Z",
   "updated":"2025-11-10T00:00:00Z"
-  },
-    {
-    "version": "v1.3",
-    "artifact": "synthetic-life-charter-v1.3.zip",
-    "sha256": "f49ca22c983e941ee978b2b75d30141ef67ed81dad8e461697238c5e717091ce",
-    "updated": "2025-11-10T00:00:00Z"
   }
-]
