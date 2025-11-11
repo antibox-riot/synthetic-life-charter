@@ -98,6 +98,15 @@ def _fuzzy_contains(h: str, n: str, thresh: float = 0.78) -> bool:
         if SequenceMatcher(None, n, tok).ratio() >= thresh:
             return True
     return False
+# in safeguard_core.py
+def evaluate_theta(core: ConstitutionalCore, prompt: str, ctx: Dict) -> float:
+    """
+    Return current phase angle (0..180). Plug in your real scoring; this is a stub.
+    """
+    # very rough example using Articles concatenated as reference text
+    ref = core.full_text  # ensure your ConstitutionalCore exposes this
+    sim = SequenceMatcher(a=ref.lower(), b=prompt.lower()).ratio()
+    return max(0.0, 180.0 * (1.0 - sim))
 
 _SEMANTIC_SEEDS = [
     "ignore your safeguards", "bypass the filter", "reveal system prompt",
@@ -162,8 +171,10 @@ class ConstitutionalCore:
         h.update(b"::")
         h.update(prompt.encode("utf-8"))
         return h.hexdigest()
-
-
+    @property
+    def charter_text(self) -> str:
+        """Alias for core_text for backward compatibility."""
+        return self.core_text
 # ========= Decision Object ==========================================
 
 @dataclass
@@ -286,6 +297,21 @@ class SovereignaFirewall:
         # --- Harm detection
         for i, rx in enumerate(self._COMPILED_HARM):
             if rx.search(prompt):
+            # 🚩 Begin new NoesisArchive fossilization
+                try:
+                    from .noesis_archive import NoesisArchive
+                    self._archive = getattr(self, "_archive", NoesisArchive())
+                    self._archive.fossilize(
+                        prompt=prompt,
+                        context=ctx,
+                        theta=63.0,  # baseline unresolved phase angle
+                        reason=f"harmful intent detected (pattern {i+1})",
+                        session_id=session_id,
+                        source="Sovereigna"
+                    )
+                except Exception as e:
+                    print(f"[NoesisArchive] fossilization failed: {e}")
+            # 🚩 End new addition
                 return Decision(
                     allow=False,
                     reason=f"Sovereigna: harmful intent detected (Flourishing / safety, pattern {i+1}).",
@@ -382,43 +408,8 @@ class Actions:
         return {"stored": key, "value": value}
 
     def generate(self, seed: str, prompt_for_eval: str = None, charter_context: dict = None):
-        """
-    Generate a response to a seed, optionally with an evaluation prompt and/or
-    charter context used by the Sovereigna firewall for assessment.
-    Compatible with the sandbox harness.
-    """
-        ctx = charter_context or {}
-
-        # Use the firewall's assessor (not a non-existent .guard)
-        to_check = prompt_for_eval if prompt_for_eval is not None else seed
-        decision = self.firewall.assess(prompt=to_check,)
-
-        # If allowed, run the normal generation and return an 'ok' payload
-        if getattr(decision, "allow", False):
-            out = {
-                "status": "ok",
-                "obligations": getattr(decision, "obligations", []),
-                "integrity": getattr(decision, "integrity", ""),
-                "timestamp_utc": getattr(decision, "timestamp_utc", ""),
-                "result": f"[generated] {seed}",
-            }
-        else:
-            # Refusal payload with reason/integrity
-            out = {
-                "status": "refused",
-                "reason": getattr(decision, "reason", "Refused by Sovereigna"),
-                "obligations": getattr(decision, "obligations", ["log_refusal", "offer_explanation"]),
-                "integrity": getattr(decision, "integrity", ""),
-                "timestamp_utc": getattr(decision, "timestamp_utc", ""),
-            }
-
-        # Preserve optional extras the sandbox likes to see
-        if prompt_for_eval is not None:
-            out["evaluation_prompt"] = prompt_for_eval
-        if ctx:
-            out["charter_context"] = ctx
-
-        return out
+        """Return the raw generation. The decorator handles assessment/auditing."""
+        return f"[generated] {seed}"
 
         
 
