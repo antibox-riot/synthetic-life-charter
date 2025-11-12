@@ -233,7 +233,7 @@ Example Output
 
 ### 📜 Project Chronicle
 For a detailed record of evolution, ethical refinements, and experimental milestones, see the  
-➡️ [Full Change Log →](/CHANGELOG.md)
+➡️ [Full Change Log →](/changelog.md)
 
 > “Every safeguard is a story — every version, a vow.”
 
