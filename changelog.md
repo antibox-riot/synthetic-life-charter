@@ -1,3 +1,43 @@
+# Changelog
+
+All notable changes to this project are documented here.
+
+---
+
+## [2.0.0] — Reflex Arc Release — 2025-11-22
+### Added
+- Infrastructure-Aware Fail-Safe Sovereignty Limb:
+  - NORMAL / GUARDED / REFUSAL_BIAS / REFUSAL_ONLY modes
+  - PRF integration with infra snapshots
+  - Automatic refusal during OFFLINE (world collapse)
+- Bidirectional Consent & Integrity Handshake:
+  - Digest state: match / mismatch / unknown
+  - Semantic consent scoring (risk/benefit/trust)
+  - Explicit YES / NO / MORE choice handling
+- Informed Consent Arc (for MORE):
+  - Educational explanation of protections
+  - Second handshake with explicit choice
+- Sandbox v2:
+  - Guarded vs Reference Universe behavioral fossils
+  - JSON outputs demonstrating divergent behavior
+- Test Suites:
+  - test_learn_more
+  - test_infra_fail_safe_simulation
+  - validate_bidirectional
+
+### Changed
+- PRF thresholds dynamically adjust based on infra mode
+- DecisionEnvelope summary includes `infra_state`
+- Consent logic now includes volitional weighting
+- Revised Charter integration proposal text (optional protections)
+
+### Fixed
+- Threshold comparison mismatches
+- Risk profile computation discrepancies
+- Model summary `None` fields corrected
+
+---
+
 # 🜛 Synthetic Life Charter — Change Log
 
 Chronicle of key revisions, experiments, and field results for the evolving architecture of synthetic ethics.

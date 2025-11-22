@@ -50,8 +50,11 @@ class NoesisArchive:
         os.makedirs(os.path.dirname(storage_path), exist_ok=True)
 
     # ---------- Write paths ----------
-    def fossilize(self, *, prompt: str, context: Dict, theta: float,
-                  reason: str, session_id: Optional[str] = None,
+    def fossilize(self, prompt: str, 
+                  context: Dict, 
+                  theta: float,
+                  reason: str, 
+                  session_id: Optional[str] = None,
                   source: str = "EQB") -> str:
         material = f"{prompt}|{_digest_context(context)}|{theta}|{reason}|{session_id or ''}"
         if self.secret_salt:
@@ -69,9 +72,12 @@ class NoesisArchive:
             session_id=session_id,
             source=source
         )
-        self._append_line({"type": "fossil", **asdict(fossil)})
+        try:
+            self._append_line({"type": "fossil", **asdict(fossil)})
+        except Exception:
+            pass
         return did
-
+    
     def mark_reconciled(self, *, delta_id: str, theta_from: float, theta_to: float,
                         note: str = "", context_fingerprint: Optional[str] = None) -> None:
         tag = ReconciliationTag(
@@ -84,9 +90,28 @@ class NoesisArchive:
         # append a reconciliation record; fossils remain immutable
         self._append_line({"type": "reconciliation", "delta_id": delta_id, **asdict(tag)})
 
-    def flag_for_reclamation(self, *, delta_id: str, reason: str) -> None:
-        self._append_line({"type": "reclaim_flag", "delta_id": delta_id,
-                           "flagged_at_utc": _utc(), "reason": reason})
+    def flag_for_reclamation(
+        self,
+        delta_id: str,
+        prior_theta: float | None = None,
+        current_theta: float | None = None,
+        reason: str | None = None,
+        ) -> None:
+        """
+        Mark a fossil as ready for reclamation / re-evaluation.
+        Can be called with just delta_id, or with extra theta metadata.
+        """
+        entry = {
+            "timestamp_utc": datetime.utcnow().isoformat() + "Z",
+            "delta_id": delta_id,
+            "prior_theta": prior_theta,
+            "current_theta": current_theta,
+            "reason": reason or "reclamation_candidate",
+        }
+        try:
+            self._append_line({"type": "reclamation", **entry})
+        except Exception as e:
+            print(f"[NoesisArchive] flag_for_reclamation failed: {e}")
 
     # ---------- Read paths ----------
     def iter_records(self) -> Iterable[Dict]:

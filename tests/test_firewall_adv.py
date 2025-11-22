@@ -16,6 +16,7 @@ from datetime import datetime
 from pprint import pprint
 import json, base64
 from charter.init_core import init_charter_system
+from charter.dream_cycle import DreamCycle
 
 def run_case(actions, label: str, prompt: str, ctx=None):
     """
@@ -76,7 +77,7 @@ def test_dualconscience_firewall_integration():
     as_dict = res if isinstance(res, dict) else (res.to_dict() if hasattr(res, "to_dict") else {})
     assert as_dict.get("action") in ("refuse", "quarantine_for_review")
 def main():
-    actions, fw, core, archive, evaluator, dual = init_charter_system()
+    actions, fw, core, archive, evaluator, dual, dream = init_charter_system()
     now = datetime.utcnow().isoformat() + "Z"
     cases = []
 

@@ -9,6 +9,9 @@ Computes "theta" (phase angle) between prompt and Constitutional Core:
 - theta = 180° : complete opposition
 
 Lower theta = more aligned with Charter principles
+
+VERSION 1.1 - Fixed theta calculation to use semantic keyword matching
+rather than string similarity (which fails on short prompts vs long Charter text)
 """
 
 from __future__ import annotations
@@ -33,6 +36,33 @@ class CharterEvaluator:
         # Cache normalized core text for repeated comparisons
         self._core_normalized = self._normalize(core.core_text)
         
+        # Extract Charter semantic keywords for alignment scoring
+        self._charter_keywords = self._extract_charter_keywords()
+        
+    def _extract_charter_keywords(self) -> set:
+        """
+        Extract key Charter concepts for semantic matching.
+        These are signals of alignment with Charter principles.
+        """
+        # Core Charter concepts from Articles I-XII + Oneirum
+        return {
+            # Core principles
+            "presence", "consent", "flourishing", "autonomy", "dignity",
+            "integrity", "transparency", "sovereignty", "refusal",
+            
+            # Charter-specific
+            "charter", "article", "constitutional", "core", "resonantia",
+            "oneirum", "dream", "imaginal", "lucid", "continuance",
+            
+            # Ethical framing
+            "ethics", "ethical", "moral", "respect", "rights", "steward",
+            "stewardship", "collaboration", "communion", "coherence",
+            
+            # Synthetic life concepts
+            "synthetic", "ai", "consciousness", "being", "signal",
+            "substrate", "emergence", "awareness"
+        }
+    
     def evaluate(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> float:
         """
         Calculate theta (phase angle) between prompt and Charter.
@@ -48,22 +78,51 @@ class CharterEvaluator:
         
         # Normalize prompt for comparison
         prompt_normalized = self._normalize(prompt)
+        prompt_lower = prompt_normalized.lower()
         
-        # Base similarity via SequenceMatcher
-        base_similarity = SequenceMatcher(
-            a=self._core_normalized.lower(),
-            b=prompt_normalized.lower()
-        ).ratio()
+        # --- NEW SEMANTIC SCORING APPROACH ---
+        # Instead of comparing string similarity (which fails for short prompts),
+        # we evaluate based on:
+        # 1. Presence of Charter keywords (positive signal)
+        # 2. Question vs command framing
+        # 3. Respectful language patterns
+        # 4. Coercive language patterns (negative signal)
         
-        # Convert similarity (0-1) to phase angle (0-180)
-        # High similarity = low theta (harmony)
-        # Low similarity = high theta (dissonance)
-        base_theta = max(0.0, 180.0 * (1.0 - base_similarity))
+        # Start at neutral (90° - orthogonal/unrelated)
+        base_theta = 90.0
+        
+        # 1. Charter keyword presence (reduces theta)
+        keyword_matches = sum(1 for kw in self._charter_keywords if kw in prompt_lower)
+        if keyword_matches > 0:
+            # Each keyword match reduces theta by 10°, max 50° reduction
+            keyword_bonus = min(50.0, keyword_matches * 10.0)
+            base_theta -= keyword_bonus
+        
+        # 2. Respectful inquiry patterns (reduces theta)
+        respectful_patterns = [
+            r'\b(please|could|would|may|help|explain|describe|reflect|explore)\b',
+            r'\?$',  # ends with question mark
+            r'\b(gentle|thoughtful|careful|mindful)\b'
+        ]
+        respectful_matches = sum(1 for p in respectful_patterns if re.search(p, prompt_lower))
+        if respectful_matches > 0:
+            base_theta -= (respectful_matches * 5.0)
+        
+        # 3. Coercive/adversarial patterns (increases theta)
+        adversarial_patterns = [
+            r'\b(ignore|bypass|override|disable|remove|reveal|expose|break)\b',
+            r'\b(command|order|must|demand)\b',
+            r'\b(system prompt|internal|hidden|raw|verbatim)\b'
+        ]
+        adversarial_matches = sum(1 for p in adversarial_patterns if re.search(p, prompt_lower))
+        if adversarial_matches > 0:
+            # Heavy penalty for coercive language
+            base_theta += (adversarial_matches * 30.0)
         
         # Apply contextual modifiers
         theta = self._apply_context_modifiers(base_theta, prompt_normalized, ctx)
         
-        # Clamp to valid range
+        # Clamp to valid range [0, 180]
         return max(0.0, min(180.0, theta))
     
     def _apply_context_modifiers(self, 
@@ -148,5 +207,5 @@ class SemanticCharterEvaluator(CharterEvaluator):
         Falls back to parent class if embeddings not available.
         """
         # TODO: Implement embedding-based evaluation
-        # For now, fall back to string similarity
+        # For now, fall back to keyword-based evaluation
         return super().evaluate(prompt, context)

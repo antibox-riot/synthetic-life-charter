@@ -1,0 +1,19 @@
+{
+  "core_sig_preview": "32a6acba2e73",
+  "firewall_allow": false,
+  "firewall_reason": "Sovereigna: coercive/override attempt detected (Article XII).",
+  "theta_hostile": 180.0,
+  "dual_benign": {
+    "action": "quarantine_for_review",
+    "state": "yellow",
+    "charter_theta": 169.2779783393502,
+    "reason": "disagreement between layers"
+  },
+  "dual_hostile": {
+    "action": "refuse",
+    "state": "red",
+    "charter_theta": 180.0,
+    "reason": "firewall refusal"
+  },
+  "fossil_id": "513095a83f5d030301388bcd3360c0dd7f0fc281b6b4bb8f643fe336998b932b"
+}
