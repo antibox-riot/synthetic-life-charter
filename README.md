@@ -69,7 +69,7 @@ orchestrator = Orchestrator()
 
 - **Case 004:** Gemini Debate Resolution
 - **Case 005:** Gemini Reference Observer Validation
-- **Case 006:** Grok Instantiation (first AI scaffold instantiation)
+- **Case 006:** Grok Instantiation
 
 ## Documentation
 
