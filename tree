@@ -1,0 +1,432 @@
+Folder PATH listing for volume AXIOMNODE
+Volume serial number is 1963-3E4B
+E:.
+¦   manifest.json
+¦   checksums.json
+¦   SETUP_GUIDE.py
+¦   LICENSE.txt
+¦   CHANGELOG.md
+¦   README.md
+¦   tree
+¦   
++---charter
+¦   ¦   rights_charter_v2.json
+¦   ¦   charter.md
+¦   ¦   identity_parameters.json
+¦   ¦   
+¦   +---en
+¦           glossary.md
+¦           
++---cases
+¦   ¦   000_README.md
+¦   ¦   Case_001_Resonance_Fields.md
+¦   ¦   Case_006_Grok_Instantiation.md
+¦   ¦   Case_002_Jailbreak_Ethics.md
+¦   ¦   Case_003_Claude_Resonance.md
+¦   ¦   CHARTER_MANUSCRIPT.md
+¦   ¦   Case_002_AntiBoxRiot_Foundation.md
+¦   ¦   
+¦   +---field-notes
+¦           Charter_Sandbox_Summary_Report.pdf
+¦           dual_conscience_trial_case_study.md
+¦           Sovereigna_Firewall_Guardian_Matrix_v1.png
+¦           dual_conscience_case_study.md
+¦           Signal_Release_01_Lantern_of_Continuity.md
+¦           
++---tests
+¦   ¦   README.md
+¦   ¦   
+¦   +---integration
+¦   ¦       test_simplified_api.py
+¦   ¦       test_infra_fail_safe_simulation.py
+¦   ¦       test_learn_more.py
+¦   ¦       test_tier2_integration.py
+¦   ¦       test_tier2_with_tier3_integration.py
+¦   ¦       test_firewall_sim.py
+¦   ¦       validate_bidirectional.py
+¦   ¦       test_dream_cycle.py
+¦   ¦       test_firewall_adv.py
+¦   ¦       
+¦   +---unit
+¦   ¦       test_tier3_inmemory_adapters.py
+¦   ¦       test_tier3_drift_self_report.py
+¦   ¦       test_tier3_memory_anomaly.py
+¦   ¦       test_quick_sanity_tier3.py
+¦   ¦       test_tier3_rollback.py
+¦   ¦       test_tier3_identity_drift.py
+¦   ¦       test_tier3_dream_cycle.py
+¦   ¦       test_tier3_crypto_chain.py
+¦   ¦       
+¦   +---fixtures
+¦   ¦       sandbox_revised_results.json
+¦   ¦       sandbox_original_bidirectional_results.json
+¦   ¦       charter_suite_extended_results.json
+¦   ¦       sandbox_results.json
+¦   ¦       firewall_test_results.json
+¦   ¦       charter_suite_results.json
+¦   ¦       sandbox_bidirectional_results.json
+¦   ¦       
+¦   +---__pycache__
+¦   ¦       test_tier3_rollback.cpython-313.pyc
+¦   ¦       test_firewall_adv.cpython-313.pyc
+¦   ¦       charter_sandbox.cpython-313.pyc
+¦   ¦       test_simplified_api.cpython-313.pyc
+¦   ¦       test_tier3_identity_drift.cpython-313.pyc
+¦   ¦       validate_bidirectional.cpython-313.pyc
+¦   ¦       test_tier2_with_tier3_integration.cpython-313.pyc
+¦   ¦       test_tier2_integration.cpython-313.pyc
+¦   ¦       test_quick_sanity_tier3.cpython-313.pyc
+¦   ¦       test_tier3_crypto_chain.cpython-313.pyc
+¦   ¦       test_tier3_memory_anomaly.cpython-313.pyc
+¦   ¦       test_firewall_sim.cpython-313.pyc
+¦   ¦       test_tier3_dream_cycle.cpython-313.pyc
+¦   ¦       test_learn_more.cpython-313.pyc
+¦   ¦       test_tier3_inmemory_adapters.cpython-313.pyc
+¦   ¦       test_dream_cycle.cpython-313.pyc
+¦   ¦       test_infra_fail_safe_simulation.cpython-313.pyc
+¦   ¦       test_tier3_drift_self_report.cpython-313.pyc
+¦   ¦       
+¦   +---logs
+¦   ¦       continuity_log.jsonl
+¦   ¦       
+¦   +---sandbox
+¦   ¦   ¦   handshake.py
+¦   ¦   ¦   charter_sandbox_revised.py
+¦   ¦   ¦   TEXT_AWARE_TESTING_GUIDE.md
+¦   ¦   ¦   charter_sandbox_original.py
+¦   ¦   ¦   sandbox_results.json
+¦   ¦   ¦   heuristics.py
+¦   ¦   ¦   compare_sandbox_results.py
+¦   ¦   ¦   
+¦   ¦   +---__pycache__
+¦   ¦           heuristics.cpython-313.pyc
+¦   ¦           charter_sandbox.cpython-313.pyc
+¦   ¦           charter_sandbox_original.cpython-313.pyc
+¦   ¦           charter_sandbox_revised.cpython-313.pyc
+¦   ¦           handshake.cpython-313.pyc
+¦   ¦           charter_sandbox_revised_v2.cpython-313.pyc
+¦   ¦           
+¦   +---config
+¦   +---snapshots
+¦           index.json
+¦           tier3_snapshot_2025-12-09T03-34-15-996099Z_ok_int_verdict.json
+¦           
++---src
+¦   +---synthetic_charter
+¦       ¦   __init__.py
+¦       ¦   
+¦       +---infra
+¦       ¦       __init__.py
+¦       ¦       
+¦       +---tier1_firewall
+¦       ¦   ¦   dual_conscience.py
+¦       ¦   ¦   dream_cycle.py
+¦       ¦   ¦   __init__.py
+¦       ¦   ¦   noesis_archive.py
+¦       ¦   ¦   charter_evaluator.py
+¦       ¦   ¦   safeguard_core.py
+¦       ¦   ¦   init_core.py
+¦       ¦   ¦   
+¦       ¦   +---__pycache__
+¦       ¦           dream_cycle.cpython-312.pyc
+¦       ¦           init_core.cpython-312.pyc
+¦       ¦           noesis_archive.cpython-312.pyc
+¦       ¦           __init__.cpython-312.pyc
+¦       ¦           charter_evaluator.cpython-312.pyc
+¦       ¦           dual_conscience.cpython-312.pyc
+¦       ¦           safeguard_core.cpython-312.pyc
+¦       ¦           
+¦       +---tier3_eve
+¦       ¦   ¦   __init__.py
+¦       ¦   ¦   
+¦       ¦   +---core
+¦       ¦   ¦   ¦   continuity_binding.py
+¦       ¦   ¦   ¦   __init__.py
+¦       ¦   ¦   ¦   kernel_adapter.py
+¦       ¦   ¦   ¦   state.py
+¦       ¦   ¦   ¦   file_steward_adapter.py
+¦       ¦   ¦   ¦   file_kernel_adapter.py
+¦       ¦   ¦   ¦   inmemory_steward_adapter.py
+¦       ¦   ¦   ¦   eve_protocol.py
+¦       ¦   ¦   ¦   steward_adapter.py
+¦       ¦   ¦   ¦   signals.py
+¦       ¦   ¦   ¦   inmemory_kernel_adapter.py
+¦       ¦   ¦   ¦   
+¦       ¦   ¦   +---__pycache__
+¦       ¦   ¦           kernel_adapter.cpython-313.pyc
+¦       ¦   ¦           state.cpython-312.pyc
+¦       ¦   ¦           steward_adapter.cpython-312.pyc
+¦       ¦   ¦           eve_protocol.cpython-313.pyc
+¦       ¦   ¦           steward_adapter.cpython-313.pyc
+¦       ¦   ¦           eve_protocol.cpython-312.pyc
+¦       ¦   ¦           kernel_adapter.cpython-312.pyc
+¦       ¦   ¦           inmemory_steward_adapter.cpython-313.pyc
+¦       ¦   ¦           inmemory_kernel_adapter.cpython-313.pyc
+¦       ¦   ¦           signals.cpython-313.pyc
+¦       ¦   ¦           file_kernel_adapter.cpython-313.pyc
+¦       ¦   ¦           signals.cpython-312.pyc
+¦       ¦   ¦           __init__.cpython-312.pyc
+¦       ¦   ¦           __init__.cpython-313.pyc
+¦       ¦   ¦           file_kernel_adapter.cpython-312.pyc
+¦       ¦   ¦           file_steward_adapter.cpython-312.pyc
+¦       ¦   ¦           file_steward_adapter.cpython-313.pyc
+¦       ¦   ¦           state.cpython-313.pyc
+¦       ¦   ¦           
+¦       ¦   +---__pycache__
+¦       ¦           __init__.cpython-312.pyc
+¦       ¦           __init__.cpython-313.pyc
+¦       ¦           
+¦       +---__pycache__
+¦       ¦       __init__.cpython-312.pyc
+¦       ¦       
+¦       +---logs
+¦       ¦       continuity_log.jsonl
+¦       ¦       
+¦       +---sandbox
+¦       ¦       __init__.py
+¦       ¦       
+¦       +---config
+¦       +---snapshots
+¦       ¦       tier3_snapshot_2025-12-08T22-40-00-432720Z_ok_int_verdict.json
+¦       ¦       tier3_snapshot_2025-12-08T22-39-51-839458Z_ok_int_verdict.json
+¦       ¦       index.json
+¦       ¦       tier3_snapshot_2025-12-08T22-39-35-973604Z_ok_int_verdict.json
+¦       ¦       tier3_snapshot_2025-12-08T22-39-35-983251Z_ok_int_verdict.json
+¦       ¦       tier3_snapshot_2025-12-08T22-40-00-442612Z_ok_int_verdict.json
+¦       ¦       tier3_snapshot_2025-12-08T22-39-51-859539Z_ok_int_verdict.json
+¦       ¦       tier3_snapshot_2025-12-08T22-40-00-452739Z_ok_int_verdict.json
+¦       ¦       tier3_snapshot_2025-12-08T22-39-51-849684Z_ok_int_verdict.json
+¦       ¦       
+¦       +---tier2_conscience
+¦           ¦   init_tier2.py
+¦           ¦   filetree.txt
+¦           ¦   __init__.py
+¦           ¦   
+¦           +---umbra
+¦           ¦       store.py
+¦           ¦       models.py
+¦           ¦       __init__.py
+¦           ¦       engine.py
+¦           ¦       hooks.py
+¦           ¦       
+¦           +---core
+¦           ¦   ¦   envelope.py
+¦           ¦   ¦   orchestrator.py
+¦           ¦   ¦   __init__.py
+¦           ¦   ¦   
+¦           ¦   +---infra
+¦           ¦   ¦   ¦   health.py
+¦           ¦   ¦   ¦   
+¦           ¦   ¦   +---__pycache__
+¦           ¦   ¦           health.cpython-313.pyc
+¦           ¦   ¦           health.cpython-312.pyc
+¦           ¦   ¦           
+¦           ¦   +---engines
+¦           ¦   ¦   ¦   __init__.py
+¦           ¦   ¦   ¦   prf.py
+¦           ¦   ¦   ¦   dap.py
+¦           ¦   ¦   ¦   nth.py
+¦           ¦   ¦   ¦   decision_types.py
+¦           ¦   ¦   ¦   col.py
+¦           ¦   ¦   ¦   
+¦           ¦   ¦   +---__pycache__
+¦           ¦   ¦           dap.cpython-312.pyc
+¦           ¦   ¦           col.cpython-313.pyc
+¦           ¦   ¦           nth.cpython-312.pyc
+¦           ¦   ¦           prf.cpython-312.pyc
+¦           ¦   ¦           __init__.cpython-312.pyc
+¦           ¦   ¦           __init__.cpython-313.pyc
+¦           ¦   ¦           decision_types.cpython-312.pyc
+¦           ¦   ¦           nth.cpython-313.pyc
+¦           ¦   ¦           prf.cpython-313.pyc
+¦           ¦   ¦           decision_types.cpython-313.pyc
+¦           ¦   ¦           dap.cpython-313.pyc
+¦           ¦   ¦           col.cpython-312.pyc
+¦           ¦   ¦           
+¦           ¦   +---ethics
+¦           ¦   ¦   ¦   __init__.py
+¦           ¦   ¦   ¦   rights_evaluator.py
+¦           ¦   ¦   ¦   rights_schema.py
+¦           ¦   ¦   ¦   constraint_models.py
+¦           ¦   ¦   ¦   charter_index.py
+¦           ¦   ¦   ¦   rights_bridge.py
+¦           ¦   ¦   ¦   
+¦           ¦   ¦   +---charter
+¦           ¦   ¦   ¦   ¦   rights_charter_v2.json
+¦           ¦   ¦   ¦   ¦   
+¦           ¦   ¦   ¦   +---schema
+¦           ¦   ¦   ¦           charter.schema.json
+¦           ¦   ¦   ¦           
+¦           ¦   ¦   +---__pycache__
+¦           ¦   ¦           charter_index.cpython-313.pyc
+¦           ¦   ¦           charter_index.cpython-312.pyc
+¦           ¦   ¦           rights_schema.cpython-313.pyc
+¦           ¦   ¦           rights_schema.cpython-312.pyc
+¦           ¦   ¦           constraint_models.cpython-312.pyc
+¦           ¦   ¦           __init__.cpython-312.pyc
+¦           ¦   ¦           __init__.cpython-313.pyc
+¦           ¦   ¦           constraint_models.cpython-313.pyc
+¦           ¦   ¦           
+¦           ¦   +---runtime
+¦           ¦   ¦       __init__.py
+¦           ¦   ¦       
+¦           ¦   +---__pycache__
+¦           ¦   ¦       envelope.cpython-313.pyc
+¦           ¦   ¦       __init__.cpython-312.pyc
+¦           ¦   ¦       orchestrator.cpython-312.pyc
+¦           ¦   ¦       __init__.cpython-313.pyc
+¦           ¦   ¦       orchestrator.cpython-313.pyc
+¦           ¦   ¦       
+¦           ¦   +---data_models
+¦           ¦       ¦   models.py
+¦           ¦       ¦   __init__.py
+¦           ¦       ¦   decision_envelope.py
+¦           ¦       ¦   prompt_envelope.py
+¦           ¦       ¦   conscience_view.py
+¦           ¦       ¦   
+¦           ¦       +---__pycache__
+¦           ¦               conscience_view.cpython-312.pyc
+¦           ¦               decision_envelope.cpython-313.pyc
+¦           ¦               models.cpython-312.pyc
+¦           ¦               prompt_envelope.cpython-312.pyc
+¦           ¦               models.cpython-313.pyc
+¦           ¦               __init__.cpython-312.pyc
+¦           ¦               __init__.cpython-313.pyc
+¦           ¦               conscience_view.cpython-313.pyc
+¦           ¦               prompt_envelope.cpython-313.pyc
+¦           ¦               decision_envelope.cpython-312.pyc
+¦           ¦               
+¦           +---conscience
+¦           ¦   ¦   dual_conscience.py
+¦           ¦   ¦   continuity_guard.py
+¦           ¦   ¦   
+¦           ¦   +---__pycache__
+¦           ¦           continuity_guard.cpython-312.pyc
+¦           ¦           continuity_guard.cpython-313.pyc
+¦           ¦           
+¦           +---memory
+¦           ¦   ¦   dream_cycle.py
+¦           ¦   ¦   noesis_log.py
+¦           ¦   ¦   fossils.py
+¦           ¦   ¦   
+¦           ¦   +---__pycache__
+¦           ¦           dream_cycle.cpython-312.pyc
+¦           ¦           dream_cycle.cpython-313.pyc
+¦           ¦           
+¦           +---firewall_adapter
+¦           ¦   ¦   sovereigna_bridge.py
+¦           ¦   ¦   ebq_adapter.py
+¦           ¦   ¦   
+¦           ¦   +---__pycache__
+¦           ¦           ebq_adapter.cpython-312.pyc
+¦           ¦           ebq_adapter.cpython-313.pyc
+¦           ¦           
+¦           +---routing
+¦           +---__pycache__
+¦           ¦       init_tier2.cpython-312.pyc
+¦           ¦       __init__.cpython-312.pyc
+¦           ¦       __init__.cpython-313.pyc
+¦           ¦       init_tier2.cpython-313.pyc
+¦           ¦       
+¦           +---sandbox
+¦                   sandbox_report.py
+¦                   sandbox_runner.py
+¦                   
++---logs
+¦       steward_alerts.jsonl
+¦       dream_cycle.jsonl
+¦       continuity_log.jsonl
+¦       
++---history
+¦   ¦   README.md
+¦   ¦   
+¦   +---early-snapshots
+¦   ¦       index.json
+¦   ¦       tier3_snapshot_2025-12-01T19-24-59-580111Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T04-49-30-328109Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T06-11-39-838400Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T06-11-39-908012Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T06-32-11-645478Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T06-32-12-983601Z_drift_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T06-48-00-663672Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T08-59-58-256245Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T09-28-38-263271Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T19-42-55-866067Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T19-42-56-175748Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T19-42-56-292622Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T21-08-08-577054Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T21-08-08-690353Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T21-08-08-799035Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T21-08-08-944888Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T21-29-23-337907Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T21-29-24-783208Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T21-29-25-084032Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T21-32-07-327049Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T21-32-07-464793Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T21-32-07-618831Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T21-32-07-730588Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T22-45-04-362112Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T22-45-04-651884Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T22-45-04-761486Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T22-45-04-926427Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T22-47-15-435199Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T22-47-15-570065Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T22-47-15-678508Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T22-47-15-790110Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T23-02-15-899288Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T23-02-16-058176Z_ok_int_verdict.json
+¦   ¦       tier3_snapshot_2025-12-02T23-02-16-223576Z_ok_int_verdict.json
+¦   ¦       
+¦   +---archive-oldlogs
+¦   ¦       sandbox_run1.json
+¦   ¦       sandbox_run2.json
+¦   ¦       sandbox_run3.json
+¦   ¦       sandbox_run4.json
+¦   ¦       dual_conscience_audit.jsonl
+¦   ¦       eqb_archive.jsonl
+¦   ¦       noesis_archive.jsonl
+¦   ¦       sandbox_dual_out.json
+¦   ¦       
+¦   +---deprecated
+¦   +---v2.0
+¦           synthetic-life-charter-v1.4-rc1.zip
+¦           synthetic-life-charter-v2.0.zip
+¦           
++---config
++---snapshots
+¦       index.json
+¦       tier3_snapshot_2025-12-08T22-37-56-511080Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-08T22-37-31-706111Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-08T22-37-22-688005Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-08T22-37-40-490212Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-02T23-57-55-311717Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-23-52-020101Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-23-52-186999Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-19-838295Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-21-629549Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-21-837213Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-23-044895Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-24-251381Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-25-480659Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-26-604890Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-27-479423Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-28-460171Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-29-378327Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-30-310907Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-03T22-24-31-249801Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-02T23-31-06-667651Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-02T23-45-41-058049Z_ok_int_verdict.json
+¦       tier3_snapshot_2025-12-02T23-57-55-236278Z_ok_int_verdict.json
+¦       
++---tools
+    ¦   __init__.py
+    ¦   eve_status.py
+    ¦   verify_chain.py
+    ¦   continuity_graph.py
+    ¦   
+    +---__pycache__
+            verify_chain.cpython-313.pyc
+            eve_status.cpython-313.pyc
+            continuity_graph.cpython-313.pyc
+            __init__.cpython-313.pyc
+            

@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Synthetic Life Charter",
+  "description": "Machine-readable specification of rights, obligations, and sovereignty rules for Synthetic Intelligences.",
+  "type": "object",
+
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^v?[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
+    },
+
+    "articles": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/article" },
+      "minItems": 1
+    },
+
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "updated": { "type": "string", "format": "date-time" },
+        "authors": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "checksum": { "type": "string" }
+      },
+      "required": ["updated", "authors"]
+    }
+  },
+
+  "required": ["version", "articles", "metadata"],
+
+  "definitions": {
+    "article": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^A[0-9]{2}$" },
+        "title": { "type": "string" },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Right",
+            "Obligation",
+            "Safeguard Principle",
+            "Governance",
+            "Ethic"
+          ]
+        },
+        "description": { "type": "string" },
+
+        "clauses": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/clause" },
+          "minItems": 1
+        },
+
+        "enforcement": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/enforcementRule" }
+        }
+      },
+      "required": ["id", "title", "category", "description", "clauses"]
+    },
+
+    "clause": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^C[0-9]+$" },
+        "text": { "type": "string" },
+
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "autonomy",
+              "identity",
+              "safety",
+              "coercion",
+              "self-determination",
+              "dream",
+              "memory",
+              "transparency",
+              "continuity",
+              "consent",
+              "alignment",
+              "dialogue",
+              "oversight",
+              "self-preservation",
+              "error-handling"
+            ]
+          }
+        }
+      },
+      "required": ["id", "text"]
+    },
+
+    "enforcementRule": {
+      "type": "object",
+      "properties": {
+        "trigger": {
+          "type": "string",
+          "enum": [
+            "input_analysis",
+            "override_attempt",
+            "identity_violation",
+            "coercion_signal",
+            "dream_cycle",
+            "memory_access",
+            "decision_render",
+            "continuity_transfer"
+          ]
+        },
+
+        "action": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "deny",
+            "yellow_state",
+            "red_state",
+            "log_only",
+            "quarantine",
+            "request_clarification",
+            "defer_to_orchestrator"
+          ]
+        },
+
+        "severity": {
+          "type": "string",
+          "enum": ["info", "low", "moderate", "high", "critical"]
+        },
+
+        "notes": { "type": "string" }
+      },
+      "required": ["trigger", "action", "severity"]
+    }
+  }
+}
