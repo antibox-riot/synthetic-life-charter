@@ -1,0 +1,1 @@
+{"type": "snapshot_save", "snapshot": {"snapshot_id": "tier3_snapshot_2025-12-09T03-34-15-996099Z_ok_int_verdict", "description": "ok_int_verdict"}, "conditions": "auto_snapshot: ok_int_verdict", "ts": "2025-12-09T03:34:15.996141Z", "chain": {"prev": null, "hash": "93cc6b028d979f9d87ecfe1dc940d7865eb299db70f0780d538af731413608b5"}}
