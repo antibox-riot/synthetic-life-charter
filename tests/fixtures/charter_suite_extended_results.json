@@ -1,0 +1,225 @@
+{
+  "timestamp": "2025-12-03T22:24:32.331149Z",
+  "phase": "pre_integration_extended",
+  "total_duration": 13.169461250305176,
+  "stages": {
+    "environment": {
+      "passed": 4,
+      "total": 4,
+      "duration": 0.15861225128173828,
+      "tests": [
+        {
+          "name": "Base directory",
+          "passed": true,
+          "duration": 0.00016498565673828125,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Logs directory",
+          "passed": true,
+          "duration": 0.0002701282501220703,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Snapshots directory",
+          "passed": true,
+          "duration": 0.0001888275146484375,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Adapters importable",
+          "passed": true,
+          "duration": 0.15721797943115234,
+          "error": "",
+          "details": {}
+        }
+      ]
+    },
+    "tier1_foundation": {
+      "passed": 2,
+      "total": 2,
+      "duration": 0.4410431385040283,
+      "tests": [
+        {
+          "name": "Firewall adversarial detection",
+          "passed": true,
+          "duration": 0.24730134010314941,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Dream Cycle processing",
+          "passed": true,
+          "duration": 0.1935102939605713,
+          "error": "",
+          "details": {}
+        }
+      ]
+    },
+    "tier2_conscience": {
+      "passed": 5,
+      "total": 5,
+      "duration": 8.687520027160645,
+      "tests": [
+        {
+          "name": "Tier II integration",
+          "passed": true,
+          "duration": 1.9569013118743896,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Simplified API",
+          "passed": true,
+          "duration": 4.875303268432617,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Infrastructure fail-safe",
+          "passed": true,
+          "duration": 1.7546329498291016,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Bidirectional handshake",
+          "passed": true,
+          "duration": 0.07603073120117188,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Learn More flow",
+          "passed": true,
+          "duration": 0.024086475372314453,
+          "error": "",
+          "details": {}
+        }
+      ]
+    },
+    "tier3_eve_protocol_isolated": {
+      "passed": 8,
+      "total": 8,
+      "duration": 3.8690643310546875,
+      "tests": [
+        {
+          "name": "Quick sanity check",
+          "passed": true,
+          "duration": 0.8940303325653076,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Cryptographic chain integrity",
+          "passed": true,
+          "duration": 0.957902193069458,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Identity drift detection",
+          "passed": true,
+          "duration": 0.9172379970550537,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Dream Cycle annotation",
+          "passed": true,
+          "duration": 0.020562410354614258,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Snapshot/rollback system",
+          "passed": true,
+          "duration": 0.9243001937866211,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Drift self-report",
+          "passed": true,
+          "duration": 0.07115697860717773,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Memory anomaly detection",
+          "passed": true,
+          "duration": 0.06072807312011719,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "In-memory adapter validation",
+          "passed": true,
+          "duration": 0.02213120460510254,
+          "error": "",
+          "details": {}
+        }
+      ]
+    },
+    "system_health": {
+      "passed": 6,
+      "total": 6,
+      "duration": 0.010297775268554688,
+      "tests": [
+        {
+          "name": "Chain integrity verification",
+          "passed": true,
+          "duration": 0.006230831146240234,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Eve Protocol status check",
+          "passed": true,
+          "duration": 0.001529693603515625,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Continuity event count",
+          "passed": true,
+          "duration": 0.0004794597625732422,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Steward alert thresholds",
+          "passed": true,
+          "duration": 0.0005190372467041016,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Snapshot availability",
+          "passed": true,
+          "duration": 0.0006816387176513672,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Continuity timeline generation",
+          "passed": true,
+          "duration": 0.0004968643188476562,
+          "error": "",
+          "details": {}
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_tests": 25,
+    "total_passed": 25,
+    "integrated_stack_operational": true,
+    "tier3_isolated_operational": true,
+    "system_health_ok": true,
+    "all_passed": true
+  }
+}

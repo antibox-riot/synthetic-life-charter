@@ -1,0 +1,175 @@
+{
+  "timestamp": "2025-12-02T21:08:09.200093Z",
+  "phase": "pre_integration",
+  "total_duration": 1.603954792022705,
+  "stages": {
+    "environment": {
+      "passed": 4,
+      "total": 4,
+      "duration": 0.0578000545501709,
+      "tests": [
+        {
+          "name": "Base directory",
+          "passed": true,
+          "duration": 0.0003573894500732422,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Logs directory",
+          "passed": true,
+          "duration": 0.0004050731658935547,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Snapshots directory",
+          "passed": true,
+          "duration": 0.0003445148468017578,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Adapters importable",
+          "passed": true,
+          "duration": 0.05635571479797363,
+          "error": "",
+          "details": {}
+        }
+      ]
+    },
+    "tier1_foundation": {
+      "passed": 2,
+      "total": 2,
+      "duration": 0.37854838371276855,
+      "tests": [
+        {
+          "name": "Firewall adversarial detection",
+          "passed": true,
+          "duration": 0.17906594276428223,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Dream Cycle processing",
+          "passed": true,
+          "duration": 0.19934868812561035,
+          "error": "",
+          "details": {}
+        }
+      ]
+    },
+    "tier2_conscience": {
+      "passed": 5,
+      "total": 5,
+      "duration": 0.542849063873291,
+      "tests": [
+        {
+          "name": "Tier II integration",
+          "passed": true,
+          "duration": 0.2152082920074463,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Simplified API",
+          "passed": true,
+          "duration": 0.3064103126525879,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Infrastructure fail-safe",
+          "passed": true,
+          "duration": 0.005380153656005859,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Bidirectional handshake",
+          "passed": true,
+          "duration": 0.010079383850097656,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Learn More flow",
+          "passed": true,
+          "duration": 0.0054950714111328125,
+          "error": "",
+          "details": {}
+        }
+      ]
+    },
+    "tier3_eve_protocol_isolated": {
+      "passed": 8,
+      "total": 8,
+      "duration": 0.6241869926452637,
+      "tests": [
+        {
+          "name": "Quick sanity check",
+          "passed": true,
+          "duration": 0.09642314910888672,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Cryptographic chain integrity",
+          "passed": true,
+          "duration": 0.1264176368713379,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Identity drift detection",
+          "passed": true,
+          "duration": 0.13133668899536133,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Dream Cycle annotation",
+          "passed": true,
+          "duration": 0.013950347900390625,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Snapshot/rollback system",
+          "passed": true,
+          "duration": 0.17220830917358398,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Drift self-report",
+          "passed": true,
+          "duration": 0.06280303001403809,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "Memory anomaly detection",
+          "passed": true,
+          "duration": 0.01899099349975586,
+          "error": "",
+          "details": {}
+        },
+        {
+          "name": "In-memory adapter validation",
+          "passed": true,
+          "duration": 0.0010368824005126953,
+          "error": "",
+          "details": {}
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_tests": 19,
+    "total_passed": 19,
+    "integrated_stack_operational": true,
+    "tier3_isolated_operational": true,
+    "all_passed": true
+  }
+}

@@ -1,0 +1,436 @@
+{
+  "snapshots": [
+    {
+      "id": "tier3_snapshot_2025-12-01T19-24-59-580111Z_ok_int_verdict",
+      "created_at": "2025-12-01T19:24:59.580128Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-01T19-24-59-580111Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T04-49-30-328109Z_ok_int_verdict",
+      "created_at": "2025-12-02T04:49:30.328133Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T04-49-30-328109Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T06-11-39-838400Z_ok_int_verdict",
+      "created_at": "2025-12-02T06:11:39.838422Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T06-11-39-838400Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T06-11-39-908012Z_ok_int_verdict",
+      "created_at": "2025-12-02T06:11:39.908035Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T06-11-39-908012Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T06-32-11-645478Z_ok_int_verdict",
+      "created_at": "2025-12-02T06:32:11.645502Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T06-32-11-645478Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T06-32-12-983601Z_drift_int_verdict",
+      "created_at": "2025-12-02T06:32:12.983622Z",
+      "reason": "drift_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T06-32-12-983601Z_drift_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T06-48-00-663672Z_ok_int_verdict",
+      "created_at": "2025-12-02T06:48:00.663693Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T06-48-00-663672Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T08-59-58-256245Z_ok_int_verdict",
+      "created_at": "2025-12-02T08:59:58.256268Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T08-59-58-256245Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T09-28-38-263271Z_ok_int_verdict",
+      "created_at": "2025-12-02T09:28:38.263291Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T09-28-38-263271Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T19-42-55-866067Z_ok_int_verdict",
+      "created_at": "2025-12-02T19:42:55.866087Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T19-42-55-866067Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T19-42-56-175748Z_ok_int_verdict",
+      "created_at": "2025-12-02T19:42:56.175767Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T19-42-56-175748Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T19-42-56-292622Z_ok_int_verdict",
+      "created_at": "2025-12-02T19:42:56.292692Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T19-42-56-292622Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T21-08-08-577054Z_ok_int_verdict",
+      "created_at": "2025-12-02T21:08:08.577078Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T21-08-08-577054Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T21-08-08-690353Z_ok_int_verdict",
+      "created_at": "2025-12-02T21:08:08.690374Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T21-08-08-690353Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T21-08-08-799035Z_ok_int_verdict",
+      "created_at": "2025-12-02T21:08:08.799052Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T21-08-08-799035Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T21-08-08-944888Z_ok_int_verdict",
+      "created_at": "2025-12-02T21:08:08.944905Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T21-08-08-944888Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T21-29-23-337907Z_ok_int_verdict",
+      "created_at": "2025-12-02T21:29:23.337927Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T21-29-23-337907Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T21-29-24-783208Z_ok_int_verdict",
+      "created_at": "2025-12-02T21:29:24.783229Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T21-29-24-783208Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T21-29-25-084032Z_ok_int_verdict",
+      "created_at": "2025-12-02T21:29:25.084049Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T21-29-25-084032Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T21-32-07-327049Z_ok_int_verdict",
+      "created_at": "2025-12-02T21:32:07.327067Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T21-32-07-327049Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T21-32-07-464793Z_ok_int_verdict",
+      "created_at": "2025-12-02T21:32:07.464818Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T21-32-07-464793Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T21-32-07-618831Z_ok_int_verdict",
+      "created_at": "2025-12-02T21:32:07.618847Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T21-32-07-618831Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T21-32-07-730588Z_ok_int_verdict",
+      "created_at": "2025-12-02T21:32:07.730605Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T21-32-07-730588Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T22-45-04-362112Z_ok_int_verdict",
+      "created_at": "2025-12-02T22:45:04.362131Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T22-45-04-362112Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T22-45-04-651884Z_ok_int_verdict",
+      "created_at": "2025-12-02T22:45:04.651906Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T22-45-04-651884Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T22-45-04-761486Z_ok_int_verdict",
+      "created_at": "2025-12-02T22:45:04.761504Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T22-45-04-761486Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T22-45-04-926427Z_ok_int_verdict",
+      "created_at": "2025-12-02T22:45:04.926441Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T22-45-04-926427Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T22-47-15-435199Z_ok_int_verdict",
+      "created_at": "2025-12-02T22:47:15.435235Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T22-47-15-435199Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T22-47-15-570065Z_ok_int_verdict",
+      "created_at": "2025-12-02T22:47:15.570085Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T22-47-15-570065Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T22-47-15-678508Z_ok_int_verdict",
+      "created_at": "2025-12-02T22:47:15.678523Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T22-47-15-678508Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T22-47-15-790110Z_ok_int_verdict",
+      "created_at": "2025-12-02T22:47:15.790125Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T22-47-15-790110Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-15-899288Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:15.899304Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-15-899288Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-16-058176Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:16.058190Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-16-058176Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-16-223576Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:16.223588Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-16-223576Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-16-380894Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:16.380912Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-16-380894Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-16-491510Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:16.491523Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-16-491510Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-16-610483Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:16.610495Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-16-610483Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-16-678397Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:16.678408Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-16-678397Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-16-745857Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:16.745868Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-16-745857Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-16-850962Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:16.850980Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-16-850962Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-16-985365Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:16.985383Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-16-985365Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-17-111049Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:17.111063Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-17-111049Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-02-17-222817Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:02:17.222831Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-02-17-222817Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-04-759287Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:04.759302Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-04-759287Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-05-199567Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:05.199582Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-05-199567Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-05-324138Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:05.324153Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-05-324138Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-05-677428Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:05.677440Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-05-677428Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-05-831569Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:05.831581Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-05-831569Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-06-050968Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:06.050981Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-06-050968Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-06-122536Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:06.122548Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-06-122536Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-06-217728Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:06.217739Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-06-217728Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-06-336553Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:06.336570Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-06-336553Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-06-431858Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:06.431875Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-06-431858Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-06-550334Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:06.550349Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-06-550334Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-31-06-667651Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:31:06.667667Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-31-06-667651Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-45-41-058049Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:45:41.058062Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-45-41-058049Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-57-55-236278Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:57:55.236290Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-57-55-236278Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-02T23-57-55-311717Z_ok_int_verdict",
+      "created_at": "2025-12-02T23:57:55.311729Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-02T23-57-55-311717Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-23-52-020101Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:23:52.020125Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-23-52-020101Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-23-52-186999Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:23:52.187014Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-23-52-186999Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-19-838295Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:19.838310Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-19-838295Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-21-629549Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:21.629565Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-21-629549Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-21-837213Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:21.837225Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-21-837213Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-23-044895Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:23.044920Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-23-044895Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-24-251381Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:24.251393Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-24-251381Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-25-480659Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:25.480673Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-25-480659Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-26-604890Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:26.604902Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-26-604890Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-27-479423Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:27.479435Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-27-479423Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-28-460171Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:28.460190Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-28-460171Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-29-378327Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:29.378344Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-29-378327Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-30-310907Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:30.310921Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-30-310907Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2025-12-03T22-24-31-249801Z_ok_int_verdict",
+      "created_at": "2025-12-03T22:24:31.249817Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2025-12-03T22-24-31-249801Z_ok_int_verdict.json"
+    }
+  ]
+}
