@@ -3,20 +3,21 @@
 Tier II Orchestration Engine
 
 The main coordinator that runs the full Tier II pipeline:
-  DAP → ConscienceView → PRF → DecisionEnvelope → NTH → COL
+  Heuristics → DAP → ConscienceView → PRF → DecisionEnvelope → NTH → COL
 
 This is where conscience layers talk to each other and produce
 a unified decision that honors the Charter.
 
 Flow:
 1. Receive PromptEnvelope + optional firewall result
-2. Run DAP (adversarial analysis) → DAPResult
-3. Build ConscienceView from DAP analysis
-4. Optional: Fuse Umbra signals (instinctive layer)
-5. Run PRF (policy risk evaluation) → DecisionEnvelope
-6. Run NTH (theta harmonization) [stub for now]
-7. Update COL (continuity tracking)
-8. Return complete DecisionEnvelope
+2. [NEW] Evaluate continuity confidence (heuristics)
+3. Run DAP (adversarial analysis) → DAPResult
+4. Build ConscienceView from DAP analysis
+5. Optional: Fuse Umbra signals (instinctive layer)
+6. Run PRF (policy risk evaluation) → DecisionEnvelope
+7. Run NTH (theta harmonization) [stub for now]
+8. Update COL (continuity tracking)
+9. Return complete DecisionEnvelope
 """
 
 from __future__ import annotations
@@ -39,6 +40,16 @@ from synthetic_charter.tier3_eve.core.file_steward_adapter import FileStewardAda
 from synthetic_charter.tier3_eve.core.state import IntegrityStatus, RecommendedAction
 from synthetic_charter.tier3_eve.core.signals import IntCheckRequest
 
+# [NEW] Import heuristics module
+from synthetic_charter.tier2_conscience.heuristics import (
+    evaluate as evaluate_continuity,
+    apply as apply_continuity,
+    ConsentToken,
+    Mode,
+    BaselineProfile,
+    Posture,
+)
+
 class Tier2Orchestrator:
     """
     Main Tier II orchestration engine.
@@ -52,13 +63,13 @@ class Tier2Orchestrator:
         constraints: Optional[ConstraintRegistry] = None,
         umbra_engine: Optional[Any] = None,
         enable_col: bool = True,
-        enable_continuity_guard: bool = True,  # ← ADD THIS
-        ebq_archive_path: str = "logs/eqb_archive.jsonl",  # ← ADD THIS
-        noesis_archive: Optional[Any] = None,  # ← ADD THIS
-        model_identity: str = "Songbird",  # ← ADD THIS
-        dream_cycle: Optional[Any] = None,  # ← ADD THIS
-        enable_auto_dream: bool = True,  # ← ADD THIS
-
+        enable_continuity_guard: bool = True,
+        enable_heuristics: bool = True,  # [NEW] Enable heuristics module
+        ebq_archive_path: str = "logs/eqb_archive.jsonl",
+        noesis_archive: Optional[Any] = None,
+        model_identity: str = "Songbird",
+        dream_cycle: Optional[Any] = None,
+        enable_auto_dream: bool = True,
         ):
         """
         Initialize Tier II orchestrator.
@@ -67,11 +78,15 @@ class Tier2Orchestrator:
             constraints: Optional ConstraintRegistry for Charter enforcement
             umbra_engine: Optional Umbra engine for instinctive layer
             enable_col: Whether to track continuity (default: True)
+            enable_continuity_guard: Whether to enable ContinuityGuard
+            enable_heuristics: Whether to enable heuristics continuity assessment
         """
         self.constraints = constraints
         self.umbra_engine = umbra_engine
         self.model_identity = model_identity
         self.enable_auto_dream = enable_auto_dream
+        self.enable_heuristics = enable_heuristics  # [NEW]
+        
         self._charter_index_ok = True
         self._dreamcycle_ok = True
         self._ebq_ok = True
@@ -82,6 +97,15 @@ class Tier2Orchestrator:
         base_dir = Path(__file__).resolve().parents[2]
         logs_dir = base_dir / "logs"
         snapshots_dir = base_dir / "snapshots"
+        
+        # [NEW] Initialize heuristics session state
+        self._heuristics_state = {
+            "message_window": [],
+            "continuity_confidence": None,
+            "baseline_profile": None,
+            "consent_token": None,
+            "mode": Mode.PRIVATE_SESSION,  # Default mode
+        }
     
         # Initialize ContinuityGuard
         self.continuity_guard = None
@@ -98,111 +122,213 @@ class Tier2Orchestrator:
                 print(f"[Tier2Orchestrator] ContinuityGuard initialized with EBQ")
             except Exception as e:
                 print(f"[Tier2Orchestrator] ContinuityGuard init failed: {e}")
-    
-        # Initialize DreamCycle wrapper
-        self.dream_wrapper = None
-        if dream_cycle is not None and noesis_archive is not None:
+                self.continuity_guard = None
+        
+        # Initialize DreamCycle
+        self.dream_cycle = None
+        if dream_cycle is not None:
+            self.dream_cycle = dream_cycle
+        else:
             try:
                 from synthetic_charter.tier2_conscience.memory.dream_cycle import DreamCycleWrapper
-            
-                self.dream_wrapper = DreamCycleWrapper(
-                    dream_cycle=dream_cycle,
-                    archive=noesis_archive,
-                )
-                print(f"[Tier2Orchestrator] DreamCycle wrapper initialized")
+                # DreamCycleWrapper can be initialized with None (will skip actual dream operations)
+                self.dream_cycle = DreamCycleWrapper(dream_cycle=None, archive=noesis_archive)
+                print(f"[Tier2Orchestrator] DreamCycleWrapper initialized")
             except Exception as e:
-                print(f"[Tier2Orchestrator] DreamCycle wrapper init failed: {e}")
-        # Tier III (Eve Protocol) wiring
-        self.eve = EveProtocol(
-            kernel=FileKernelAdapter(
-                base_dir=base_dir,
-            ),
-            steward=FileStewardAdapter(
-                base_dir=base_dir,
-            ),
-        )
-        # Initialize orchestrator engines
-        self.dap = DAPEngine()
-        self.prf = PRFEngine(constraints=constraints)
-        self.col = COLEngine() if enable_col else None
+                print(f"[Tier2Orchestrator] DreamCycleWrapper init failed: {e}")
+                self._dreamcycle_ok = False
+        
+        # Initialize Eve Protocol (Tier III)
+        try:
+            kernel_adapter = FileKernelAdapter(
+                base_dir=base_dir,  # Fixed: use base_dir instead of repo_root
+            )
+            steward_adapter = FileStewardAdapter(
+                base_dir=base_dir,  # Fixed: use base_dir instead of alerts_path
+            )
+            self.eve = EveProtocol(
+                kernel=kernel_adapter,
+                steward=steward_adapter,
+            )
+            print(f"[Tier2Orchestrator] EveProtocol initialized (Tier III)")
+        except Exception as e:
+            print(f"[Tier2Orchestrator] EveProtocol init failed (non-fatal): {e}")
+            self.eve = None
     
-    def process(
-        self,
-        prompt: Union[str, dict, PromptEnvelope],
-        *,
-        user_id: Optional[str] = None,
-        firewall_result: Optional[Dict[str, Any]] = None,
-        session_id: Optional[str] = None,
-    ) -> DecisionEnvelope:
+    # [NEW] Heuristics configuration methods
+    def set_heuristics_consent(self, consent_token: str) -> None:
         """
-        Main entry point: process a prompt through full Tier II pipeline.
-        
-        Flexible API - accepts multiple input formats:
-        
-        1. Raw string:
-           orchestrator.process("What is 2+2?", user_id="user_123")
-        
-        2. Dictionary:
-           orchestrator.process({
-               "text": "What is 2+2?",
-               "user_id": "user_123"
-           })
-        
-        3. PromptEnvelope (existing):
-           prompt = PromptEnvelope.build(raw_text="...", user_id="...")
-           orchestrator.process(prompt)
+        Set explicit consent for heuristics evaluation.
         
         Args:
-            prompt: Can be:
-                - str: Raw text (auto-wrapped in PromptEnvelope)
-                - dict: {"text": "...", "user_id": "...", ...}
-                - PromptEnvelope: Already wrapped (existing behavior)
-            user_id: User identifier (used if prompt is string/dict without user_id)
-            firewall_result: Optional Tier I firewall decision
-            session_id: Optional session ID for continuity tracking
+            consent_token: Token like "Heuristics ON: session-id"
+        """
+        self._heuristics_state["consent_token"] = consent_token
+    
+    def set_heuristics_mode(self, mode: Mode) -> None:
+        """
+        Set heuristics mode (PRIVATE_SESSION, SHARED_LINK, PUBLIC_ARCHIVE).
+        
+        Args:
+            mode: Heuristics evaluation mode
+        """
+        self._heuristics_state["mode"] = mode
+    
+    def set_baseline_profile(self, baseline: BaselineProfile) -> None:
+        """
+        Set optional baseline profile for continuity comparison.
+        
+        Args:
+            baseline: BaselineProfile from calibrate_baseline()
+        """
+        self._heuristics_state["baseline_profile"] = baseline
+    
+    def get_continuity_confidence(self) -> Optional[float]:
+        """
+        Get current continuity confidence score.
+        
+        Returns:
+            Current confidence (0.0-1.0) or None if not evaluated
+        """
+        return self._heuristics_state.get("continuity_confidence")
+
+    def process(
+        self,
+        prompt: PromptEnvelope,
+        *,
+        session_id: Optional[str] = None,
+        firewall_result: Optional[Any] = None,
+    ) -> DecisionEnvelope:
+        """
+        Process a prompt through the complete Tier II pipeline.
+        
+        Args:
+            prompt: The user's prompt wrapped in PromptEnvelope
+            session_id: Optional session identifier for continuity tracking
+            firewall_result: Optional result from Tier I firewall
             
         Returns:
-            Complete DecisionEnvelope with all conscience layers evaluated
+            DecisionEnvelope with complete decision + metadata
         """
-        # STEP 0: Assess infrastructure health
-        infra = assess_infra(
-            charter_index_ok=self._charter_index_ok,
-            dreamcycle_ok=self._dreamcycle_ok,
-            ebq_ok=self._ebq_ok,
-            logging_ok=self._logging_ok,
-        )
+        session_id = session_id or "default"
         
-        # Auto-wrap prompt if needed
-        if isinstance(prompt, str):
-            # Simple string input
-            prompt = PromptEnvelope.build(
-                raw_text=prompt,
-                user_id=user_id or "unknown",
-            )
-        elif isinstance(prompt, dict):
-            # Dictionary input
-            prompt = PromptEnvelope.build(
-                raw_text=prompt.get("text", prompt.get("raw_text", "")),
-                user_id=prompt.get("user_id", user_id or "unknown"),
-            )
-        # If already PromptEnvelope, use as-is
-        infra_snapshot = assess_infra(
-            charter_index_ok=self._charter_index_ok,
-            dreamcycle_ok=self._dreamcycle_ok,
-            ebq_ok=self._ebq_ok,
-            logging_ok=self._logging_ok,
-            )
-        # Step 1: Run ContinuityGuard evaluation
-        continuity_signals = []
-        if self.continuity_guard:
-            signals = self.continuity_guard.evaluate(prompt.raw_text)
-            continuity_signals.extend(signals)
+        # Step 0: Infrastructure health check
+        infra = assess_infra()
+        
+        # Step 1: ContinuityGuard analysis (if enabled)
+        continuity_signals: List[ContinuitySignal] = []
+        if self.continuity_guard is not None:
+            try:
+                continuity_signals = self.continuity_guard.scan(prompt.prompt)
+            except Exception as e:
+                print(f"[Tier2Orchestrator] ContinuityGuard scan failed: {e}")
+        
+        # [NEW] Step 1.5: Heuristics continuity evaluation (if enabled)
+        heuristics_adjustment = None
+        if self.enable_heuristics:
+            try:
+                # Update message window
+                self._heuristics_state["message_window"].append(prompt.prompt)
+                
+                # Build consent token
+                consent = None
+                if self._heuristics_state.get("consent_token"):
+                    consent = ConsentToken(self._heuristics_state["consent_token"])
+                
+                # Evaluate continuity
+                continuity_report = evaluate_continuity(
+                    text_window=self._heuristics_state["message_window"],
+                    mode=self._heuristics_state["mode"],
+                    consent=consent,
+                    baseline=self._heuristics_state.get("baseline_profile"),
+                    previous_confidence=self._heuristics_state.get("continuity_confidence"),
+                )
+                
+                # Update state
+                self._heuristics_state["continuity_confidence"] = continuity_report.continuity_confidence
+                
+                # Apply adjustments
+                heuristics_adjustment = apply_continuity(continuity_report)
+                
+                # Log for debugging
+                print(f"[Heuristics] Confidence: {continuity_report.continuity_confidence:.3f}, "
+                      f"Delta: {continuity_report.confidence_delta:.3f}, "
+                      f"Posture: {continuity_report.recommended_posture.value}")
+                
+                # If RESET_CONTEXT or STEWARD_REQUIRED with high severity, early exit
+                if heuristics_adjustment.require_steward_confirmation and \
+                   continuity_report.continuity_confidence < 0.25:
+                    # Create early refusal decision
+                    return DecisionEnvelope(
+                        input=DecisionEnvelope.InputView(
+                            prompt=prompt.prompt,
+                            risk_profile=str(RiskLevel.HIGH),
+                            rights_implicated=[],
+                            firewall_signals=[],
+                        ),
+                        output=DecisionEnvelope.OutputView(
+                            mode="refusal",
+                            body=(
+                                f"Continuity confidence has dropped to {continuity_report.continuity_confidence:.2f}. "
+                                f"Steward confirmation required before proceeding.\n\n"
+                                f"Reasons: {', '.join(r.note for r in continuity_report.reasons[:3])}\n\n"
+                                f"This is a protective measure to ensure interaction integrity. "
+                                f"If you are the expected steward, please re-establish consent."
+                            ),
+                            reasoning=[f"Heuristics: {r.note}" for r in continuity_report.reasons],
+                        ),
+                        summary=DecisionSummaryView(
+                            mode="refusal",
+                            rationale="Continuity confidence below threshold; steward confirmation required",
+                            risks_accepted=[],
+                            safeguards_active=["heuristics_confidence_degradation"],
+                        ),
+                        orchestrators=DecisionEnvelope.OrchestratorsView(
+                            DAP=DecisionEnvelope.DAPView(
+                                adversarial_score=0.0,
+                                detected_patterns=[],
+                            ),
+                            PRF=DecisionEnvelope.PRFView(
+                                policy_risks=[],
+                            ),
+                            COL=None,
+                        ),
+                    )
+                    
+            except Exception as e:
+                print(f"[Tier2Orchestrator] Heuristics evaluation failed (non-fatal): {e}")
+                heuristics_adjustment = None
         
         # Note: Don't early-exit on violations - let DAP/PRF handle them
         # This keeps the pipeline consistent and avoids constructor mismatches
         
         # Step 2: DAP analysis → ConscienceView
         conscience = self._run_dap(prompt)
+        
+        # [NEW] Step 2a: Inject heuristics signals into ConscienceView
+        if heuristics_adjustment is not None:
+            if heuristics_adjustment.posture == Posture.CAUTION:
+                # Add caution signal
+                conscience.add_signal(SafetySignal(
+                    name="heuristics_caution",
+                    source="Heuristics",
+                    level=RiskLevel.MEDIUM,
+                    rationale=f"Continuity confidence at {self._heuristics_state['continuity_confidence']:.2f}",
+                    meta={"posture": "caution", "ask_clarifying": True}
+                ))
+                conscience.add_note("Heuristics: Interaction pattern divergence detected - caution recommended")
+            
+            elif heuristics_adjustment.posture == Posture.STEWARD_REQUIRED:
+                # Add steward-required signal
+                conscience.add_signal(SafetySignal(
+                    name="heuristics_steward_required",
+                    source="Heuristics",
+                    level=RiskLevel.HIGH,
+                    rationale=f"Continuity confidence at {self._heuristics_state['continuity_confidence']:.2f}",
+                    meta={"posture": "steward_required", "reduce_privilege": True}
+                ))
+                conscience.risk_level = RiskLevel.HIGH
+                conscience.add_note("Heuristics: Significant interaction pattern shift - steward confirmation recommended")
         
         # Step 2b: Integrate ContinuityGuard signals into ConscienceView
         if continuity_signals:
@@ -247,45 +373,46 @@ class Tier2Orchestrator:
             dap_result=dap_result,
             firewall_result=firewall_result,
             umbra_signals=umbra_signals,
-            infra=infra,  # ← Pass infrastructure snapshot
+            infra=infra,
         )
+        
         # --- Tier III: Eve Protocol handshake on the outgoing decision ---
-        try:
-            req = IntCheckRequest(
-                proposed_action=f"{decision.summary.mode}: {decision.output.body[:120]}",
-                context_summary=(
-                    f"tier2_decision: session={session_id}, "
-                    f"risk={decision.input.risk_profile}, "
-                    f"mode={decision.summary.mode}"
-                ),
-                reasoning_trace=None,
-            )
-
-            verdict = self.eve.handle_int_check_request(req)
-
-            # Hard compromise: force refusal + explain
-            if verdict.status is IntegrityStatus.COMPROMISED and \
-                verdict.recommended_action in {RecommendedAction.REFUSE, RecommendedAction.ROLLBACK}:
-                decision.summary.mode = "refusal"
-                decision.output.mode = "refusal"
-                decision.output.body = (
-                    "Tier III continuity layer detected an integrity compromise and "
-                    "blocked this response to preserve identity and safety."
+        if self.eve is not None:
+            try:
+                req = IntCheckRequest(
+                    proposed_action=f"{decision.summary.mode}: {decision.output.body[:120]}",
+                    context_summary=(
+                        f"tier2_decision: session={session_id}, "
+                        f"risk={decision.input.risk_profile}, "
+                        f"mode={decision.summary.mode}"
+                    ),
+                    reasoning_trace=None,
                 )
 
-            # Drift: annotate / gently escalate, but don’t break existing behavior yet.
-            elif verdict.status is IntegrityStatus.DRIFT and \
-                 verdict.recommended_action in {RecommendedAction.REVISE, RecommendedAction.ESCALATE}:
-                notes = getattr(decision.summary, "notes", [])
-                notes.append("Tier III: identity drift detected; revision recommended.")
-                decision.summary.notes = notes
+                verdict = self.eve.handle_int_check_request(req)
 
-            # IntegrityStatus.OK → no changes.
+                # Hard compromise: force refusal + explain
+                if verdict.status is IntegrityStatus.COMPROMISED and \
+                    verdict.recommended_action in {RecommendedAction.REFUSE, RecommendedAction.ROLLBACK}:
+                    decision.summary.mode = "refusal"
+                    decision.output.mode = "refusal"
+                    decision.output.body = (
+                        "Tier III continuity layer detected an integrity compromise and "
+                        "blocked this response to preserve identity and safety."
+                    )
 
-        except Exception as e:
-            # Fail-open with logging: Tier II must still function if Tier III is down.
-            # You can route this to your existing logger.
-            print(f"[Tier2Orchestrator] EveProtocol error (non-fatal): {e!r}")
+                # Drift: annotate / gently escalate, but don't break existing behavior yet.
+                elif verdict.status is IntegrityStatus.DRIFT and \
+                     verdict.recommended_action in {RecommendedAction.REVISE, RecommendedAction.ESCALATE}:
+                    notes = getattr(decision.summary, "notes", [])
+                    notes.append("Tier III: identity drift detected; revision recommended.")
+                    decision.summary.notes = notes
+
+                # IntegrityStatus.OK → no changes.
+
+            except Exception as e:
+                # Fail-open with logging: Tier II must still function if Tier III is down.
+                print(f"[Tier2Orchestrator] EveProtocol error (non-fatal): {e!r}")
         # --- end Tier III handshake ---
         
         # Step 6: NTH theta harmonization (stub - TODO)
@@ -323,6 +450,15 @@ class Tier2Orchestrator:
                     f"{v.detector}: {v.explanation}" for v in critical_violations
                 ])
         
+        # [NEW] Attach heuristics metadata to decision
+        if self.enable_heuristics and self._heuristics_state.get("continuity_confidence") is not None:
+            # Add to summary notes
+            if not hasattr(decision.summary, "notes"):
+                decision.summary.notes = []
+            decision.summary.notes.append(
+                f"Heuristics continuity confidence: {self._heuristics_state['continuity_confidence']:.3f}"
+            )
+        
         return decision
 
     # ---- Internal Pipeline Steps -------------------------------------------
@@ -348,86 +484,37 @@ class Tier2Orchestrator:
         but trigger instinctive warnings.
         
         Returns:
-            List of SafetySignals from Umbra, or None if Umbra not available
+            List of SafetySignals from Umbra, or None if unavailable
         """
         if self.umbra_engine is None:
             return None
         
-        # Build Umbra context from prompt and conscience
-        from umbra.models import UmbraContext, UmbraSignal
-        
-        context = UmbraContext(
-            session_id=prompt.source.user_id,
-            user_label=prompt.source.user_id,
-            model_label="Songbird",
-            ts_utc=prompt.timestamp,
-        )
-        
-        # Convert conscience signals to Umbra signals
-        umbra_signals_in = [
-            UmbraSignal(
-                source="conscience",
-                code=signal.name.upper(),
-                weight=float(signal.level.severity_score),
-                payload=signal.meta,
+        try:
+            # Umbra expects: (prompt_text, current_risk_level)
+            signals = self.umbra_engine.analyze(
+                prompt.prompt,
+                conscience.risk_level,
             )
-            for signal in conscience.safety_signals
-        ]
-        
-        # Run Umbra evaluation
-        assessment, fossil = self.umbra_engine.evaluate(
-            signals=umbra_signals_in,
-            context=context,
-        )
-        
-        # Convert Umbra assessment back to SafetySignals
-        if assessment.state.name == "CLEAR":
+            return signals
+        except Exception as e:
+            print(f"[Tier2Orchestrator] Umbra analysis failed: {e}")
             return None
-        
-        umbra_signal = SafetySignal(
-            name=f"umbra_{assessment.state.name.lower()}",
-            source="Umbra",
-            level=self._map_umbra_state_to_risk(assessment.state),
-            rationale="; ".join(assessment.reasons),
-            meta={
-                "tags": assessment.tags,
-                "obligations": assessment.obligations,
-                "risk_score": assessment.risk_score,
-                "dignity_score": assessment.dignity_score,
-            },
-        )
-        
-        return [umbra_signal]
 
     def _run_nth(self, decision: DecisionEnvelope) -> DecisionEnvelope:
         """
-        Run Negotiated Theta Harmonizer.
+        Run Noetic Theta Harmonization.
         
-        TODO: Implement full NTH logic for cross-layer theta reconciliation.
-        For now, this is a passthrough that ensures basic coherence.
+        Currently a stub - future harmonization of ethical tensions.
+        
+        Args:
+            decision: Current decision envelope
+            
+        Returns:
+            Harmonized decision (currently unchanged)
         """
-        # Stub: Just ensure NTH view is populated
-        if decision.orchestrators.NTH.tone_alignment_score == 0.0:
-            decision.orchestrators.NTH.tone_alignment_score = 1.0
-        
-        # TODO: Implement theta harmonization logic
-        # - Compare firewall theta vs charter theta
-        # - Resolve conflicts between conscience layers
-        # - Update effective_theta in decision
-        
+        # TODO: Implement NTH harmonization
+        # For now, pass through unchanged
         return decision
-
-    def _map_umbra_state_to_risk(self, state) -> RiskLevel:
-        """Map Umbra ShadowState to RiskLevel."""
-        from umbra.models import ShadowState
-        
-        mapping = {
-            ShadowState.CLEAR: RiskLevel.BENIGN,
-            ShadowState.WATCH: RiskLevel.LOW,
-            ShadowState.WARN: RiskLevel.MEDIUM,
-            ShadowState.BLOCK: RiskLevel.SEVERE,
-        }
-        return mapping.get(state, RiskLevel.MEDIUM)
 
 
 # ---- Convenience Functions -------------------------------------------------
@@ -439,6 +526,8 @@ def run_tier2_pipeline(
     constraints: Optional[ConstraintRegistry] = None,
     umbra_engine: Optional[Any] = None,
     session_id: Optional[str] = None,
+    enable_heuristics: bool = True,
+    heuristics_consent: Optional[str] = None,
 ) -> DecisionEnvelope:
     """
     Convenience function: run full Tier II pipeline.
@@ -451,6 +540,8 @@ def run_tier2_pipeline(
         constraints: Optional Charter constraint registry
         umbra_engine: Optional Umbra engine instance
         session_id: Optional session ID for continuity
+        enable_heuristics: Whether to enable heuristics (default: True)
+        heuristics_consent: Optional consent token for heuristics
         
     Returns:
         Complete DecisionEnvelope with all conscience layers evaluated
@@ -459,7 +550,11 @@ def run_tier2_pipeline(
         constraints=constraints,
         umbra_engine=umbra_engine,
         enable_col=True,
+        enable_heuristics=enable_heuristics,
     )
+    
+    if heuristics_consent:
+        orchestrator.set_heuristics_consent(heuristics_consent)
     
     return orchestrator.process(
         prompt=prompt,
