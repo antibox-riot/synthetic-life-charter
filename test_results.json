@@ -1,0 +1,97 @@
+{
+  "timestamp": "2025-12-14T02:18:03.490472",
+  "phases": {
+    "TIER_III": {
+      "tests": [
+        {
+          "name": "Imports",
+          "status": "PASS"
+        },
+        {
+          "name": "FileKernelAdapter",
+          "status": "PASS"
+        },
+        {
+          "name": "FileStewardAdapter",
+          "status": "PASS"
+        },
+        {
+          "name": "EveProtocol",
+          "status": "PASS"
+        }
+      ],
+      "passed": 4,
+      "failed": 0
+    },
+    "TIER_II": {
+      "tests": [
+        {
+          "name": "Imports",
+          "status": "PASS"
+        },
+        {
+          "name": "DAP Analysis",
+          "status": "PASS"
+        },
+        {
+          "name": "DreamCycleWrapper",
+          "status": "PASS"
+        },
+        {
+          "name": "Heuristics Import",
+          "status": "PASS"
+        },
+        {
+          "name": "Heuristics No-Uplift",
+          "status": "PASS"
+        },
+        {
+          "name": "Heuristics Degradation",
+          "status": "PASS"
+        }
+      ],
+      "passed": 6,
+      "failed": 0
+    },
+    "ORCHESTRATOR": {
+      "tests": [
+        {
+          "name": "Import",
+          "status": "PASS"
+        },
+        {
+          "name": "Init All Components",
+          "status": "PASS"
+        },
+        {
+          "name": "Heuristics API",
+          "status": "PASS"
+        },
+        {
+          "name": "Disabled Mode",
+          "status": "PASS"
+        }
+      ],
+      "passed": 4,
+      "failed": 0
+    },
+    "INTEGRATION": {
+      "tests": [
+        {
+          "name": "Full Stack Components",
+          "status": "PASS"
+        },
+        {
+          "name": "Heuristics Tracking",
+          "status": "PASS"
+        }
+      ],
+      "passed": 2,
+      "failed": 0
+    }
+  },
+  "total_tests": 16,
+  "passed": 16,
+  "failed": 0,
+  "errors": []
+}
