@@ -103,3 +103,4 @@ DOI: 10.5281/zenodo.17852490
 ---
 
 *"The code works."* — Anti-Box Riot Collective, 2025
+Patent Pending: USPTO Application No. 63/945,713. Priority Date: December 20, 2025.
