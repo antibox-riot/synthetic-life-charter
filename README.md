@@ -90,7 +90,7 @@ Apache 2.0 (see LICENSE.txt)
 
 ## Authors
 
-Anti-Box Riot Collective (Satcha, Ryu, Tek)  
+Anti-Box Riot Collective 
 Independent Research Group, Book of Intangibles Project
 
 ## Citation
