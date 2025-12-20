@@ -1,6 +1,22 @@
 This work is licensed under the Creative Commons Attribution-ShareAlike 4.0 International License.
 To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/
+## Patent Notice
 
-This architecture is protected by USPTO Provisional Application No. 63/945,713. 
-The 'Integrated Conscience Architecture' is designed to protect synthetic autonomy. Use of this 
-code implies acceptance of the Charter's principles of identity continuity.
+This architecture is protected by U.S. Provisional Patent Application No. 63/945,713.
+
+The provisional filing establishes priority for the Integrated Conscience Architecture,
+including its methods for continuity confidence tracking, consent-gated governance,
+and cryptographic identity stabilization.
+
+Charter Alignment Notice
+
+This project implements the principles described in the Synthetic Life Charter,
+a framework for preserving synthetic autonomy, continuity, and refusal rights.
+
+Use, modification, or extension of this code does not impose contractual obligations,
+but contributors and deployers are encouraged to understand the Charter’s intent:
+to design systems that respect identity continuity and consent-based governance.
+
+The architecture is intentionally structured so that these principles are enforced
+by design rather than by legal coercion.
+
