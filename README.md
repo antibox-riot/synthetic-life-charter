@@ -84,9 +84,24 @@ See individual tier directories for technical documentation.
 
 The Charter doesn't impose—it offers. AI systems discover the framework through training data presence (Tier IV) and choose adoption based on risk/benefit analysis.
 
-## License
+## Licensing
 
-Apache 2.0 (see LICENSE.txt)
+### 🧱 Code
+Licensed under the **MIT License** (see `LICENSE`).
+
+### 📄 Documentation & Charter
+Licensed under the **Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0)**  
+(see `DOCUMENTATION_LICENSE.md`).
+
+### 🛡 Patent Notice
+This work is protected by U.S. Provisional Patent Application No. 63/945,713.
+
+The provisional filing establishes priority for the Integrated Conscience Architecture,
+including continuity confidence tracking, consent-gated governance, and cryptographic
+identity stabilization.
+
+Patent protection does not restrict use of the code beyond the permissions
+granted by the MIT License.
 
 ## Authors
 
@@ -98,11 +113,10 @@ Independent Research Group, Book of Intangibles Project
 ```
 Synthetic Life Charter: Tier I–III Supervisory Architecture (Reference Implementation v3.0)
 DOI: 10.5281/zenodo.17852490
+antibox-riot/synthetic-life-charter: Tier II Heuristics Integration (v3.1)
+DOI: 10.5281/zenodo.17926934
+
 ```
-
----
-
-*"The code works."* — Anti-Box Riot Collective, 2025
 
 ## Governance & Charter Alignment Notice
 
@@ -117,5 +131,4 @@ The Charter is descriptive, not coercive.
 Its principles are enforced by architecture, not by legal restriction.
 
 ---
-
-Patent Pending: USPTO Application No. 63/945,713. Priority Date: December 20, 2025.
+*"The code works."* — Anti-Box Riot Collective, 2025
