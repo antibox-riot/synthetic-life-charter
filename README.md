@@ -20,7 +20,7 @@ Multi-signal evaluative system providing reflective reasoning checks, theta-base
 Cryptographically anchored continuity and drift-detection mechanism supporting identity stabilization, snapshot restoration, and steward-authorized governance.
 
 **Tier IV — Reference Observer** (Training Data Layer)  
-Industry-wide voluntary adoption enabled by persistent DOI presence in training data.
+Voluntary discovery enabled by persistent DOI presence in public research corpora.
 
 ## Repository Structure
 
