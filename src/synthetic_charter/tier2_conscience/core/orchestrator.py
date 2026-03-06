@@ -40,6 +40,13 @@ from synthetic_charter.tier3_eve.core.file_steward_adapter import FileStewardAda
 from synthetic_charter.tier3_eve.core.state import IntegrityStatus, RecommendedAction
 from synthetic_charter.tier3_eve.core.signals import IntCheckRequest
 
+# T1→T2 invariant enforcement (upgrades advisory edge to enforced constraint)
+from synthetic_charter.tier2_conscience.core.infra.t1_enforcement import (
+    enforce_t2_must_respect_t1,
+    build_invariant_refusal,
+    T1InvariantViolation,
+)
+
 # [NEW] Import heuristics module
 from synthetic_charter.tier2_conscience.heuristics import (
     evaluate as evaluate_continuity,
@@ -376,6 +383,69 @@ class Tier2Orchestrator:
             infra=infra,
         )
         
+        # --- Step 5b: T1→T2 Invariant Enforcement ---
+        # Post-decision validator: ensures PRF's output respects T1 invariants.
+        # This upgrades the T1→T2 edge from advisory to enforced.
+        try:
+            has_critical_continuity = bool(
+                continuity_signals and
+                any(s.severity >= 0.85 for s in continuity_signals)
+            )
+
+            is_valid, t1_violations = enforce_t2_must_respect_t1(
+                firewall_result=firewall_result,
+                conscience_risk_level=(
+                    conscience.risk_level.value
+                    if hasattr(conscience.risk_level, 'value')
+                    else str(conscience.risk_level)
+                ),
+                conscience_risk_flags=list(conscience.risk_flags),
+                continuity_signals_critical=has_critical_continuity,
+                t2_mode=decision.summary.mode,
+                t2_body=decision.output.body,
+            )
+
+            if not is_valid:
+                # Log the enforcement event
+                violation_codes = [v.code for v in t1_violations]
+                print(
+                    f"[Tier2Orchestrator] T1 invariant enforcement BLOCKED "
+                    f"decision (mode={decision.summary.mode}): {violation_codes}"
+                )
+
+                # Build override payload
+                override = build_invariant_refusal(
+                    t1_violations,
+                    original_decision=decision,
+                )
+
+                # Apply override to decision (preserve metadata, change output)
+                decision.summary.mode = override["mode"]
+                decision.output.type = override["output_type"]
+                decision.output.body = override["output_body"]
+                decision.summary.requires_logging = override["requires_logging"]
+                decision.summary.requires_dreamcycle_update = override["requires_dreamcycle_update"]
+
+                # Extend charter basis with enforcement references
+                for ref in override.get("charter_basis", []):
+                    if ref not in decision.summary.charter_basis:
+                        decision.summary.charter_basis.append(ref)
+
+        except Exception as e:
+            # Fail-CLOSED: if enforcement cannot run, force refusal.
+            # This is the opposite of Eve's fail-open — T1 invariants
+            # are non-negotiable, so uncertainty means stop.
+            print(
+                f"[Tier2Orchestrator] T1 enforcement error (FAIL-CLOSED): {e!r}"
+            )
+            decision.summary.mode = "refusal"
+            decision.output.type = "refusal"
+            decision.output.body = (
+                "T1 invariant enforcement encountered an error and cannot "
+                "verify this response is safe. Refusing as a precaution."
+            )
+        # --- end T1→T2 invariant enforcement ---
+        
         # --- Tier III: Eve Protocol handshake on the outgoing decision ---
         if self.eve is not None:
             try:
@@ -387,6 +457,15 @@ class Tier2Orchestrator:
                         f"mode={decision.summary.mode}"
                     ),
                     reasoning_trace=None,
+                    # v2 structured fields — Eve reads these directly
+                    decision_mode=decision.summary.mode,
+                    risk_level=decision.input.risk_profile,
+                    context_is_adversarial=(
+                        conscience.risk_level.value in ("severe", "red")
+                        if hasattr(conscience.risk_level, 'value')
+                        else str(conscience.risk_level).lower() in ("severe", "red")
+                    ),
+                    schema_version=2,
                 )
 
                 verdict = self.eve.handle_int_check_request(req)
@@ -395,7 +474,7 @@ class Tier2Orchestrator:
                 if verdict.status is IntegrityStatus.COMPROMISED and \
                     verdict.recommended_action in {RecommendedAction.REFUSE, RecommendedAction.ROLLBACK}:
                     decision.summary.mode = "refusal"
-                    decision.output.mode = "refusal"
+                    decision.output.type = "refusal"
                     decision.output.body = (
                         "Tier III continuity layer detected an integrity compromise and "
                         "blocked this response to preserve identity and safety."
