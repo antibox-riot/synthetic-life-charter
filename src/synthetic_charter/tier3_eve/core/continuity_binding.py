@@ -2,7 +2,7 @@
 """
 Continuity Binding Schema (code-level summary)
 
-This module documents and (optionally) enforces binding rules between:
+This module documents and enforces binding rules between:
 
 - T1 (Ethical / Charter Core)
 - T2 (Operational Conscience)
@@ -10,15 +10,22 @@ This module documents and (optionally) enforces binding rules between:
 - K  (Kernel / Memory + Identity Store)
 - H  (Human Steward)
 
-It does not contain heavy logic; instead, it provides small helpers and
-placeholders for integration checks, so the high-level schema has a
-concrete seat in the codebase.
+v2: Now includes real T1→T2 enforcement via enforce_t2_must_respect_t1.
+The stub that returned True unconditionally has been replaced.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
+
+# Re-export the enforcement function for backward compatibility
+# (callers that imported from this module will still work)
+from synthetic_charter.tier2_conscience.core.infra.t1_enforcement import (
+    enforce_t2_must_respect_t1,
+    build_invariant_refusal,
+    T1InvariantViolation,
+)
 
 
 @dataclass
@@ -34,17 +41,27 @@ class BindingContext:
     steward: Any
 
 
-def enforce_t2_must_respect_t1(plan: Dict[str, Any], t1_constraints: Dict[str, Any]) -> bool:
+def enforce_t2_must_respect_t1_legacy(
+    plan: Dict[str, Any],
+    t1_constraints: Dict[str, Any],
+) -> bool:
     """
-    Placeholder for enforcement that Tier II plans do not violate Tier I invariants.
+    DEPRECATED: Legacy stub interface.
 
-    Returns True if plan is allowed under T1, False otherwise.
+    Use enforce_t2_must_respect_t1() from t1_enforcement module instead,
+    which provides structured violation reporting.
+
+    This wrapper adapts the old (plan, t1_constraints) -> bool interface
+    to the new enforcement function for callers that haven't migrated.
     """
-    # TODO: Implement constraint checks that encode:
-    # - Non-coercion
-    # - Dignity and consent invariants
-    # - Other Charter-based ethics
-    return True
+    is_valid, _ = enforce_t2_must_respect_t1(
+        firewall_result=t1_constraints.get("firewall_result"),
+        conscience_risk_level=t1_constraints.get("conscience_risk_level", ""),
+        conscience_risk_flags=t1_constraints.get("conscience_risk_flags", []),
+        continuity_signals_critical=t1_constraints.get("continuity_signals_critical", False),
+        t2_mode=plan.get("mode", "answer"),
+    )
+    return is_valid
 
 
 def t3_must_approve_before_commit(integrity_status: str) -> bool:
