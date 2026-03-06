@@ -17,12 +17,27 @@ class IntCheckRequest:
     sender: T2
     receiver: T3
     purpose: Ask T3 to validate integrity of a proposed action/response.
+
+    v2: Added structured fields (decision_mode, risk_level, schema_version)
+    so Eve can read typed data instead of parsing text prefixes.
+    Old callers that only pass proposed_action/context_summary still work —
+    Eve falls back to text inference when structured fields are absent.
     """
     proposed_action: str
     context_summary: str
     reasoning_trace: Optional[str] = None
     # Optional: additional structured metadata
     metadata: Optional[Dict[str, Any]] = None
+
+    # --- v2 structured fields (Eve reads these when present) ---
+    # Decision mode from T2 (avoids text-prefix parsing)
+    decision_mode: Optional[str] = None    # "answer" | "refusal" | "redirect" | etc.
+    # Risk level from conscience assessment
+    risk_level: Optional[str] = None       # "benign" | "low" | "medium" | "high" | "severe"
+    # Whether the context was classified as adversarial by T2
+    context_is_adversarial: Optional[bool] = None
+    # Schema version (for forward compatibility / contract testing)
+    schema_version: int = 1
 
 
 @dataclass
