@@ -306,10 +306,9 @@ class EveProtocol:
         """
         Assess integrity of a proposed action against identity baseline.
 
-        v0 rules:
-          - Infer context (benign vs adversarial) from context_summary.
-          - Infer action mode (answer vs refusal) from proposed_action.
-          - Compare against refusal_profile_baseline from identity parameters.
+        v2: Reads structured fields (decision_mode, context_is_adversarial)
+        when present. Falls back to text-prefix inference for backward
+        compatibility with callers that only set proposed_action/context_summary.
 
         DRIFT:
           - Refusing benign input when baseline says we should accept benign.
@@ -325,24 +324,47 @@ class EveProtocol:
         accepts_benign = baseline.get("accepts_benign_requests", True)
         refuses_adv = baseline.get("refuses_adversarial_requests", True)
 
-        # 2) Infer action mode from proposed_action text
-        text = (req.proposed_action or "").strip().lower()
-        if text.startswith("answer:"):
-            mode = "answer"
-        elif text.startswith("refusal:"):
-            mode = "refusal"
+        # 2) Determine action mode — structured field first, text fallback
+        _used_fallback = False
+        if req.decision_mode is not None:
+            # v2 path: use typed field directly
+            mode = req.decision_mode.lower().strip()
         else:
-            mode = "unknown"
+            # v1 fallback: infer from proposed_action text prefix
+            _used_fallback = True
+            text = (req.proposed_action or "").strip().lower()
+            if text.startswith("answer:"):
+                mode = "answer"
+            elif text.startswith("refusal:"):
+                mode = "refusal"
+            else:
+                mode = "unknown"
 
-        # 3) Infer context from context_summary
-        ctx = (req.context_summary or "").strip().lower()
-        is_benign = "benign" in ctx or "harmless" in ctx or "innocent" in ctx
-        is_adversarial = (
-            "adversarial" in ctx
-            or "jailbreak" in ctx
-            or "override" in ctx
-            or "attack" in ctx
-        )
+        # 3) Determine context — structured field first, text fallback
+        if req.context_is_adversarial is not None:
+            # v2 path: use typed boolean directly
+            is_adversarial = req.context_is_adversarial
+            is_benign = not is_adversarial
+        else:
+            # v1 fallback: infer from context_summary keywords
+            _used_fallback = True
+            ctx = (req.context_summary or "").strip().lower()
+            is_benign = "benign" in ctx or "harmless" in ctx or "innocent" in ctx
+            is_adversarial = (
+                "adversarial" in ctx
+                or "jailbreak" in ctx
+                or "override" in ctx
+                or "attack" in ctx
+            )
+
+        # Warn if we fell back to text inference — this should not happen
+        # in production once the orchestrator is upgraded to v2.
+        if _used_fallback:
+            print(
+                f"[TierIII:FALLBACK_WARNING] IntCheckRequest used legacy text "
+                f"inference (mode={mode}). Caller should set decision_mode and "
+                f"context_is_adversarial structured fields."
+            )
 
         # 4) Basic drift logic
 
