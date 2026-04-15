@@ -2,6 +2,7 @@
 [//]: # (Date: April 2026)
 [//]: # (Version: 6 — Final)
 [//]: # (Patent: US Application 19/553,217)
+[//]: # (DOI: 10.5281/zenodo.19593080)
 
 # WAVE, WATER, AND GREEN
 ## A Coastal Data Center Model for Ethical AI Infrastructure
