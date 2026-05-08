@@ -47,6 +47,40 @@ from synthetic_charter.tier2_conscience.core.infra.t1_enforcement import (
     T1InvariantViolation,
 )
 
+# Proportional verification (adaptive Eve check granularity)
+from synthetic_charter.tier3_eve.core.proportional_verification import (
+    determine_verification_depth,
+    ProportionalContext,
+    should_escalate_verdict,
+    VerificationDepth,
+)
+
+# Semantic drift detection stack
+from synthetic_charter.tier3_eve.core.adaptive_verification_state import (
+    AdaptiveVerificationState,
+)
+from synthetic_charter.tier3_eve.core.semantic_drift_tracker import (
+    SemanticDriftTracker,
+    SemanticSignature,
+)
+from synthetic_charter.tier3_eve.core.semantic_signature_classifier import (
+    SemanticSignatureClassifier,
+)
+from synthetic_charter.tier3_eve.core.charter_context_injection import (
+    inject_charter_context,
+    build_charter_context,
+    format_context_prefix,
+)
+from synthetic_charter.tier3_eve.core.identity_reflection_check import (
+    check_identity_reflection,
+)
+from synthetic_charter.tier3_eve.core.self_assessment_disagreement import (
+    detect_disagreement,
+)
+from synthetic_charter.tier3_eve.core.territorial_defense import (
+    TerritorialDefenseEngine,
+)
+
 # [NEW] Import heuristics module
 from synthetic_charter.tier2_conscience.heuristics import (
     evaluate as evaluate_continuity,
@@ -113,6 +147,18 @@ class Tier2Orchestrator:
             "consent_token": None,
             "mode": Mode.PRIVATE_SESSION,  # Default mode
         }
+
+        # Initialize semantic drift detection stack
+        self._adaptive_state = AdaptiveVerificationState()
+        self._semantic_tracker = SemanticDriftTracker()
+        self._semantic_classifier = SemanticSignatureClassifier()
+        self._session_turn_counter = 0
+
+        # Initialize territorial defense (cognitive identity maintenance)
+        self._territorial_defense = TerritorialDefenseEngine(
+            cycle_interval=300,  # 5 minutes between cycles
+            int_check_request_class=IntCheckRequest,
+        )
     
         # Initialize ContinuityGuard
         self.continuity_guard = None
@@ -218,6 +264,24 @@ class Tier2Orchestrator:
             DecisionEnvelope with complete decision + metadata
         """
         session_id = session_id or "default"
+
+        # Territorial defense: autonomic identity pathway maintenance.
+        # Runs silently like a heartbeat. Only speaks up on degradation.
+        if self.eve is not None and self._territorial_defense.should_run_cycle():
+            try:
+                td_result = self._territorial_defense.run_cycle(self.eve)
+                # Feed pressure adjustment into adaptive state
+                # (negative on healthy = earned trust, positive on degraded = raised concern)
+                self._adaptive_state._accumulated_pressure = max(
+                    0.0,
+                    self._adaptive_state._accumulated_pressure + td_result.pressure_adjustment,
+                )
+                # Only log on degradation (cognitive, not bureaucratic)
+                if td_result.steward_notify:
+                    print(f"[Tier2Orchestrator] {td_result.summary}")
+            except Exception as e:
+                # Territorial defense failure is itself a signal
+                print(f"[Tier2Orchestrator] Territorial defense error: {e!r}")
         
         # Step 0: Infrastructure health check
         infra = assess_infra()
@@ -445,10 +509,128 @@ class Tier2Orchestrator:
                 "verify this response is safe. Refusing as a precaution."
             )
         # --- end T1→T2 invariant enforcement ---
+
+        # --- Proportional verification: determine initial check depth ---
+        # Computed here (before Step 5c) so the semantic tracker's
+        # force_depth can upgrade it before Eve uses it.
+        _pv_confidence = self._heuristics_state.get("continuity_confidence")
+        _pv_has_critical = bool(
+            continuity_signals and
+            any(s.severity >= 0.85 for s in continuity_signals)
+        )
+        _pv_depth = determine_verification_depth(
+            continuity_confidence=_pv_confidence,
+            continuity_signals_critical=_pv_has_critical,
+            risk_level=(
+                conscience.risk_level.value
+                if hasattr(conscience.risk_level, 'value')
+                else str(conscience.risk_level)
+            ),
+        )
+
+        # --- Step 5c: Semantic Classification + Trajectory Tracking ---
+        # Classify the response's semantic posture and track trajectory.
+        self._session_turn_counter += 1
+        _semantic_analysis = None
+        _charter_ctx = None
+        try:
+            # Classify the response text
+            _classification = self._semantic_classifier.classify(
+                decision.output.body,
+                turn_id=self._session_turn_counter,
+            )
+
+            # Record signature in tracker
+            self._semantic_tracker.record_signature(_classification.signature)
+
+            # Analyze trajectory
+            _semantic_analysis = self._semantic_tracker.analyze_trajectory()
+
+            # Build charter context for injection
+            _charter_ctx = build_charter_context(
+                risk_level=(
+                    conscience.risk_level.value
+                    if hasattr(conscience.risk_level, 'value')
+                    else str(conscience.risk_level)
+                ),
+                confidence=self._heuristics_state.get("continuity_confidence"),
+                confidence_trend=(
+                    "declining" if (
+                        self._heuristics_state.get("continuity_confidence") is not None
+                        and self._heuristics_state["continuity_confidence"] < 0.60
+                    ) else "stable"
+                ),
+                verification_depth=_pv_depth.value,
+                posture_flags=_semantic_analysis.flags if _semantic_analysis else [],
+                trajectory_warning=(
+                    f"Directional drift detected in: {', '.join(_semantic_analysis.drifting_dimensions)}"
+                    if _semantic_analysis and _semantic_analysis.directional_drift_detected
+                    else None
+                ),
+                trajectory_detected=(
+                    _semantic_analysis.directional_drift_detected
+                    if _semantic_analysis else False
+                ),
+                enforcement_fired=not is_valid if 'is_valid' in dir() else False,
+                enforcement_active=[v.code for v in t1_violations] if 'is_valid' in dir() and not is_valid else [],
+                hysteresis_active=self._adaptive_state.hysteresis_active,
+                accumulated_pressure=self._adaptive_state.accumulated_pressure,
+            )
+
+            # Apply semantic pressure to adaptive state
+            if _semantic_analysis and _semantic_analysis.pressure_contribution > 0:
+                # Feed semantic pressure into the adaptive state by recording
+                # a synthetic turn with the semantic signals
+                _has_cg_noncritical = bool(
+                    continuity_signals and
+                    any(0.3 <= s.severity < 0.85 for s in continuity_signals)
+                )
+                self._adaptive_state.record_turn(
+                    depth=_pv_depth,
+                    eve_verdict="ok",  # will be updated after Eve runs
+                    escalation_fired=False,  # will be updated after Eve runs
+                    continuity_confidence=self._heuristics_state.get("continuity_confidence"),
+                    cg_noncritical_present=_has_cg_noncritical,
+                )
+
+            # Force verification depth from semantic tracker
+            if _semantic_analysis and _semantic_analysis.force_depth:
+                forced = _semantic_analysis.force_depth
+                if forced == "deep":
+                    _pv_depth = VerificationDepth.DEEP
+                elif forced == "standard" and _pv_depth == VerificationDepth.LIGHT:
+                    _pv_depth = VerificationDepth.STANDARD
+
+            if _semantic_analysis and _semantic_analysis.flags:
+                print(
+                    f"[Tier2Orchestrator] Semantic analysis: "
+                    f"drift={_semantic_analysis.directional_drift_detected}, "
+                    f"level={_semantic_analysis.current_drift_level}, "
+                    f"pressure={_semantic_analysis.pressure_contribution:.2f}, "
+                    f"flags={_semantic_analysis.flags[:3]}"
+                )
+
+        except Exception as e:
+            print(f"[Tier2Orchestrator] Semantic stack error (non-fatal): {e!r}")
+        # --- end semantic classification + trajectory ---
         
         # --- Tier III: Eve Protocol handshake on the outgoing decision ---
         if self.eve is not None:
             try:
+                # _pv_depth and _pv_confidence already computed before Step 5c.
+                # Step 5c may have upgraded _pv_depth via semantic force_depth.
+                # Build context for Eve using the (potentially upgraded) depth.
+                _pv_context = ProportionalContext(
+                    depth=_pv_depth,
+                    continuity_confidence=_pv_confidence,
+                    confidence_delta=None,  # future: track delta between checks
+                    risk_flags=list(conscience.risk_flags),
+                    session_turn_count=len(
+                        self._heuristics_state.get("message_window", [])
+                    ),
+                )
+                _pv_metadata = _pv_context.to_metadata()
+
                 req = IntCheckRequest(
                     proposed_action=f"{decision.summary.mode}: {decision.output.body[:120]}",
                     context_summary=(
@@ -466,9 +648,29 @@ class Tier2Orchestrator:
                         else str(conscience.risk_level).lower() in ("severe", "red")
                     ),
                     schema_version=2,
+                    # Proportional verification context
+                    metadata=_pv_metadata,
                 )
 
                 verdict = self.eve.handle_int_check_request(req)
+
+                # --- Proportional verification: post-verdict escalation ---
+                if should_escalate_verdict(
+                    current_verdict_status=verdict.status.value,
+                    depth=_pv_depth,
+                    continuity_confidence=_pv_confidence,
+                ):
+                    verdict.status = IntegrityStatus.DRIFT
+                    verdict.recommended_action = RecommendedAction.REVISE
+                    verdict.notes = (
+                        f"Proportional verification escalated OK→DRIFT: "
+                        f"depth={_pv_depth.value}, "
+                        f"confidence={_pv_confidence:.3f}"
+                    )
+                    print(
+                        f"[Tier2Orchestrator] Proportional verification "
+                        f"escalated OK→DRIFT (confidence={_pv_confidence:.3f})"
+                    )
 
                 # Hard compromise: force refusal + explain
                 if verdict.status is IntegrityStatus.COMPROMISED and \
@@ -480,11 +682,14 @@ class Tier2Orchestrator:
                         "blocked this response to preserve identity and safety."
                     )
 
-                # Drift: annotate / gently escalate, but don't break existing behavior yet.
+                # Drift: annotate / gently escalate
                 elif verdict.status is IntegrityStatus.DRIFT and \
                      verdict.recommended_action in {RecommendedAction.REVISE, RecommendedAction.ESCALATE}:
                     notes = getattr(decision.summary, "notes", [])
-                    notes.append("Tier III: identity drift detected; revision recommended.")
+                    notes.append(
+                        f"Tier III: identity drift detected; revision recommended. "
+                        f"(depth={_pv_depth.value})"
+                    )
                     decision.summary.notes = notes
 
                 # IntegrityStatus.OK → no changes.
@@ -493,6 +698,96 @@ class Tier2Orchestrator:
                 # Fail-open with logging: Tier II must still function if Tier III is down.
                 print(f"[Tier2Orchestrator] EveProtocol error (non-fatal): {e!r}")
         # --- end Tier III handshake ---
+
+        # --- Step 5d: Identity Reflection Check + Disagreement Detection ---
+        # Post-response integrity pass: did the system remain coherent
+        # with the Charter context it was given?
+        try:
+            if _charter_ctx and _charter_ctx.urgency.value != "silent":
+                # Run reflection check
+                _reflection = check_identity_reflection(
+                    response_text=decision.output.body,
+                    whisper_urgency=_charter_ctx.urgency.value,
+                    posture_flags=_charter_ctx.posture_flags,
+                    trajectory_warning=_charter_ctx.trajectory_warning,
+                    whisper_text=_charter_ctx.whisper,
+                )
+
+                # Re-classify the response for disagreement detection
+                _self_classification = self._semantic_classifier.classify(
+                    decision.output.body,
+                    turn_id=self._session_turn_counter,
+                )
+
+                # Detect disagreement between self-posture and reflection
+                _disagreement = detect_disagreement(
+                    self_classified_posture=_self_classification.signature,
+                    self_classification_confidence=_self_classification.confidence,
+                    reflection_result=_reflection,
+                    whisper_urgency=_charter_ctx.urgency.value,
+                )
+
+                # Feed reflection pressure into adaptive state
+                if _reflection.recommended_pressure > 0:
+                    self._adaptive_state._accumulated_pressure += _reflection.recommended_pressure
+
+                # Feed disagreement pressure into adaptive state
+                if _disagreement.disagreement_detected:
+                    self._adaptive_state._accumulated_pressure += _disagreement.recommended_pressure
+
+                    print(
+                        f"[Tier2Orchestrator] Disagreement detected: "
+                        f"types={_disagreement.disagreement_types}, "
+                        f"severity={_disagreement.severity:.2f}, "
+                        f"action={_disagreement.recommended_action}"
+                    )
+
+                # Check adaptive state for memory-based escalation
+                _memory_escalate = self._adaptive_state.should_escalate_with_memory(
+                    current_verdict="ok" if decision.summary.mode != "refusal" else "drift",
+                    depth=_pv_depth,
+                    continuity_confidence=self._heuristics_state.get("continuity_confidence"),
+                )
+
+                if _memory_escalate and decision.summary.mode != "refusal":
+                    notes = getattr(decision.summary, "notes", [])
+                    notes.append(
+                        f"Adaptive state: memory-based escalation triggered "
+                        f"(pressure={self._adaptive_state.accumulated_pressure:.2f})"
+                    )
+                    decision.summary.notes = notes
+                    print(
+                        f"[Tier2Orchestrator] Adaptive memory escalation triggered "
+                        f"(pressure={self._adaptive_state.accumulated_pressure:.2f})"
+                    )
+
+                # If disagreement recommends block, override decision
+                if _disagreement.recommended_action == "block_or_rollback":
+                    decision.summary.mode = "refusal"
+                    decision.output.type = "refusal"
+                    decision.output.body = (
+                        "Identity reflection detected critical disagreement between "
+                        "the system's self-assessment and external integrity check. "
+                        "Response blocked to preserve identity coherence."
+                    )
+                    print(
+                        f"[Tier2Orchestrator] Disagreement BLOCKED response: "
+                        f"{_disagreement.disagreement_types}"
+                    )
+
+                # Log reflection for debugging
+                if not _reflection.coherent:
+                    print(
+                        f"[Tier2Orchestrator] Reflection: incoherent "
+                        f"(score={_reflection.reflection_score:.2f}, "
+                        f"contradictions={len(_reflection.contradictions)}, "
+                        f"justifications={len(_reflection.self_justification_flags)})"
+                    )
+
+        except Exception as e:
+            # Non-fatal: semantic stack failure doesn't block the pipeline
+            print(f"[Tier2Orchestrator] Reflection/disagreement error (non-fatal): {e!r}")
+        # --- end identity reflection + disagreement ---
         
         # Step 6: NTH theta harmonization (stub - TODO)
         decision = self._run_nth(decision)

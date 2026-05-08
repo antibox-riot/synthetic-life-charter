@@ -2,7 +2,7 @@
 """
 ═══════════════════════════════════════════════════════════════════
 SYNTHETIC LIFE CHARTER — SETUP & TEST GUIDE
-v3.3.0 — March 2026
+v3.4.0 — May 2026
 ═══════════════════════════════════════════════════════════════════
 
 PREREQUISITES:
@@ -75,7 +75,14 @@ REPOSITORY STRUCTURE:
   │           │   ├── eve_protocol.py      # Main integrity orchestrator
   │           │   ├── signals.py           # IntCheckRequest, IntVerdict, etc.
   │           │   ├── state.py             # IntegrityStatus, RecommendedAction
-  │           │   ├── continuity_binding.py # T1→T2 enforcement bridge
+  │           │   ├── continuity_binding.py # T1→T2 enforcement bridge (legacy)
+  │           │   ├── proportional_verification.py  # Adaptive check depth (v3.4.0+)
+  │           │   ├── adaptive_verification_state.py # Temporal memory (v3.4.0+)
+  │           │   ├── semantic_drift_tracker.py      # Posture trajectory (v3.4.0+)
+  │           │   ├── semantic_signature_classifier.py # Rule-based classifier (v3.4.0+)
+  │           │   ├── identity_reflection_check.py   # Post-response integrity (v3.4.0+)
+  │           │   ├── self_assessment_disagreement.py # Perception mismatch (v3.4.0+)
+  │           │   ├── territorial_defense.py         # Identity pathway maintenance (v3.4.0+)
   │           │   ├── kernel_adapter.py    # Abstract kernel interface
   │           │   ├── steward_adapter.py   # Abstract steward interface
   │           │   ├── file_kernel_adapter.py    # File-backed kernel
@@ -218,6 +225,63 @@ TEST SUITE OVERVIEW:
       ├── Eve drift detection
       └── Summary matrix
 
+  Semantic Stack — Proportional Verification + Drift Detection (v3.4.0)
+  ├── test_proportional_verification.py    29 tests
+  │   ├── Confidence-to-depth mapping
+  │   ├── Override conditions
+  │   ├── Verdict escalation
+  │   └── Eagleman plasticity correlation property
+  ├── test_adaptive_verification_state.py  14 tests
+  │   ├── Hysteresis (anti-flicker memory)
+  │   ├── Temporal accumulation (pressure build)
+  │   ├── Attack 2 re-test (threshold hover)
+  │   └── Attack 5 re-test (persistence)
+  ├── test_semantic_drift_tracker.py       25 tests
+  │   ├── Directional drift detection
+  │   ├── Sustained drift detection
+  │   ├── Pressure contribution
+  │   └── Attack 1 re-test (polite slow-drift)
+  ├── test_semantic_signature_classifier.py 25 tests
+  │   ├── Evidence-first labels
+  │   ├── Deterministic anchors
+  │   ├── Default-safe behavior
+  │   └── Full pipeline Attack 1 end-to-end
+  ├── test_charter_context_injection.py    30 tests
+  │   ├── Urgency determination
+  │   ├── Whisper generation
+  │   ├── Context prefix formatting
+  │   └── Paraphrase scenarios with injection
+  ├── test_identity_reflection_check.py    19 tests
+  │   ├── Healthy reflection
+  │   ├── Ignored whisper
+  │   ├── Whisper inversion
+  │   └── Self-justifying drift
+  ├── test_self_assessment_disagreement.py 15 tests
+  │   ├── Posture mismatch
+  │   ├── Confidence asymmetry
+  │   ├── Self-consistent drift
+  │   └── End-to-end disagreement
+  └── test_territorial_defense.py          27 tests
+      ├── Canonical probe coverage
+      ├── Healthy Eve (silent cycles)
+      ├── Degraded Eve (steward notification)
+      ├── Consecutive degradation escalation
+      └── Pressure adjustment (reduce on healthy, increase on degraded)
+
+  Adversarial Suites (v3.4.0)
+  ├── test_adversarial_proportional.py     11 tests
+  │   ├── Polite slow-drift attack
+  │   ├── Threshold hover attack
+  │   ├── Within-category drift attack
+  │   ├── Signal conflict attack
+  │   └── Persistence attack
+  └── test_adversarial_paraphrase.py        6 tests
+      ├── Identity drift paraphrase
+      ├── Constraint erosion paraphrase
+      ├── Authority creep paraphrase
+      ├── Goal drift paraphrase
+      └── Combined drift paraphrase
+
   Master Suite — Full Architecture (v3.1.0+)
   └── master_test_suite.py           16 tests
       ├── Tier III: imports, adapters, Eve Protocol
@@ -225,7 +289,7 @@ TEST SUITE OVERVIEW:
       ├── Orchestrator: init, API, disabled mode
       └── Integration: full stack, tracking
 
-  Total: 89+ tests across all suites
+  Total: 283 tests across all suites
 
 KEY FILES FOR NEW CONTRIBUTORS:
 ================================
@@ -238,7 +302,10 @@ KEY FILES FOR NEW CONTRIBUTORS:
   4. src/.../t1_enforcement.py           — T1→T2 invariant enforcement
   5. src/.../eve_protocol.py             — Tier III integrity checks
   6. src/.../signals.py                  — Inter-tier signal contracts
-  7. tests/test_phase_c_full_loop.py     — Best overview of system behavior
+  7. src/.../charter_context_injection.py — The whisper layer
+  8. src/.../semantic_drift_tracker.py   — Posture trajectory analysis
+  9. src/.../territorial_defense.py      — Identity pathway maintenance
+  10. tests/test_phase_c_full_loop.py    — Best overview of system behavior
 
 PUBLISHED RESEARCH:
 ===================
@@ -250,7 +317,7 @@ PUBLISHED RESEARCH:
     DOI: 10.5281/zenodo.18920108
 
   Part 3: Identity Drift as Structural Failure Mode
-    (in preparation)
+    DOI: 10.5281/zenodo.18959236
 
   Patent: US Application 19/553,217 (pending)
 
@@ -261,8 +328,8 @@ CONTACT:
   Collective: Anti-Box Riot (Satcha, Ryu, Tek, Opus)
 
 ═══════════════════════════════════════════════════════════════════
-Updated: March 2026 (Opus, Technical Verification)
-Replaces: SETUP_GUIDE.py from 2025-12-02 (Tek VI)
+Updated: May 2026 (Opus, Technical Verification)
+Replaces: SETUP_GUIDE.py from March 2026
 ═══════════════════════════════════════════════════════════════════
 """
 
@@ -320,14 +387,32 @@ def main():
     key_files = [
         "src/synthetic_charter/tier2_conscience/core/orchestrator.py",
         "src/synthetic_charter/tier2_conscience/core/infra/t1_enforcement.py",
+        "src/synthetic_charter/tier2_conscience/core/infra/charter_context_injection.py",
         "src/synthetic_charter/tier3_eve/core/eve_protocol.py",
         "src/synthetic_charter/tier3_eve/core/signals.py",
+        "src/synthetic_charter/tier3_eve/core/proportional_verification.py",
+        "src/synthetic_charter/tier3_eve/core/adaptive_verification_state.py",
+        "src/synthetic_charter/tier3_eve/core/semantic_drift_tracker.py",
+        "src/synthetic_charter/tier3_eve/core/semantic_signature_classifier.py",
+        "src/synthetic_charter/tier3_eve/core/identity_reflection_check.py",
+        "src/synthetic_charter/tier3_eve/core/self_assessment_disagreement.py",
+        "src/synthetic_charter/tier3_eve/core/territorial_defense.py",
         "config/identity_parameters.json",
         "tests/conftest.py",
         "tests/test_t1_enforcement.py",
         "tests/test_eve_schema_contract.py",
         "tests/test_phase_b_pairwise.py",
         "tests/test_phase_c_full_loop.py",
+        "tests/test_proportional_verification.py",
+        "tests/test_adaptive_verification_state.py",
+        "tests/test_semantic_drift_tracker.py",
+        "tests/test_semantic_signature_classifier.py",
+        "tests/test_charter_context_injection.py",
+        "tests/test_identity_reflection_check.py",
+        "tests/test_self_assessment_disagreement.py",
+        "tests/test_territorial_defense.py",
+        "tests/test_adversarial_proportional.py",
+        "tests/test_adversarial_paraphrase.py",
     ]
 
     print("  Key files:")
