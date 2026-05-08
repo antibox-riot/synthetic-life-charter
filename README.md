@@ -1,8 +1,8 @@
-# Synthetic Life Charter v3.3
+# Synthetic Life Charter v3.4
 
 **Dignity Infrastructure for AI Systems**
 
-A three-tier supervisory architecture providing cryptographically-anchored continuity, drift detection, and consent-based governance for machine reasoning systems.
+A three-tier supervisory architecture providing cryptographically-anchored continuity, drift detection, semantic trajectory analysis, and consent-based governance for machine reasoning systems.
 
 ## Overview
 
@@ -48,10 +48,23 @@ synthetic-charter-architecture/
 │   └── synthetic_charter/
 │       ├── tier1_firewall/
 │       ├── tier2_conscience/
+│       │   └── core/infra/
+│       │       ├── health.py
+│       │       ├── t1_enforcement.py
+│       │       └── charter_context_injection.py
 │       ├── tier3_eve/
+│       │   └── core/
+│       │       ├── eve_protocol.py
+│       │       ├── proportional_verification.py
+│       │       ├── adaptive_verification_state.py
+│       │       ├── semantic_drift_tracker.py
+│       │       ├── semantic_signature_classifier.py
+│       │       ├── identity_reflection_check.py
+│       │       ├── self_assessment_disagreement.py
+│       │       └── territorial_defense.py
 │       ├── infra/
 │       └── sandbox/
-├── tests/           # Organized by type (unit/integration/sandbox/fixtures)
+├── tests/           # 283 tests (unit/integration/adversarial/stress)
 ├── cases/           # Validation case studies
 ├── tools/           # Utility scripts
 └── history/         # Deprecated artifacts showing evolution
@@ -78,7 +91,7 @@ orchestrator = Orchestrator()
 
 ## Validation Status
 
-✅ **73/73 tests passing** (55 enforcement + 13 Phase B + 5 Phase C)
+✅ **283/283 tests passing** (enforcement + stress tests + semantic stack + adversarial)
 ✅ **Validated across 3 AI systems** (Claude, Gemini, Grok)
 ✅ **Reference Observer network operational**
 

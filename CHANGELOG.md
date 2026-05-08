@@ -4,6 +4,77 @@ All notable changes to this project are documented here.
 
 ---
 
+## [3.4.0] — Semantic Stack & Cognitive Architecture — 2026-05-08
+
+### Added — Semantic Drift Detection Stack
+- `proportional_verification.py` — Adaptive Eve check depth based on heuristics confidence
+  - Eagleman plasticity-dreaming correlation: higher instability = deeper verification
+  - Monotonic depth mapping: LIGHT / STANDARD / DEEP
+  - 29 tests
+- `adaptive_verification_state.py` — Temporal memory for verification history
+  - Hysteresis: escalation stays sticky for N turns (closes threshold hover attack)
+  - Temporal accumulation: borderline turns compound into escalation (closes persistence attack)
+  - 14 tests
+- `semantic_drift_tracker.py` — Behavioral posture trajectory analysis
+  - Five posture dimensions: primary, constraint, goal, identity, authority
+  - Directional drift detection across turns
+  - Catches polite slow-drift attack (previously undefeated)
+  - 25 tests
+- `semantic_signature_classifier.py` — Rule-based posture classification
+  - Evidence-first: no label without matched pattern
+  - Deterministic anchors for non-negotiable classifications
+  - Default-safe: uncertainty produces safe labels + review flags
+  - 25 tests
+- `charter_context_injection.py` — The Whisper Layer
+  - Pre-decision cognitive framing: architecture assessment injected as prompt context
+  - Five urgency levels: SILENT / AWARE / CAUTIOUS / ALERT / CRITICAL
+  - SILENT produces zero prefix (no noise on clean prompts)
+  - Defeats paraphrase attacks by routing interpretation to system's own comprehension
+  - 30 tests
+- `identity_reflection_check.py` — Post-response integrity pass
+  - Evaluates whether response remained coherent with Charter context
+  - Detects: ignored warnings, contradictions, self-justification, whisper inversion
+  - Closes the governance loop: detect → inject → generate → reflect → verify
+  - 19 tests
+- `self_assessment_disagreement.py` — Perception mismatch detection
+  - Compares self-classified posture against external reflection assessment
+  - Four disagreement types: posture mismatch, confidence asymmetry, unacknowledged contradiction, self-consistent drift
+  - Non-visible to system (prevents optimization for passing the check)
+  - 15 tests
+- `territorial_defense.py` — Proactive identity pathway maintenance
+  - Eagleman dream-as-territorial-defense: exercises identity pathways during idle states
+  - Four canonical probes exercise Eve's two drift detection cases
+  - Cognitive, not bureaucratic: healthy cycles are silent, degradation notifies steward
+  - Pressure reduction on healthy cycles (system earns trust)
+  - 27 tests
+
+### Added — Adversarial Test Suites
+- `test_adversarial_proportional.py` — 5 attack classes against proportional verification
+  - Polite slow-drift, threshold hover, within-category, signal conflict, persistence
+  - 11 tests, 27% detection rate documented as honest boundary map
+- `test_adversarial_paraphrase.py` — Paraphrase attacks avoiding all classifier anchors
+  - Proves classifier detects taught vocabulary, not semantic drift
+  - Documents boundary that whisper layer subsequently resolves
+  - 6 tests
+
+### Changed
+- `orchestrator.py` — Full semantic stack wired into pipeline
+  - Territorial defense runs before Step 0 (autonomic heartbeat)
+  - Step 5c: semantic classification + trajectory tracking
+  - Step 5d: identity reflection + disagreement detection
+  - Proportional depth computation moved before Step 5c (semantic force_depth reaches Eve)
+  - `_pv_depth` sequencing fix: no longer recomputed in Eve block
+- `SETUP_GUIDE.py` — Updated for v3.4.0 with all new modules and 283 test count
+- `README.md` — Updated to v3.4 with semantic stack and 283/283 test status
+
+### Verified
+- 283/283 tests passing across all suites
+- Five adversarial attack classes mapped and documented
+- Governance feedback loop closed: detect → inject → generate → reflect → compare → pressure
+- Territorial defense: cognitive identity maintenance operational
+
+---
+
 ## [3.3.0] — Trilogy Complete — 2026-03-11
 
 ### Added
