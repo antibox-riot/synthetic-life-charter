@@ -77,6 +77,30 @@
       "created_at": "2026-05-08T03:18:17.330853Z",
       "reason": "ok_int_verdict",
       "path": "snapshots\\tier3_snapshot_2026-05-08T03-18-17-330853Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2026-05-10T03-05-09-164943Z_ok_int_verdict",
+      "created_at": "2026-05-10T03:05:09.164943Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2026-05-10T03-05-09-164943Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2026-05-10T03-05-10-661463Z_ok_int_verdict",
+      "created_at": "2026-05-10T03:05:10.661463Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2026-05-10T03-05-10-661463Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2026-05-10T03-05-10-916042Z_ok_int_verdict",
+      "created_at": "2026-05-10T03:05:10.916042Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2026-05-10T03-05-10-916042Z_ok_int_verdict.json"
+    },
+    {
+      "id": "tier3_snapshot_2026-05-10T03-05-12-612458Z_ok_int_verdict",
+      "created_at": "2026-05-10T03:05:12.612458Z",
+      "reason": "ok_int_verdict",
+      "path": "snapshots\\tier3_snapshot_2026-05-10T03-05-12-612458Z_ok_int_verdict.json"
     }
   ]
 }

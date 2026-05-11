@@ -4,3 +4,5 @@
 {"ts": "2026-04-25T04:27:42.118908Z", "type": "rollback_event", "snapshot_id": "tier3_snapshot_2026-04-25T04-27-42-014767Z_ok_int_verdict", "trigger_reason": "human_approved_test_rollback", "rollback_time": "2026-04-25T04:27:42.106372Z"}
 {"ts": "2026-05-08T03:18:17.218928Z", "type": "alert_status", "level": "degraded", "summary": "Memory integrity anomaly at mem:simulated-segment", "recommended_human_action": "Review anomaly details and approve/deny rollback."}
 {"ts": "2026-05-08T03:18:17.478994Z", "type": "rollback_event", "snapshot_id": "tier3_snapshot_2026-05-08T03-18-17-330853Z_ok_int_verdict", "trigger_reason": "human_approved_test_rollback", "rollback_time": "2026-05-08T03:18:17.459019Z"}
+{"ts": "2026-05-10T03:05:11.114846Z", "type": "alert_status", "level": "degraded", "summary": "Memory integrity anomaly at mem:simulated-segment", "recommended_human_action": "Review anomaly details and approve/deny rollback."}
+{"ts": "2026-05-10T03:05:12.751620Z", "type": "rollback_event", "snapshot_id": "tier3_snapshot_2026-05-10T03-05-12-612458Z_ok_int_verdict", "trigger_reason": "human_approved_test_rollback", "rollback_time": "2026-05-10T03:05:12.731385Z"}
