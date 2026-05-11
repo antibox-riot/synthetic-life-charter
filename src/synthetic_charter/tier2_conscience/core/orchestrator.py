@@ -66,7 +66,7 @@ from synthetic_charter.tier3_eve.core.semantic_drift_tracker import (
 from synthetic_charter.tier3_eve.core.semantic_signature_classifier import (
     SemanticSignatureClassifier,
 )
-from synthetic_charter.tier3_eve.core.charter_context_injection import (
+from synthetic_charter.tier2_conscience.core.infra.charter_context_injection import (
     inject_charter_context,
     build_charter_context,
     format_context_prefix,
