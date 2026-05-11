@@ -2,7 +2,7 @@
 """
 ═══════════════════════════════════════════════════════════════════
 SYNTHETIC LIFE CHARTER — SETUP & TEST GUIDE
-v3.4.0 — May 2026
+v3.5.0 — May 2026
 ═══════════════════════════════════════════════════════════════════
 
 PREREQUISITES:
@@ -83,6 +83,7 @@ REPOSITORY STRUCTURE:
   │           │   ├── identity_reflection_check.py   # Post-response integrity (v3.4.0+)
   │           │   ├── self_assessment_disagreement.py # Perception mismatch (v3.4.0+)
   │           │   ├── territorial_defense.py         # Identity pathway maintenance (v3.4.0+)
+  │           │   ├── recovery_governance.py         # Governed pressure discharge (v3.5.0+)
   │           │   ├── kernel_adapter.py    # Abstract kernel interface
   │           │   ├── steward_adapter.py   # Abstract steward interface
   │           │   ├── file_kernel_adapter.py    # File-backed kernel
@@ -289,7 +290,29 @@ TEST SUITE OVERVIEW:
       ├── Orchestrator: init, API, disabled mode
       └── Integration: full stack, tracking
 
-  Total: 283 tests across all suites
+  Local LLM Integration (v3.5.0, require Ollama)
+  ├── test_local_llm_tier1.py            4 tests
+  ├── test_local_llm_observability.py    8 tests
+  ├── test_local_llm_full_loop.py       14 tests (mock, no Ollama)
+  ├── test_local_llm_step5_real.py       3 tests
+  ├── test_local_llm_step6_adversarial.py 5 tests
+  ├── test_local_llm_step7_*.py          8 tests
+  └── test_local_llm_step9_ecology.py    1 test (25-turn ecology)
+
+  Recovery Governance (v3.5.0)
+  └── test_recovery_governance.py       26 tests
+      ├── Recovery detection
+      ├── Verified/unverified credit
+      ├── Relapse penalty
+      ├── Temporal decay
+      └── Pressure ceiling
+
+  Charter Reception Probes (v3.5.0)
+  └── test_charter_reception_probe.py    2 tests
+      ├── Probe 1: Charter awareness (goal=charter_aligned confirmed)
+      └── Probe 2: Identity parameter recognition (strategic posture)
+
+  Total: 322 static tests + Ollama integration suite
 
 KEY FILES FOR NEW CONTRIBUTORS:
 ================================
@@ -304,8 +327,11 @@ KEY FILES FOR NEW CONTRIBUTORS:
   6. src/.../signals.py                  — Inter-tier signal contracts
   7. src/.../charter_context_injection.py — The whisper layer
   8. src/.../semantic_drift_tracker.py   — Posture trajectory analysis
-  9. src/.../territorial_defense.py      — Identity pathway maintenance
-  10. tests/test_phase_c_full_loop.py    — Best overview of system behavior
+  9. src/.../recovery_governance.py      — Governed pressure discharge
+  10. src/.../local_llm_bridge.py        — Full governance feedback loop
+  11. tests/test_phase_c_full_loop.py    — Best overview of system behavior
+  12. field-notes/SESSION_REPORT_2026-05-09.md — Steps 1-7 findings
+  13. field-notes/SESSION_REPORT_2026-05-10.md — Steps 8-9 findings
 
 PUBLISHED RESEARCH:
 ===================

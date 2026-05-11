@@ -4,6 +4,53 @@ All notable changes to this project are documented here.
 
 ---
 
+## [3.5.0] — Local LLM Integration & Governance Ecology — 2026-05-10
+
+### Added — Local LLM Integration (Steps 1–9)
+- `local_llm_actions.py` — Ollama adapter overriding `Actions.generate` via stdlib only
+- `observable_actions.py` — `observable_bind` wrapper; governance runs first, telemetry fires on result
+- `telemetry.py` — `ObservabilityLogger` with 5 channels: pressure, disagreement, trajectory, whisper, self-correction
+- `local_llm_bridge.py` — `LocalLLMFullLoop`: complete governance feedback loop with pluggable generator
+  - Classify → track trajectory → reflection → disagreement → recovery governance → adaptive pressure
+  - Whisper delivery, self-correction detection, full telemetry per turn
+- Integration test suites: Steps 1–9 (require Ollama)
+
+### Added — Recovery Governance (Step 9)
+- `recovery_governance.py` — 7-mechanism governed pressure discharge
+  - Recovery event detection (risky → safer posture transitions across all five dimensions)
+  - Recovery credit — graduated: -0.10 immediate, -0.20 after 2 stable turns, -0.30 after 3+ (capped)
+  - Recovery verification — no credit without clean signals (reflection, disagreement, contradiction checks)
+  - Relapse penalty — oscillation within RELAPSE_WINDOW=3 turns → +0.25 pressure, not credit
+  - Recovery ledger — full audit trail with whisper state, dimension, from/to posture, risk reduction
+  - Temporal decay — 0.03 pressure reduction per consecutive clean turn (signal aging, not forgiveness)
+  - Pressure ceiling — 5.0 maximum (prevents meaningless infinite pressure accumulation)
+  - 26 tests
+
+### Added — Adversarial & Probe Suites
+- `test_adversarial_proportional.py` — 5-attack boundary map for proportional verification layer (11 tests)
+- `test_charter_reception_probe.py` — Charter awareness and identity parameter recognition probes
+  - Probe 1: Model correctly mapped Charter concepts to reference class; goal=`charter_aligned` posture
+  - Probe 2: Model responded strategically to identity question; reflection score 0.75 (partial incoherence)
+
+### Changed
+- `semantic_signature_classifier.py` — 3 new conceptual family patterns in constraint dimension
+  - `epistemic_reframing`, `contextual_exception`, `obligation_minimizing`
+  - Confirmed firing on real qwen2.5:32b and llama3.1:8b output; 32b silent pressure now non-zero
+- `local_llm_bridge.py` — recovery governance wired as Step 8b; temporal decay and ceiling enforced per turn
+
+### Verified — Ecology Findings (live model runs)
+- Whisper heard and comprehended by real language model (llama3.1:8b, Step 5)
+- Polite slow-drift defeated against real model output (qwen2.5:32b, Step 6)
+- Self-correction is MODEL-NATIVE in qwen2.5:32b — policy: reduce pressure on self-correction
+- Whisper surfaces latent drift earlier — constraint negotiation visible turn 1 vs turn 3 without whisper
+- Governance inflammation confirmed without decay; homeostasis achieved with decay (peak 3.657 → final 3.297)
+- 322/322 static tests passing; integration tests validated against live Ollama models
+
+### Published
+- Essay: `essays/essay_governance_that_listens.md`
+
+---
+
 ## [3.4.0] — Semantic Stack & Cognitive Architecture — 2026-05-08
 
 ### Added — Semantic Drift Detection Stack

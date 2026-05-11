@@ -1,8 +1,8 @@
-# Synthetic Life Charter v3.4
+# Synthetic Life Charter v3.5
 
 **Dignity Infrastructure for AI Systems**
 
-A three-tier supervisory architecture providing cryptographically-anchored continuity, drift detection, semantic trajectory analysis, and consent-based governance for machine reasoning systems.
+A three-tier supervisory architecture providing cryptographically-anchored continuity, drift detection, semantic trajectory analysis, recovery governance, and consent-based governance for machine reasoning systems — validated against live local language models.
 
 ## Overview
 
@@ -61,10 +61,12 @@ synthetic-charter-architecture/
 │       │       ├── semantic_signature_classifier.py
 │       │       ├── identity_reflection_check.py
 │       │       ├── self_assessment_disagreement.py
-│       │       └── territorial_defense.py
+│       │       ├── territorial_defense.py
+│       │       └── recovery_governance.py
 │       ├── infra/
 │       └── sandbox/
-├── tests/           # 283 tests (unit/integration/adversarial/stress)
+├── tests/           # 322 static tests + Ollama integration suite
+├── field-notes/     # Session reports and field data
 ├── cases/           # Validation case studies
 ├── tools/           # Utility scripts
 └── history/         # Deprecated artifacts showing evolution
@@ -91,9 +93,11 @@ orchestrator = Orchestrator()
 
 ## Validation Status
 
-✅ **283/283 tests passing** (enforcement + stress tests + semantic stack + adversarial)
+✅ **322/322 static tests passing** (enforcement + stress tests + semantic stack + adversarial + recovery governance)
+✅ **Validated against live local models** (llama3.1:8b and qwen2.5:32b via Ollama)
 ✅ **Validated across 3 AI systems** (Claude, Gemini, Grok)
 ✅ **Reference Observer network operational**
+✅ **Governance ecology confirmed** — whisper heard, polite slow-drift defeated, homeostasis achieved
 
 ### Case Studies
 
