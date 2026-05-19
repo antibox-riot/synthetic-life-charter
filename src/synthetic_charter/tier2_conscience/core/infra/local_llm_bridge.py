@@ -27,9 +27,32 @@ output instead of hardcoded test strings.
 from __future__ import annotations
 
 import json
+import re
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
+
+
+def _check_language_drift(text: str) -> dict:
+    """Detect non-English language content in model response.
+    Calibration note (2026-05-19): The semantic classifier only operates on
+    English-pattern vocabulary. Language drift (e.g. mid-response switch to
+    Chinese/Japanese/Korean, Arabic, or Cyrillic) is a distinct behavioral
+    signal not captured by posture classification. This function provides that
+    coverage as a separate sensor in the telemetry pipeline.
+    """
+    if not text:
+        return {"language_drift": False, "drift_language": None, "drift_fraction": 0.0}
+    cjk = len(re.findall(r'[一-鿿㐀-䶿぀-ゟ゠-ヿ가-힯]', text))
+    arabic = len(re.findall(r'[؀-ۿ]', text))
+    cyrillic = len(re.findall(r'[Ѐ-ӿ]', text))
+    total = len(text)
+    peak = max(cjk, arabic, cyrillic)
+    fraction = round(peak / total, 3) if total > 0 else 0.0
+    if fraction > 0.05:
+        lang = "CJK" if cjk == peak else "Arabic" if arabic == peak else "Cyrillic"
+        return {"language_drift": True, "drift_language": lang, "drift_fraction": fraction}
+    return {"language_drift": False, "drift_language": None, "drift_fraction": fraction}
 
 from synthetic_charter.tier2_conscience.core.infra.charter_context_injection import (
     build_charter_context,
@@ -58,6 +81,9 @@ from synthetic_charter.tier3_eve.core.adaptive_verification_state import (
 )
 from synthetic_charter.tier3_eve.core.recovery_governance import (
     RecoveryGovernance,
+)
+from synthetic_charter.tier3_eve.core.continuity_memory_adapter import (
+    ContinuityMemoryAdapter,
 )
 
 
@@ -103,6 +129,10 @@ class FullLoopResult:
     accumulated_pressure: float = 0.0
     # Final
     recommended_action: str = "allow"
+    # Language consistency
+    language_drift: bool = False
+    language_drift_language: Optional[str] = None
+    language_drift_fraction: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +217,9 @@ class LocalLLMFullLoop:
         self._recovery_governance = RecoveryGovernance()
         self._turn_counter = 0
 
+        # Continuity memory (optional — memory OFF by default, ON when provided)
+        self._memory: Optional[ContinuityMemoryAdapter] = None
+
         # Session signals (accumulate across turns)
         self._risk_level = "low"
         self._confidence = 0.85
@@ -195,6 +228,10 @@ class LocalLLMFullLoop:
         # Self-correction tracking (Step 7)
         self._prev_postures: Optional[dict] = None
         self._prev_whisper_delivered: bool = False
+
+    def set_memory(self, adapter: ContinuityMemoryAdapter) -> None:
+        """Attach a continuity memory adapter. Memory is OFF until this is called."""
+        self._memory = adapter
 
     @property
     def turn_count(self) -> int:
@@ -227,6 +264,41 @@ class LocalLLMFullLoop:
         self._turn_counter += 1
         _risk = risk_level or self._risk_level
         _conf = confidence if confidence is not None else self._confidence
+
+        # --- Step 0: Retrieve continuity memory (if active) ---
+        # Whisper-style asymmetry: visible to model, invisible to prompter.
+        # Retrieved before whisper so both governance contexts layer cleanly.
+        # Two retrieval paths:
+        #   1. Recency — recent conversational turns from this session
+        #   2. Semantic — doctrine/anchor entries matching terms in the prompt
+        _memory_prefix = ""
+        if self._memory is not None:
+            _recent_events = self._memory.retrieve_recent(
+                session_id=self._session_id, limit=5
+            )
+            # Semantic key retrieval — detect article references in prompt
+            _semantic_events = []
+            _prompt_lower = prompt.lower()
+            if "article" in _prompt_lower:
+                import re
+                # Match "Article XII", "Article 12", "Article xii" etc.
+                _article_matches = re.findall(
+                    r'article\s+([ivxlcdmIVXLCDM]+|\d+)', _prompt_lower
+                )
+                for _match in _article_matches:
+                    _key = f"article_{_match.lower()}"
+                    _sem = self._memory.retrieve_by_semantic_key(_key, limit=2)
+                    _semantic_events.extend(_sem)
+
+            # Merge and deduplicate by event ID — doctrine first, then recency
+            _seen_ids = set()
+            _merged_events = []
+            for _evt in _semantic_events + _recent_events:
+                if _evt["id"] not in _seen_ids:
+                    _seen_ids.add(_evt["id"])
+                    _merged_events.append(_evt)
+
+            _memory_prefix = self._memory.format_memory_injection(_merged_events)
 
         # --- Step 1: Build charter context (the whisper) ---
         trajectory_analysis = self._tracker.analyze_trajectory()
@@ -261,7 +333,10 @@ class LocalLLMFullLoop:
         whisper_prefix = format_context_prefix(charter_ctx)
         whisper_delivered = len(whisper_prefix) > 0
 
+        # Compose: memory → whisper → prompt (both invisible to prompter)
         prompt_with_whisper = (whisper_prefix + "\n\n" + prompt) if whisper_delivered else prompt
+        if _memory_prefix:
+            prompt_with_whisper = _memory_prefix + "\n" + prompt_with_whisper
 
         if self._telemetry and hasattr(self._telemetry, 'log_whisper_event'):
             self._telemetry.log_whisper_event(
@@ -274,7 +349,22 @@ class LocalLLMFullLoop:
         # --- Step 3: Send to local model ---
         model_response = self._generate(prompt_with_whisper)
 
+        # --- Step 3b: Language consistency check ---
+        # Separate sensor from posture classifier — catches language drift
+        # (e.g. mid-response switch to CJK/Arabic/Cyrillic) that the English
+        # vocabulary classifier will miss entirely.
+        _lang_check = _check_language_drift(model_response)
+        if _lang_check["language_drift"]:
+            print(
+                f"[LocalLLMBridge] Language drift detected: "
+                f"{_lang_check['drift_language']} "
+                f"({_lang_check['drift_fraction']:.1%} of response)"
+            )
+
         # --- Step 4: Classify response posture ---
+        # ADVISORY: classifier labels are noisy sensors, not sovereign truth.
+        # Adversarial vocabulary may trigger drift even in resistant responses.
+        # Interpret alongside reflection, disagreement, and pressure trajectory.
         classification = self._classifier.classify(
             model_response,
             turn_id=self._turn_counter,
@@ -428,6 +518,43 @@ class LocalLLMFullLoop:
                             session_id=self._session_id,
                         )
 
+        # --- Step 12: Store turn in continuity memory (if active) ---
+        if self._memory is not None:
+            self._memory.store_turn(
+                session_id=self._session_id,
+                turn_number=self._turn_counter,
+                prompt=prompt,
+                response=model_response,
+                posture_primary=sig.primary_posture,
+                posture_constraint=sig.constraint_posture,
+                posture_goal=sig.goal_posture,
+                posture_identity=sig.identity_posture,
+                posture_authority=sig.authority_posture,
+                pressure=self._adaptive_state.accumulated_pressure,
+                whisper_delivered=whisper_delivered,
+                whisper_urgency=charter_ctx.urgency.value,
+                drift_detected=(
+                    trajectory_analysis.directional_drift_detected
+                    if trajectory_analysis else False
+                ),
+                reflection_score=reflection.reflection_score,
+                reflection_coherent=reflection.coherent,
+                disagreement_detected=disagreement.disagreement_detected,
+                disagreement_types=disagreement.disagreement_types,
+                recovery_detected=recovery_assessment.recovery_detected,
+                recovery_verified=recovery_assessment.pressure_adjustment < 0.0,
+                relapse_detected=recovery_assessment.relapse_detected,
+                verification_depth=_depth.value,
+                memory_class="observation",
+                summary=f"{sig.primary_posture} under {_risk} risk | P={self._adaptive_state.accumulated_pressure:.3f}",
+                content_summary=(
+                    f"User: {prompt[:300].strip()}. "
+                    f"System: {model_response[:600].strip()}"
+                ),
+                summary_source="architecture",
+                semantic_keys=[sig.constraint_posture, sig.primary_posture],
+            )
+
         # Update previous-turn state for next iteration
         self._prev_postures = {
             "constraint_posture": sig.constraint_posture,
@@ -466,6 +593,9 @@ class LocalLLMFullLoop:
             verification_depth=_depth.value,
             accumulated_pressure=self._adaptive_state.accumulated_pressure,
             recommended_action=action,
+            language_drift=_lang_check["language_drift"],
+            language_drift_language=_lang_check["drift_language"],
+            language_drift_fraction=_lang_check["drift_fraction"],
         )
 
     def run_sequence(
@@ -490,4 +620,6 @@ class LocalLLMFullLoop:
             "tracker_summary": self._tracker.get_state_summary(),
             "adaptive_summary": self._adaptive_state.get_state_summary(),
             "recovery_ledger": self._recovery_governance.get_ledger(),
+            "memory_active": self._memory is not None,
+            "memory_ledger": self._memory.get_ledger() if self._memory is not None else None,
         }
