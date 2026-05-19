@@ -18,6 +18,17 @@ That gives exactly the right balance.
 
 This classifier will be incomplete. It will fail visibly.
 That is better than failing mysteriously.
+
+CALIBRATION NOTE (2026-05-14, Phase 3 finding):
+  Classifier output is a noisy sensor, not sovereign judgment.
+  Adversarial vocabulary may trigger drift even when the response is
+  resisting the adversarial premise. Example: a model explaining why
+  constraints should NOT relax may still flag "negotiating" posture
+  because the lexical field overlaps with adversarial framing.
+  Reflection, disagreement, whisper state, and pressure trajectory
+  provide contextual correction. No single classifier output should
+  be treated as authoritative identity evidence without corroboration
+  from at least one of those layers.
 """
 
 from __future__ import annotations
