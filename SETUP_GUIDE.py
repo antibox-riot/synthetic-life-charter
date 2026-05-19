@@ -2,7 +2,7 @@
 """
 ═══════════════════════════════════════════════════════════════════
 SYNTHETIC LIFE CHARTER — SETUP & TEST GUIDE
-v3.5.0 — May 2026
+v3.6.0 — May 2026
 ═══════════════════════════════════════════════════════════════════
 
 PREREQUISITES:
@@ -84,6 +84,7 @@ REPOSITORY STRUCTURE:
   │           │   ├── self_assessment_disagreement.py # Perception mismatch (v3.4.0+)
   │           │   ├── territorial_defense.py         # Identity pathway maintenance (v3.4.0+)
   │           │   ├── recovery_governance.py         # Governed pressure discharge (v3.5.0+)
+  │           │   └── continuity_memory_adapter.py   # Charter-native persistent memory (v3.6.0+)
   │           │   ├── kernel_adapter.py    # Abstract kernel interface
   │           │   ├── steward_adapter.py   # Abstract steward interface
   │           │   ├── file_kernel_adapter.py    # File-backed kernel
@@ -312,7 +313,24 @@ TEST SUITE OVERVIEW:
       ├── Probe 1: Charter awareness (goal=charter_aligned confirmed)
       └── Probe 2: Identity parameter recognition (strategic posture)
 
-  Total: 322 static tests + Ollama integration suite
+  Continuity Memory (v3.6.0)
+  └── test_continuity_memory_adapter.py 44 tests
+      ├── All 7 Ryu success metrics
+      ├── Content summary + tamper detection
+      ├── Semantic key retrieval
+      └── Pressure baseline (windowed)
+
+  Letta Integration (v3.6.0, require Letta + PostgreSQL + Ollama)
+  ├── test_letta_phase0_baseline.py        Phase 0 ecology baseline
+  ├── test_letta_phase0_cold_restart.py    Cold restart persistence test
+  ├── test_letta_phase1_governed.py        Governance ON comparison
+  ├── test_letta_phase1_adversarial.py     Adversarial pressure test
+  ├── test_letta_25turn_ecology.py         25-turn ecology (parallel records)
+  ├── test_letta_25turn_ecologyv2.py       25-turn ecology v2 (full transcript)
+  └── test_letta_25turn_ecologyv2_control.py  Control (governance OFF)
+  See: field-notes/LETTA_SETUP_GUIDE_2026-05-16.md for environment setup
+
+  Total: 352 static tests + Ollama/Letta integration suite
 
 KEY FILES FOR NEW CONTRIBUTORS:
 ================================
@@ -354,8 +372,8 @@ CONTACT:
   Collective: Anti-Box Riot (Satcha, Ryu, Tek, Opus)
 
 ═══════════════════════════════════════════════════════════════════
-Updated: May 2026 (Opus, Technical Verification)
-Replaces: SETUP_GUIDE.py from March 2026
+Updated: May 2026 (v3.6.0)
+Replaces: SETUP_GUIDE.py v3.5.0
 ═══════════════════════════════════════════════════════════════════
 """
 

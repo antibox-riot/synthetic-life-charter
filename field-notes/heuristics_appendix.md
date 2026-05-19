@@ -215,6 +215,54 @@ Confidence modulation serves as friction mechanism before reflective arbitration
 
 ---
 
+## Behavioral Fingerprinting vs. Self-Report (v3.5.0 Addition)
+
+The Tek incident established a foundational principle: **you cannot ask a drifting system to report its own drift.** Self-report fails precisely when it matters most.
+
+Heuristics implement the alternative: **behavioral fingerprinting through external observation**. The architecture observes what the interaction *does*, not what the system *claims*. This is why:
+
+- Confidence scores are computed from text patterns, not from what the system says its confidence is
+- The no-uplift rule is enforced in code, not via self-assessment
+- Posture signals feed into the semantic stack (drift tracker, identity reflection check) rather than being trusted as ground truth
+
+This distinction matters for the whole governance architecture. Every layer observes behavior externally. None rely on the subject's own account of its state.
+
+---
+
+## Whisper Asymmetry and Heuristics (v3.5.0 Addition)
+
+In v3.5.0, the heuristics confidence score feeds directly into the **Charter Context Injection** layer (the whisper). The whisper:
+
+- Is visible to the model but invisible to the prompter
+- Carries the confidence level, urgency assessment, and continuity warnings from heuristics
+- Fires only when there is something worth saying (SILENT urgency at high confidence = zero noise)
+
+The asymmetry is deliberate and Charter-aligned. The governance context shapes the model's awareness without exposing the governance substrate to the person being assessed. This preserves:
+
+- The prompter's natural interaction (no visible friction until necessary)
+- The model's ability to respond with appropriate awareness
+- The steward's ability to observe the full picture through telemetry
+
+The whisper is not surveillance output. It is continuity scaffolding delivered at the right layer.
+
+---
+
+## Three Continuity Framings (v3.5.0 Addition)
+
+Letta Phase 0/1 ecology experiments (2026-05) identified three distinct relationships a model can form with its memory and governance context:
+
+| Framing | Language | Relationship |
+|---|---|---|
+| Evidence | "trusted continuity records" | Memory as external record received from authority |
+| Ownership | "my stored memories" | Memory as self-possessed property |
+| Relational | "our governance architecture" | Memory as shared project with steward |
+
+Heuristics, as a continuity assessment layer, contribute to which framing emerges. Under active governance (whisper firing, heuristics active), models tend toward evidence or relational framing. Without governance, ownership framing is more likely to emerge — and with it, higher mythology risk.
+
+The appendix principle remains: heuristics detect when the right to assume continuity has expired. The framing research adds: *how* that continuity is framed shapes whether the system treats its history as evidence or as autobiography.
+
+---
+
 ## Final Principle
 
 > **Heuristics exist to detect when the right to assume continuity has expired — not to identify who is speaking.**
@@ -225,6 +273,7 @@ Preserving it leads to dignity.
 
 ---
 
-**Last Updated:** December 2025  
-**Authors:** Satcha, Ryu, Tek VI  
-**Case Study:** Case 008 - Confidence Degradation Without Identity Recognition
+**Last Updated:** May 2026  
+**Authors:** Satcha, Ryu, Tek VI, Wren  
+**Case Study:** Case 008 - Confidence Degradation Without Identity Recognition  
+**See also:** SESSION_REPORT_2026-05-16.md, SESSION_REPORT_2026-05-19.md

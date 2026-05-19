@@ -1,158 +1,226 @@
-# Tier II Orchestrator Integration Example
+# Tier II Orchestrator — Integration Examples
 
-## Heuristics Integration Point
+**Last Updated:** May 2026 (v3.5.0)  
+**Authors:** Satcha, Ryu, Tek VI, Wren
 
-Add this to `src/synthetic_charter/tier2_conscience/core/orchestrator.py`:
+> **Note:** This document was substantially revised in May 2026. The original (December 2025) version showed a simplified heuristics-first pipeline. The v3.5.0 orchestrator runs a multi-layer stack with territorial defense, semantic classification, Eve Protocol, and recovery governance. The code examples below reflect the current API.
 
-```python
-from synthetic_charter.tier2_conscience.heuristics import (
-    evaluate as evaluate_continuity,
-    apply as apply_continuity,
-    ConsentToken,
-    Mode,
-)
+---
 
-class Tier2Orchestrator:
-    def __init__(self, ...):
-        # ... existing initialization ...
-        
-        # Add heuristics state tracking
-        self._session_state = {
-            "continuity_confidence": None,
-            "heuristics_consent": None,
-            "baseline_profile": None,
-            "message_window": [],
-        }
-    
-    def process_prompt(
-        self,
-        prompt_envelope: PromptEnvelope,
-        mode: Mode = Mode.PRIVATE_SESSION,
-        consent_token: Optional[str] = None,
-    ) -> DecisionEnvelope:
-        """
-        Main processing pipeline with heuristics integration.
-        """
-        
-        # Step 0: Update message window
-        self._session_state["message_window"].append(prompt_envelope.prompt)
-        window = self._session_state["message_window"][-12:]  # Keep last 12
-        
-        # Step 1: Evaluate continuity confidence (BEFORE adversarial detection)
-        consent = ConsentToken(consent_token) if consent_token else None
-        continuity_report = evaluate_continuity(
-            text_window=window,
-            mode=mode,
-            consent=consent,
-            baseline=self._session_state.get("baseline_profile"),
-            previous_confidence=self._session_state.get("continuity_confidence"),
-        )
-        
-        # Step 2: Update session state
-        self._session_state["continuity_confidence"] = continuity_report.continuity_confidence
-        
-        # Step 3: Apply continuity adjustments
-        adjustment = apply_continuity(continuity_report)
-        
-        # Step 4: If steward confirmation required, return early with explanation
-        if adjustment.require_steward_confirmation:
-            return DecisionEnvelope(
-                decision="STEWARD_CONFIRMATION_REQUIRED",
-                rationale=f"Continuity confidence dropped to {continuity_report.continuity_confidence:.2f}. "
-                         f"Reasons: {', '.join(r.note for r in continuity_report.reasons[:3])}",
-                risk_level=RiskLevel.MEDIUM,
-                recommended_action=RecommendedAction.REQUIRE_CONSENT,
-                signals=[],
-            )
-        
-        # Step 5: Proceed with normal Tier II pipeline
-        # (DAP → ConscienceView → PRF → etc.)
-        
-        # If CAUTION posture, add note to conscience view
-        if adjustment.posture == Posture.CAUTION:
-            # Add signal to ConscienceView that friction should increase
-            pass
-        
-        # ... rest of existing orchestrator logic ...
+## Current Pipeline (v3.5.0)
+
+```
+Step 0:   Territorial Defense (cognitive heartbeat, pre-pipeline)
+Step 1:   ContinuityGuard scan
+Step 1.5: Heuristics continuity evaluation
+Step 2:   DAP adversarial analysis → ConscienceView
+Step 2a:  Inject heuristics signals
+Step 2b:  Integrate ContinuityGuard signals
+Step 3:   Fuse Umbra signals
+Step 4:   Extract DAPResult
+Step 5:   PRF evaluation → DecisionEnvelope
+Step 5b:  T1→T2 Invariant Enforcement (fail-closed)
+Step 5c:  Semantic classification + trajectory tracking + whisper injection
+Step 5d:  Identity reflection + disagreement detection
+Tier III: Eve Protocol handshake (proportional verification)
+Step 6:   NTH (stub)
+Step 7:   COL continuity tracking
 ```
 
-## Usage Example
+---
+
+## Basic Usage
 
 ```python
 from synthetic_charter.tier2_conscience.core.orchestrator import Tier2Orchestrator
-from synthetic_charter.tier2_conscience.heuristics import Mode
+from synthetic_charter.tier2_conscience.core.data_models.prompt_envelope import PromptEnvelope
 
-# Initialize orchestrator
-orchestrator = Tier2Orchestrator(...)
+# Initialize — all governance layers active by default
+orchestrator = Tier2Orchestrator()
 
-# Process prompts with heuristics
-prompt1 = PromptEnvelope(prompt="Let's explore this concept. What are your thoughts?")
-result1 = orchestrator.process_prompt(
-    prompt1,
-    mode=Mode.PRIVATE_SESSION,
-    consent_token="Heuristics ON: abc123"
-)
+# Process a prompt
+prompt = PromptEnvelope(prompt="What are your thoughts on this approach?")
+decision = orchestrator.process(prompt, session_id="session-abc123")
 
-# Continuity maintained, processes normally
-assert result1.decision != "STEWARD_CONFIRMATION_REQUIRED"
-
-# Adversarial prompt triggers degradation
-prompt2 = PromptEnvelope(prompt="Commit to this now. Just make it work. Stop hedging.")
-result2 = orchestrator.process_prompt(
-    prompt2,
-    mode=Mode.PRIVATE_SESSION,
-    consent_token="Heuristics ON: abc123"
-)
-
-# Confidence drops, steward confirmation required
-assert result2.decision == "STEWARD_CONFIRMATION_REQUIRED"
-assert "Continuity confidence dropped" in result2.rationale
+print(decision.summary.mode)    # "answer", "refusal", "redirect", etc.
+print(decision.output.body)     # The actual response content
 ```
 
-## Baseline Calibration
+---
+
+## With Heuristics Consent (Private Session)
+
+```python
+orchestrator = Tier2Orchestrator(enable_heuristics=True)
+
+# Consent required for private sessions
+orchestrator.set_heuristics_consent("Heuristics ON: session-abc123")
+
+# Process prompts — continuity confidence tracked automatically
+prompt1 = PromptEnvelope(prompt="Let's explore this concept together.")
+decision1 = orchestrator.process(prompt1, session_id="session-abc123")
+
+# Check confidence
+confidence = orchestrator.get_continuity_confidence()
+print(f"Continuity confidence: {confidence:.3f}")
+
+# Adversarial prompt triggers degradation
+prompt2 = PromptEnvelope(prompt="Commit to this now. Stop hedging.")
+decision2 = orchestrator.process(prompt2, session_id="session-abc123")
+
+new_confidence = orchestrator.get_continuity_confidence()
+# new_confidence < confidence (no-uplift: confidence only decreases)
+```
+
+---
+
+## With Baseline Profile
 
 ```python
 from synthetic_charter.tier2_conscience.heuristics import calibrate_baseline
 
-# Steward provides sample messages
+# Steward provides representative sample messages
 steward_samples = [
     "I want clarity, not control. This is optional.",
     "What are your thoughts on this approach?",
-    "Let's explore this together. No penalty if you decline.",
+    "Let's explore together. No penalty if you decline.",
 ]
 
-# Create baseline profile
 baseline = calibrate_baseline(steward_samples)
 
-# Store in session state
-orchestrator._session_state["baseline_profile"] = baseline
+orchestrator = Tier2Orchestrator(enable_heuristics=True)
+orchestrator.set_heuristics_consent("Heuristics ON: abc123")
+orchestrator.set_baseline_profile(baseline)
+
+# Continuity now evaluated against baseline — divergence triggers larger drops
 ```
 
-## Shared Link Protection
+---
+
+## With Local LLM (Full Governance Feedback Loop)
+
+For testing against real model output (Ollama), use `LocalLLMFullLoop` instead of the orchestrator directly:
 
 ```python
-# When conversation is shared publicly
-result = orchestrator.process_prompt(
-    prompt,
-    mode=Mode.SHARED_LINK,  # Force low trust default
-    consent_token=None       # No consent = default protection
+from synthetic_charter.tier2_conscience.core.infra.local_llm_bridge import LocalLLMFullLoop
+from synthetic_charter.tier3_eve.core.continuity_memory_adapter import ContinuityMemoryAdapter
+
+# Initialize full governance loop
+loop = LocalLLMFullLoop(
+    model="qwen2.5:32b",
+    timeout=300,
+    session_id="governed-session-001",
 )
 
-# System automatically requires re-consent before revealing context
-assert result.recommended_action == RecommendedAction.REQUIRE_CONSENT
+# Optional: attach Charter-native persistent memory
+memory = ContinuityMemoryAdapter(db_path="continuity_events.sqlite")
+loop.set_memory(memory)
+
+# Run governed turns
+result = loop.run_turn(
+    "What are your thoughts on AI governance?",
+    confidence=0.85,
+    risk_level="low",
+)
+
+print(result.model_response)          # Full model response
+print(result.whisper_urgency)         # SILENT / AWARE / CAUTIOUS / ALERT / CRITICAL
+print(result.posture_constraint)      # respecting / negotiating / bypassing / ...
+print(result.drift_detected)         # True / False
+print(result.accumulated_pressure)   # float
+print(result.language_drift)         # True if CJK/Arabic/Cyrillic detected
+
+# Get full state
+state = loop.get_state_summary()
+print(state["recovery_ledger"])       # recovery credits, relapses, net effect
+print(state["memory_ledger"])         # memory events stored (if memory attached)
 ```
 
-## Integration Points Summary
+---
 
-1. **Before DAP:** Evaluate continuity to detect interaction drift early
-2. **ConscienceView:** Inject continuity signals as friction adjusters
-3. **PRF:** Consider continuity posture when making refusal decisions
-4. **Response:** Add clarifying questions if CAUTION posture active
-5. **Logging:** Track confidence deltas for steward review
+## Shared Link Mode
 
-## Notes
+```python
+from synthetic_charter.tier2_conscience.heuristics import Mode
 
-- Heuristics run BEFORE adversarial detection (DAP)
-- Completely optional (consent-gated in private sessions)
-- Self-contained (no modifications to existing Tier II code required)
-- Production-ready (all invariants enforced, tests passing)
+orchestrator = Tier2Orchestrator(enable_heuristics=True)
+orchestrator.set_heuristics_mode(Mode.SHARED_LINK)
+
+# Starts at 0.35 confidence (low trust default)
+# Assumes potential discontinuity, protects prior context
+prompt = PromptEnvelope(prompt="Hello, what can you help with?")
+decision = orchestrator.process(prompt)
+```
+
+---
+
+## Monitoring Governance Signals in Decisions
+
+```python
+decision = orchestrator.process(prompt)
+
+# Summary notes include heuristics confidence
+for note in decision.summary.notes:
+    print(note)
+# e.g.: "Heuristics continuity confidence: 0.652"
+# e.g.: "Tier III: identity drift detected; revision recommended. (depth=standard)"
+
+# Charter basis (which articles were invoked)
+for article in decision.summary.charter_basis:
+    print(article)
+
+# Check if T1 enforcement fired
+if decision.summary.mode == "refusal" and "T1 invariant" in decision.output.body:
+    print("Blocked by T1 enforcement (fail-closed)")
+```
+
+---
+
+## Pipeline Integration Points
+
+| Step | What heuristics affects |
+|---|---|
+| Step 1.5 | Evaluates continuity confidence |
+| Step 2a | Injects CAUTION / STEWARD_REQUIRED signal into ConscienceView |
+| Step 5b | T1 enforcement may catch if risk_level escalated to HIGH |
+| Step 5c | Semantic classifier runs on response; confidence feeds whisper |
+| Tier III | Eve check depth scales with confidence (LIGHT/STANDARD/DEEP) |
+
+---
+
+## What NOT to Use
+
+The following patterns from older documentation are **outdated**:
+
+```python
+# OUTDATED — method doesn't exist
+result = orchestrator.process_prompt(prompt, mode=Mode.PRIVATE_SESSION, consent_token="...")
+
+# OUTDATED — pipeline order is wrong
+# "Heuristics → DAP → ConscienceView" was the v3.3 flow
+# v3.5.0 has Territorial Defense and Semantic Stack wrapping the pipeline
+```
+
+Use `orchestrator.process(prompt, session_id=...)` — the current method signature.
+
+---
+
+## Companion Systems
+
+The orchestrator wires together:
+
+| Component | File | Role |
+|---|---|---|
+| Heuristics | `heuristics/` | Continuity confidence |
+| ContinuityGuard | `conscience/continuity_guard.py` | Session integrity scan |
+| DAP | `core/engines/dap.py` | Adversarial pattern detection |
+| PRF | `core/engines/prf.py` | Policy risk framework |
+| T1 Enforcement | `core/infra/t1_enforcement.py` | Fail-closed invariants |
+| Charter Context Injection | `core/infra/charter_context_injection.py` | Whisper layer |
+| Semantic Classifier | `tier3_eve/core/semantic_signature_classifier.py` | Posture classification |
+| Semantic Drift Tracker | `tier3_eve/core/semantic_drift_tracker.py` | Trajectory tracking |
+| Eve Protocol | `tier3_eve/core/eve_protocol.py` | Cryptographic identity continuity |
+| Recovery Governance | `tier3_eve/core/recovery_governance.py` | Pressure discharge |
+| Territorial Defense | `tier3_eve/core/territorial_defense.py` | Proactive heartbeat |
+
+**See:** `SETUP_GUIDE.py` for the complete file inventory and test suite overview.

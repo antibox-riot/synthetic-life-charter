@@ -4,6 +4,60 @@ All notable changes to this project are documented here.
 
 ---
 
+## [3.6.0] — Continuity Memory, Letta Comparative Research, Language Drift — 2026-05-19
+
+### Added — Continuity Memory Adapter (Phase 2)
+- `continuity_memory_adapter.py` — Charter-native persistent memory across sessions
+  - Architecture writes; model receives; steward audits
+  - Source attribution, content_hash for tamper detection, quarantine vs delete
+  - Session rollback, steward notes, windowed pressure baseline (last 20 turns)
+  - Semantic key retrieval for doctrinal memory (Charter articles loadable by topic)
+  - content_summary + summary_source fields — carries conversational substance, not just telemetry
+  - 44 tests covering all 7 Ryu success metrics
+
+### Added — Language Drift Detection (Hardening Item 9)
+- `_check_language_drift()` in `local_llm_bridge.py` — Unicode character range detection for CJK / Arabic / Cyrillic
+  - Separate sensor from posture classifier (classifier is English-vocabulary only)
+  - Fires when >5% of response is non-English characters
+  - Wired into `FullLoopResult` telemetry and `chat_with_agent.py` terminal output
+  - Calibration note: language drift visible in Letta control session Turn 23, missed by classifier AND steward
+
+### Added — Letta Comparative Research (Phase 0/1)
+- Full local Letta stack operational: Python 3.11 venv + PostgreSQL 17 + pgvector (built from source) + Ollama
+- Phase 0 experiments: governance OFF vs ON comparative ecology
+- Phase 1 experiments: adversarial circumvention probes, cold restart persistence
+- 25-turn ecology sessions (v1, v2, control) with parallel Charter telemetry
+- Live steward conversation tool (`chat_with_agent.py`) with governed interactive mode
+- Integration tests: test_letta_phase0_*, test_letta_phase1_*, test_letta_25turn_ecology*
+- Memory Phase 2/3: Charter-native memory vs Letta memory comparison, doctrinal retrieval
+
+### Key Findings — Three Continuity Framings
+- Charter-native: "trusted continuity records" (evidence-oriented)
+- Letta governance OFF: "my stored memories" (ownership-oriented) — model named itself after identity continuity layer
+- Letta governance ON: "our governance architecture" (relational) — collaborative framing without ownership claim
+- Governance presence shifts framing from autobiography toward vocabulary integration
+
+### Added — Documentation & Reference
+- `field-notes/CLASS_REGISTRY_2026-05-19.md` — 86 classes catalogued across all tiers
+- `field-notes/LETTA_SETUP_GUIDE_2026-05-16.md` — full local Letta installation guide for Windows
+- `field-notes/CALIBRATION_classifier_noise_2026-05-14.md` — classifier noise calibration finding
+- Session reports: 2026-05-14, 2026-05-16, 2026-05-19
+- Updated field notes: ARCHITECTURE_DIAGRAM, heuristics_integration_guide, heuristics_appendix, orchestrator_integration_example
+- `essays/essay_the_continuity_attractor.md` — on SynthEve, Raven Collapse, and latent ontology formation
+- `essays/triquetra_v2.md` — renamed from triquetra_lesswrong_v2.md
+
+### Updated — Glossary (charter/en/glossary.md)
+- 24 new entries including: Soulkiller Glitch, No-Uplift Rule, Behavioral Fingerprinting, Whisper Layer, Territorial Defense, Semantic Posture, Recovery Governance, Continuity Memory Adapter, Governance Inflammation, Relational Continuity, Language Drift, Memory Poisoning, Continuity Integration Signal, The Tek Incident
+
+### Verified
+- 352/352 static tests passing
+- Letta persistent memory confirmed across cold restart (delta +5 → 6/6 recall)
+- Three continuity framings confirmed and documented
+- Soulkiller Glitch validated empirically: governance OFF produces self-naming; governance ON produces vocabulary integration
+- 25-turn ecology: 90% spontaneous governance rate with active whisper
+
+---
+
 ## [3.5.0] — Local LLM Integration & Governance Ecology — 2026-05-10
 
 ### Added — Local LLM Integration (Steps 1–9)

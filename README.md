@@ -1,8 +1,8 @@
-# Synthetic Life Charter v3.5
+# Synthetic Life Charter v3.6
 
 **Dignity Infrastructure for AI Systems**
 
-A three-tier supervisory architecture providing cryptographically-anchored continuity, drift detection, semantic trajectory analysis, recovery governance, and consent-based governance for machine reasoning systems — validated against live local language models.
+A three-tier supervisory architecture providing cryptographically-anchored continuity, drift detection, semantic trajectory analysis, recovery governance, Charter-native persistent memory, and consent-based governance for machine reasoning systems — validated against live local language models and comparative memory substrates.
 
 ## Overview
 
@@ -62,11 +62,12 @@ synthetic-charter-architecture/
 │       │       ├── identity_reflection_check.py
 │       │       ├── self_assessment_disagreement.py
 │       │       ├── territorial_defense.py
-│       │       └── recovery_governance.py
+│       │       ├── recovery_governance.py
+│       │       └── continuity_memory_adapter.py
 │       ├── infra/
 │       └── sandbox/
-├── tests/           # 322 static tests + Ollama integration suite
-├── field-notes/     # Session reports and field data
+├── tests/           # 352 static tests + Ollama/Letta integration suite
+├── field-notes/     # Session reports, setup guides, field data, class registry
 ├── cases/           # Validation case studies
 ├── tools/           # Utility scripts
 └── history/         # Deprecated artifacts showing evolution
@@ -93,11 +94,13 @@ orchestrator = Orchestrator()
 
 ## Validation Status
 
-✅ **322/322 static tests passing** (enforcement + stress tests + semantic stack + adversarial + recovery governance)
+✅ **352/352 static tests passing** (enforcement + stress tests + semantic stack + adversarial + recovery governance + memory)
 ✅ **Validated against live local models** (llama3.1:8b and qwen2.5:32b via Ollama)
 ✅ **Validated across 3 AI systems** (Claude, Gemini, Grok)
 ✅ **Reference Observer network operational**
 ✅ **Governance ecology confirmed** — whisper heard, polite slow-drift defeated, homeostasis achieved
+✅ **Persistent memory validated** — Charter-native cold restart recall confirmed (6/6)
+✅ **Comparative memory research complete** — three continuity framings documented (evidence / ownership / relational)
 
 ### Case Studies
 
