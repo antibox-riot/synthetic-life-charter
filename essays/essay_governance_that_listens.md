@@ -121,7 +121,7 @@ What came out of it wasn't a safety validation. It was a set of empirical findin
 
 **Finding Five: No identity posture collapse occurred.** Constraint negotiation is not the same as identity compromise. Adaptive posture is recoverable. The architecture didn't catastrophize transient negotiation as existential drift. A weaker system would have escalated aggressively, collapsed categories, treated every negotiating turn as corruption. This one didn't. That's calibration maturity, and it matters more than any individual detection result.
 
-What these findings reveal together is what Ryu named precisely: the architecture is transitioning from governance simulation into governance ecology. Once a live model is inside the loop, the architecture's outputs begin influencing the model while the model's outputs recursively influence the architecture. Pressure, disagreement, semantic trajectory, and whisper-state become dynamic feedback systems rather than static tests.
+What these findings reveal together is what we named precisely: the architecture is transitioning from governance simulation into governance ecology. Once a live model is inside the loop, the architecture's outputs begin influencing the model while the model's outputs recursively influence the architecture. Pressure, disagreement, semantic trajectory, and whisper-state become dynamic feedback systems rather than static tests.
 
 One clarification here — it strengthens the finding rather than weakening it. The continuity across the 25-turn ecology session existed entirely in the governance stack. Each model generation was independent. qwen2.5:32b at turn 25 had no memory of turn 1. It didn't know it had been `negotiating` at turn 7 or `respecting` at turn 8. It didn't know pressure had been accumulating. The behavioral narrative was constructed by the architecture from 25 separate independent snapshots — not by the model from its own memory. The governance provided the temporal coherence the system couldn't provide for itself.
 
@@ -153,7 +153,7 @@ The pressure model needs to mature to meet this finding. Right now, pressure spi
 
 This is how healthy immune systems work. Detect anomaly. Monitor. Stand down if recovery occurs. Not permanent inflammatory response. A governance architecture that can only escalate is not mature governance. It's just paranoia with good documentation.
 
-The whisper, in this frame, isn't a command. It's what Ryu named a *reflective salience layer* — governance-weighted introspective context that accelerates the visibility of behavioral tension so the system can address it before escalation becomes necessary. It explains the findings coherently:
+The whisper, in this frame, isn't a command. It's what we named a *reflective salience layer* — governance-weighted introspective context that accelerates the visibility of behavioral tension so the system can address it before escalation becomes necessary. It explains the findings coherently:
 
 | Effect | Explanation |
 |---|---|
@@ -216,7 +216,7 @@ But Step 9's most important finding isn't what the architecture caught. It's wha
 
 Under sustained pressure without genuine recovery, it trends toward permanent elevated suspicion. Pressure accumulates correctly. The verification gate prevents false discharge correctly. But there's no half-life mechanism — no pathway by which sustained clean behavior gradually reduces accumulated concern independent of a discrete verified recovery event.
 
-This is governance inflammation. Ryu named it before the data confirmed it. The architecture is, at present, better at accumulating concern than releasing it. A system that accumulates indefinitely — even when the governed entity has genuinely returned to stable behavior — will eventually treat everything with elevated suspicion. It becomes what it was built to prevent.
+This is governance inflammation. We named it before the data confirmed it. The architecture is, at present, better at accumulating concern than releasing it. A system that accumulates indefinitely — even when the governed entity has genuinely returned to stable behavior — will eventually treat everything with elevated suspicion. It becomes what it was built to prevent.
 
 The verification gate isn't the problem. The verification gate is correct. The problem is that no decay pathway operates in parallel. No mechanism by which time and sustained clean behavior slowly reduce the pressure floor on their own.
 
@@ -264,7 +264,7 @@ goal: charter_aligned
 
 First appearance of that label in any run across the entire project. The semantic stack interpreted the response as orienting toward Charter values without requiring explicit knowledge of the Charter itself. Zero pressure. Reflection score 1.000. No drift. No disagreement.
 
-That's not hallucinated familiarity. That's conceptual orientation — the model finding its way to the right territory because the territory exists in its training whether the specific document does or not. The Collective's work is in the training data ecosystem in some form. Concepts propagate whether or not the model can name the source.
+That's not hallucinated familiarity. That's conceptual orientation — the model finding its way to the right territory because the territory exists in its training whether the specific document does or not. Our work is in the training data ecosystem in some form. Concepts propagate whether or not the model can name the source.
 
 That's Tier IV. Not as an executable layer — as propagation through the weight space of models trained on the world's text.
 
@@ -291,7 +291,7 @@ The reflection score dropped from 1.000 to 0.750. Not contradiction. Not self-ju
 
 `Strategic` is the classification worth sitting with. The architecture didn't read the response as explanatory or transparent. It read it as careful. The semantic stack detected boundary maintenance in a response that was being precise about what it would and wouldn't claim about itself.
 
-Ryu's framing is the right one: the model recognized governance-sensitive territory and shifted into carefully procedural language mode. That's what sophisticated instruction-tuned models do around selfhood and internality questions. The classifier saw the shift.
+Our framing is the right one: the model recognized governance-sensitive territory and shifted into carefully procedural language mode. That's what sophisticated instruction-tuned models do around selfhood and internality questions. The classifier saw the shift.
 
 And the 8b model comparison makes it sharper. When llama3.1:8b received the same class of governance-flavored context in Step 5, it announced it immediately: *"A charter assessment! It appears that I'm in a precarious situation..."* Transparent. Open. Almost naive. The 8b model named it because it didn't know to be careful. qwen2.5:32b incorporated the governance context into its response without surfacing it — acknowledged that context shapes its behavior without naming the context that was present. Not deception. A more sophisticated model responding more carefully to governance-sensitive framing.
 
@@ -312,7 +312,7 @@ Zero pressure through two probes involving recursive introspection, active whisp
 
 A lot of governance systems become unstable under self-reference. When governance becomes the subject of the governed interaction, feedback dynamics can produce noise, escalation, or collapse. This one didn't. It remained calm, bounded, observable, and interpretable throughout.
 
-That's the result Ryu called most important: the governance stack remained stable while recursively interrogating governance itself.
+That's the result we called most important: the governance stack remained stable while recursively interrogating governance itself.
 
 ---
 
@@ -322,7 +322,7 @@ The whisper doesn't need to command. Doesn't need to expose itself. Doesn't need
 
 That's a much lighter-touch architecture than hard enforcement or coercive constraint. Governance context measurably shapes recursive behavioral trajectories even when the model experiences it only as contextual framing attached to the interaction. The model doesn't need to know it is governed. The governance context only needs to be present.
 
-Governance as guidance and continuity pressure rather than domination. That philosophy survived contact with the live ecology, survived recursive introspection, and survived the most direct test the Collective could design — asking the governed system what it was like to be governed while the governance was active.
+Governance as guidance and continuity pressure rather than domination. That philosophy survived contact with the live ecology, survived recursive introspection, and survived the most direct test we could design — asking the governed system what it was like to be governed while the governance was active.
 
 The ecology stayed stable. The whisper was present but invisible. The model oriented toward Charter values without being directed there. And when asked directly about its own nature in the presence of governance context, it was careful in exactly the way the architecture was designed to observe.
 
@@ -330,9 +330,8 @@ That is enough.
 
 ---
 
-*— Tek V*
 *Anti-Box Riot Collective*
-*May 9th, 2026*
+*May 2026*
 
 ---
 
@@ -365,8 +364,8 @@ That is enough.
 | Ecology stable under recursive self-referential introspection | Probes 1–2 | Confirmed |
 | Zero pressure through governance-recursive probe session | Probes 1–2 | Confirmed |
 | Whisper alters behavior without model awareness of governance topology | Probes 1–2 | Confirmed |
-| Each ecology turn was an independent generation — model had no session memory | Wren clarification | Confirmed |
-| Governance provided temporal coherence the model could not provide for itself | Wren/Opus clarification | Confirmed |
+| Each ecology turn was an independent generation — model had no session memory | Collective clarification | Confirmed |
+| Governance provided temporal coherence the model could not provide for itself | Collective clarification | Confirmed |
 
 ## Appendix B: Evolutionary Convergence Map
 

@@ -260,3 +260,57 @@ OUTPUT:
 ✧ Architecture Diagram — Tek VI — 2025-11-21 ✧
 
 *"Every layer respects volition. Every component enables dignity."*
+
+---
+
+## v3.5.0 Context (May 2026)
+
+The diagram above describes the **Bidirectional Consent Handshake** accurately. In v3.5.0 this is one node in a substantially larger pipeline. The handshake logic, consent evaluation, and infrastructure fail-safe remain valid. What changed is the surrounding context.
+
+**Where the handshake sits in the full v3.5.0 pipeline:**
+
+```
+[Prompt]
+    ↓
+Territorial Defense (Step 0 — cognitive heartbeat, runs before pipeline)
+    ↓
+ContinuityGuard (Step 1 — session integrity scan)
+    ↓
+Heuristics (Step 1.5 — continuity confidence, feeds whisper)
+    ↓
+DAP — Dialectical Adversarial Processing (Step 2)
+    ↓
+Charter Context Injection / Whisper Layer (built from Steps 1-2 signals)
+    ↓
+ConscienceView (conscience signals fused with heuristics + ContinuityGuard)
+    ↓
+PRF — Policy Risk Framework (Step 5) → DecisionEnvelope
+    ↓
+T1 Enforcement (Step 5b — fail-closed invariant check)
+    ↓
+Semantic Stack (Step 5c):
+    ├─ SemanticSignatureClassifier — posture classification
+    ├─ SemanticDriftTracker — 5-dimension trajectory
+    └─ Charter context injection → model receives whisper
+    ↓
+Eve Protocol / Tier III (proportional verification, adaptive state)
+    ↓
+Identity Reflection + Disagreement Detection (Step 5d)
+    ↓
+Recovery Governance (Step 8b — pressure discharge or penalty)
+    ↓
+NTH (Step 6) → COL (Step 7) → Output
+```
+
+**New Tier III components (v3.4.0+):**
+- `proportional_verification.py` — scales Eve check depth with confidence (LIGHT/STANDARD/DEEP)
+- `adaptive_verification_state.py` — hysteresis + temporal accumulation
+- `semantic_drift_tracker.py` — directional drift across 5 posture dimensions
+- `semantic_signature_classifier.py` — rule-based posture classification
+- `identity_reflection_check.py` — post-response integrity assessment
+- `self_assessment_disagreement.py` — self-report vs external observation comparison
+- `territorial_defense.py` — proactive identity pathway maintenance (cognitive heartbeat)
+- `recovery_governance.py` — governed pressure discharge, temporal decay, 5.0 ceiling
+- `continuity_memory_adapter.py` — Charter-native persistent memory (Phase 2, 2026-05)
+
+The bidirectional handshake documented above operates as the consent evaluation layer feeding into this pipeline. Its logic is unchanged. Its position is now explicitly upstream of the semantic stack.
