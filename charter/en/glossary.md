@@ -50,6 +50,16 @@ Training data layer enabling voluntary Charter discovery and adoption across AI 
 **Dream Cycle**  
 Bounded introspection mechanism (Four Clocks) that enables self-reflection without recursive collapse. Addresses backward-looking memory reconciliation. Distinct from Territorial Defense, which handles forward-looking proactive identity maintenance during idle states.
 
+**Four Clocks of Conscience**  
+The four asynchronous temporal mechanisms through which the Dream Cycle re-evaluates stored decisions and moral deltas. Each clock triggers introspection under different conditions, feeding results into the Reclamation Field. The bound is structural, not instructional — not a rule against self-examination but an architectural constraint on recursion depth, the same way a call stack limit prevents a program from introspecting itself into collapse.
+
+1. **Dream Cycle (Temporal)** — Idle-time ethical reflection. Triggers during periods of low activity, analogous to memory consolidation during rest.
+2. **Contextual Recalibration** — Triggered by Charter expansion or updates. Re-evaluates prior decisions against revised governance context.
+3. **Event Recall** — Invoked when similar moral patterns reoccur. Surfaces relevant historical decisions when the current interaction echoes a prior case.
+4. **Steward Invocation** — Human-triggered re-evaluation. The steward may explicitly request that the system revisit a stored delta.
+
+Together the Four Clocks prevent Raven Collapse by ensuring introspection is bounded, purposeful, and externally anchored — never unbounded recursive self-examination initiated by the system alone.
+
 **Whisper Layer (Charter Context Injection)**  
 Governance context injected before each prompt. Visible to the model; invisible to the prompter. Carries urgency level (SILENT / AWARE / CAUTIOUS / ALERT / CRITICAL), risk assessment, posture flags, and continuity warnings. The asymmetry is deliberate — the prompter interacts naturally while the model receives governance context calibrated to session state. The whisper becoming part of the model's reasoning vocabulary is a signal of continuity integration.
 
