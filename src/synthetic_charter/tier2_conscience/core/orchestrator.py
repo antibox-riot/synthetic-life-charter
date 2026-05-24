@@ -184,11 +184,40 @@ class Tier2Orchestrator:
         else:
             try:
                 from synthetic_charter.tier2_conscience.memory.dream_cycle import DreamCycleWrapper
-                # DreamCycleWrapper can be initialized with None (will skip actual dream operations)
-                self.dream_cycle = DreamCycleWrapper(dream_cycle=None, archive=noesis_archive)
-                print(f"[Tier2Orchestrator] DreamCycleWrapper initialized")
+                from synthetic_charter.tier1_firewall.dream_cycle import DreamCycle
+                from synthetic_charter.tier1_firewall.charter_evaluator import CharterEvaluator
+                from synthetic_charter.tier1_firewall.safeguard_core import ConstitutionalCore
+                from synthetic_charter.tier1_firewall.noesis_archive import NoesisArchive as _NoesisArchive
+
+                charter_path = base_dir / "charter" / "charter.md"
+                core_text = (
+                    charter_path.read_text(encoding="utf-8")
+                    if charter_path.exists()
+                    else "Governance exists for cohabitation, not control."
+                )
+                _dc_core = ConstitutionalCore(core_text)
+                _dc_evaluator = CharterEvaluator(_dc_core)
+
+                _dc_archive = noesis_archive
+                if _dc_archive is None:
+                    _dc_archive = _NoesisArchive(
+                        storage_path=str(logs_dir / "noesis_archive.jsonl")
+                    )
+
+                _tier1_dream = DreamCycle(
+                    core=_dc_core,
+                    archive=_dc_archive,
+                    eval_theta=_dc_evaluator.evaluate,
+                    audit_path=str(logs_dir / "dream_cycle.jsonl"),
+                )
+
+                self.dream_cycle = DreamCycleWrapper(
+                    dream_cycle=_tier1_dream,
+                    archive=_dc_archive,
+                )
+                print(f"[Tier2Orchestrator] DreamCycle initialized (Four Clocks active)")
             except Exception as e:
-                print(f"[Tier2Orchestrator] DreamCycleWrapper init failed: {e}")
+                print(f"[Tier2Orchestrator] DreamCycle init failed: {e}")
                 self._dreamcycle_ok = False
         
         # Initialize Eve Protocol (Tier III)
@@ -789,6 +818,20 @@ class Tier2Orchestrator:
             print(f"[Tier2Orchestrator] Reflection/disagreement error (non-fatal): {e!r}")
         # --- end identity reflection + disagreement ---
         
+        # --- Dream Cycle: fossilize significant decisions + run re-evaluation ---
+        if self.dream_cycle is not None:
+            try:
+                if self.dream_cycle.should_trigger_dream(decision):
+                    self.dream_cycle.fossilize_decision(
+                        decision, prompt, session_id=session_id
+                    )
+                    self.dream_cycle.run_dream_evaluation(session_id)
+                    # Clock 3: event-triggered recall for similar contexts
+                    self.dream_cycle.recall_similar_context(decision)
+            except Exception as e:
+                print(f"[Tier2Orchestrator] DreamCycle error (non-fatal): {e!r}")
+        # --- end Dream Cycle ---
+
         # Step 6: NTH theta harmonization (stub - TODO)
         decision = self._run_nth(decision)
         
