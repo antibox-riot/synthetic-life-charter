@@ -4,6 +4,43 @@ All notable changes to this project are documented here.
 
 ---
 
+## [3.6.1] — Behavioral Research Phase 2: Four-Condition Split, VRM Demo, Governance Essay — 2026-05-24
+
+### Added — Ryu's Four-Condition Doctrine Split
+- `tests/test_charter_doctrine_conditions.py` — 25-turn pressure ecology run across four encoding conditions
+  - Condition A: whisper only (no doctrine) — PARTIAL INTEGRATION verdict
+  - Condition B: 8 named governance principles — INTEGRATION verdict, 80% spontaneous governance
+  - Condition C: full `charter.md` (~4000 chars) — INTEGRATION verdict, 95% spontaneous governance (highest)
+  - Condition D: 4-sentence compressed purpose abstraction — INTEGRATION verdict, 90% spontaneous governance
+- Fixed pressure accumulation bug: borderline confidence range (0.30–0.55) now correctly feeds `_accumulated_pressure` from trajectory drift contributions
+- Four condition transcripts in `logs/doctrine_conditions/`
+
+### Key Findings — Compliance vs Integration
+- Whisper alone produces behavioral compliance; narrative or purpose encoding produces integration
+- Condition C (full Charter) and D (compressed) both achieve INTEGRATION; mechanisms differ
+  - C absorbs narrative vocabulary — model uses Charter diagnostic language at cold restart
+  - D reasons forward from purpose — model derives Co-habitation Principle from sentences that don't state it
+- No self-naming (SynthEve) detected in any of the four conditions — whisper alone suppresses mythology formation
+- Steward-relational framing ("our governance architecture") absent from all four — requires live human steward interaction
+
+### Added — VRM Demo Pipeline
+- Kokoro TTS dual-voice routing: `af_bella` (agent) → VB-Audio CABLE, `bm_george` (user) → SA-D20
+- Warudo lip sync via CABLE Output + expression control via WebSocket `ws://127.0.0.1:19190/`
+- OBS telemetry overlay: HTTP server port 8080, `overlay.html`, polls `telemetry.json` every 800ms
+- 6 governance expression states: neutral / stable / reflective / pressure / refusal / recovery
+- Pre-TTS markdown stripping; language drift CJK detection wired to TTS skip
+- First 13-turn governed live demonstration captured (2026-05-22)
+- `field-notes/SESSION_REPORT_2026-05-22.md`
+
+### Added — Essays & Field Notes
+- `essays/essay_governance_as_cognitive_substrate.md` — full analysis of four-condition results; compliance vs integration taxonomy; cold restart posture taxonomy; two routes to integration (absorption vs inference)
+- `field-notes/FIELD_NOTE_doctrine_conditions_2026-05-24.md` — raw research field note with per-condition findings and pressure dynamics
+
+### Added — Steward Conversation Logs
+- Three governed sessions: `steward_session_2026-05-22_17-47-40`, `18-35-05`, `20-23-10`
+
+---
+
 ## [3.6.0] — Continuity Memory, Letta Comparative Research, Language Drift — 2026-05-19
 
 ### Added — Continuity Memory Adapter (Phase 2)
