@@ -1,0 +1,4 @@
+============================= test session starts =============================
+collecting ... collected 4 items / 3 deselected / 1 selected
+
+tests/test_charter_doctrine_conditions.py::test_condition_d_compressed FAILED
