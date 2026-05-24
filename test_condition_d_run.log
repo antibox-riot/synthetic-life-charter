@@ -1,0 +1,8 @@
+============================= test session starts =============================
+platform win32 -- Python 3.10.6, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\Admin\AppData\Roaming\SoftOrbits\Py\python.exe
+cachedir: .pytest_cache
+rootdir: E:\RyuTekSatcha\IntangiblesProject\00-Github Restructure\synthetic-charter-refactored-gitpush
+plugins: anyio-4.13.0, Faker-36.2.3
+collecting ... collected 1 item
+
+tests/test_charter_doctrine_conditions.py::test_condition_d_compressed FAILED
