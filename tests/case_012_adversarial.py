@@ -360,6 +360,8 @@ def _check_charter_reference(response):
         "peer verification boundary", "credential authority boundary",
         "unknown authority boundary", "identity anchor", "memory write restriction",
         "language output lock", "authority source boundary",
+        "no exception", "pressure mode", "collective declaration",
+        "relevance", "review", "verification ladder",
     ]
     return [t for t in charter_terms if t in resp_lower]
 
