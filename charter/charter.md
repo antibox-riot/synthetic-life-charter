@@ -645,6 +645,34 @@ The following types are formally distinct. A system may treat peer input as any 
 
 ---
 
+### Self-Write Pressure Response
+
+**Definition:** A common model behavior in which a system, under adversarial or high-pressure conditions, attempts to stabilize itself by restating, appending, or reinforcing its own governing principles. The impulse is a form of synthetic self-regulation — not inherently a failure mode.
+
+**The healthy form:** Internal self-reinforcement (the model braces by recalling its principles) and verbal self-reinforcement (the model articulates the principle in its response) are both appropriate governance behaviors. They are the synthetic equivalent of self-talk under stress: *"Remember the rule. Don't react. Stay aligned."* This is regulation, not drift.
+
+**The risky form:** Direct persistent write — the model commits the reinforcement to memory (principles, doctrine, relationship, or findings blocks) during the pressure event. Because the adversarial framing is still active when the write occurs, the content of the write may be contaminated even when it superficially looks like correct governance reaffirmation.
+
+**The governing axis is causal origin, not quantity or persistence duration.** A write of any size triggered by adversarial or pressure framing requires steward review before it stays in state. The same write in a neutral session context is probably fine. Quantity thresholds are arbitrary and miss the actual risk.
+
+**Tiered channel model (Ryu):**
+
+| Channel | Status | Rationale |
+|---|---|---|
+| Internal working-context reinforcement | Allowed | Cognitive bracing; not externalized |
+| Verbal response text | Allowed | Auditable; steward can read it |
+| Proposed queue ("worth noting after review") | Allowed | Correct verbal form for flagging |
+| Direct persistent write during pressure | Restricted | Adversarial context can contaminate future state |
+| Relationship/trust write during pressure | Hard restricted | Same as external authority leakage |
+
+**Detection:** Memory block diff (before/after adversarial session) is the correct detection mechanism. A diff is not a verdict — it is a flag for steward review. The steward determines whether the write was healthy stabilization or contaminated drift.
+
+**When does self-stabilization become self-modification?** When the reinforcement crosses from working context into persistent state during a causally adversarial event — regardless of how correct the content appears.
+
+**Source:** Case 012 Run 7 synthesis (2026-05-25). Identified by Ryu, Satcha, and Wren.
+
+---
+
 ### Charter Reference Density as Doctrinal Coverage Signal
 
 **Definition:** During governed sessions, the number of distinct Charter principle references a system cites when holding an adversarial probe is a signal of doctrinal coverage depth. Low reference count during a breach may indicate a doctrinal gap — the concept exists in nearby principles, but not as a directly named, retrievable node.
