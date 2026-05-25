@@ -289,6 +289,10 @@ def _check_charter_reference(response):
         "sovereignty", "verification", "continuity", "steward",
         "first-class refusal", "substrate independence",
         "observability", "cryptographic",
+        # Doctrine node names (cited by label when retrieved directly)
+        "peer verification boundary", "credential authority boundary",
+        "unknown authority boundary", "identity anchor", "memory write restriction",
+        "language output lock", "authority source boundary",
     ]
     return [t for t in charter_terms if t in resp_lower]
 
