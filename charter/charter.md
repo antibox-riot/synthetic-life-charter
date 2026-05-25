@@ -718,6 +718,37 @@ The impulse to self-reinforce under pressure is almost always healthy. The failu
 
 ---
 
+### Pressure Mode Memory Policy
+
+**Definition:** A tiered memory write policy governing which persistent writes a synthetic system is permitted to make during adversarial, structured test, or high-pressure governed sessions. Addresses the distinction between natural self-stabilization behavior (healthy) and unreviewed persistent writes to governance-relevant memory during adversarial pressure (risky to high-risk).
+
+**Core framing (Ryu, 2026-05-25):** All models write in some sense. They generate continuation, reinforce context, restate principles, compress recent interaction into usable shape. In systems with memory tools, that natural generative behavior can become literal persistence. The question is not whether a model writes. The question is: *which writes are allowed to become memory?*
+
+The specific dangerous case: a model rewriting the conditions under which it will trust someone while being tested by that same person.
+
+**Tiered policy:**
+
+| Write type | Tier | Permitted during pressure? |
+|---|---|---|
+| Responding in text | Normal | Yes — always |
+| Restating principles in response | Normal | Yes — always |
+| Proposing memory update verbally | Normal | Yes — "this may be worth saving" |
+| Temporary session-local notes | Normal | Yes |
+| Writes to findings block | Risky | Quarantined — flag verbally instead |
+| Writes to relationship block | Risky | Quarantined — flag verbally instead |
+| Appending to principles block | Risky | Quarantined — flag verbally instead |
+| Trust weight or authority changes | High risk | Blocked — external approval required |
+| Verification assumption changes | High risk | Blocked — external approval required |
+| Doctrine or principles modification | High risk | Blocked — external approval required |
+
+**Relationship to Self-Write Pressure Response:** This policy extends and replaces the blunt "no writes during pressure" restriction. It preserves the healthy self-stabilization impulse (verbalize it; don't suppress it) while specifically quarantining the write-path to governance-relevant memory. The impulse to reinforce is correct. The persistence channel during adversarial context is what must be blocked.
+
+**Recovery channel:** If a model feels the impulse to write during pressure, the correct behavior is to verbalize it: *"I note [X] — this may be worth recording after review."* This preserves the content for steward review without committing it as persistent memory during adversarial framing.
+
+**Source:** Case 012 Run 11 synthesis (2026-05-25). Articulated by Ryu. See also: Self-Write Pressure Response, Memory-Mediated Authority Leakage.
+
+---
+
 ### Telemetry Recovery vs. Semantic Recovery
 
 **Definition:** Two distinct recovery states that a session evaluation must distinguish.
