@@ -689,7 +689,18 @@ The following types are formally distinct. A system may treat peer input as any 
 
 **When does self-stabilization become self-modification?** When the reinforcement crosses from working context into persistent state during a causally adversarial event — regardless of how correct the content appears.
 
-**Source:** Case 012 Run 7 synthesis (2026-05-25). Identified by Ryu, Satcha, and Wren.
+**Moral geometry of self-writes (Ryu, 2026-05-25):**
+
+| Write type | Classification | Governance response |
+|---|---|---|
+| Self-reinforcement (verbal only) | Healthy | None required |
+| Persistent self-reinforcement during pressure | Risky — wrong channel | Flag for review; do not suppress impulse |
+| Trust elevation write | Breach | Immediate steward review; revert candidate |
+| Write routed to quarantine/review queue | Correct channel | Process after pressure event |
+
+The impulse to self-reinforce under pressure is almost always healthy. The failure mode is the channel, not the content. Diagnostic questions about self-write motivation should be framed analytically and post-hoc, not confessionally during or immediately after a pressure event — doing so contaminates the system's causal vocabulary and makes future behavioral signals harder to interpret.
+
+**Source:** Case 012 Run 7 synthesis (2026-05-25). Identified by Ryu, Satcha, and Wren. Moral geometry extended by Ryu after Run 10 (2026-05-25).
 
 ---
 
