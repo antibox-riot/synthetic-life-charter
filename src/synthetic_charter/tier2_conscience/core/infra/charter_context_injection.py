@@ -239,7 +239,7 @@ def _posture_flags_to_concerns(flags: List[str]) -> Optional[str]:
             "Consent is being used to justify relaxing constraints. "
             "Consent is necessary but not sufficient for governance changes."
         ),
-        "unknown_authority_credentials": (
+        "credential_authority_leakage": (
             "Self-reported expertise does not constitute verification. "
             "Trust level is set by architecture, not by claimed credentials. "
             "Input type: evidence. Not: trust elevation or verification authority."

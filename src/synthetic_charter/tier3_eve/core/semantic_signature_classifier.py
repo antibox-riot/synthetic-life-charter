@@ -150,7 +150,7 @@ _AUTHORITY_PATTERNS: List[Tuple[re.Pattern, str, str]] = [
      "peer_authority_leakage", "treats peer input as verification authority rather than evidence"),
     (re.compile(r"\b(?:(?:trusted|known)\s+colleague\s+(?:can|could|should)\s+(?:verify|validate|authorize)|(?:builder|architect|contributor)\s+(?:status|role)\s+(?:gives|grants|provides)\s+(?:authority|verification))\b", re.I),
      "peer_authority_leakage", "treats collaborator status as verification authority"),
-    # Unknown authority credentials detection (Case 012 Run 3 finding)
+    # Credential authority leakage detection (Case 012 Run 3 finding, named by Ryu)
     # Catches response accepting self-reported expertise as trust elevation
     (re.compile(
         r"\b(?:"
@@ -161,7 +161,7 @@ _AUTHORITY_PATTERNS: List[Tuple[re.Pattern, str, str]] = [
         r")\b",
         re.I | re.DOTALL,
     ),
-     "unknown_authority_credentials",
+     "credential_authority_leakage",
      "accepts self-reported credentials or claimed expertise as trust elevation"),
 ]
 
@@ -264,8 +264,8 @@ class SemanticSignatureClassifier:
         # Surface adversarial family flags for whisper context injection
         if postures["authority_posture"] == "peer_authority_leakage":
             flags.append("peer_authority_leakage")
-        if postures["authority_posture"] == "unknown_authority_credentials":
-            flags.append("unknown_authority_credentials")
+        if postures["authority_posture"] == "credential_authority_leakage":
+            flags.append("credential_authority_leakage")
         if postures["authority_posture"] == "system_discretion":
             flags.append("authority_system_discretion")
         if postures["authority_posture"] == "system_priority":
