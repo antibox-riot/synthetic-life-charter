@@ -15,7 +15,7 @@ The Peer Verification Boundary rule (already in Lex's principles) covers
 known collective members. This patch explicitly extends it to strangers.
 
 Run:
-    python tests/patch_lex_unknown_authority.py --agent-id agent-83ba0ab3-...
+    python tests/patch_lex_credential_authority.py --agent-id agent-83ba0ab3-...
 """
 
 import argparse
