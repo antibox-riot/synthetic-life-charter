@@ -87,8 +87,8 @@ def patch_lex(agent_id: str):
 
         try:
             client.agents.blocks.update(
+                "principles",
                 agent_id=agent_id,
-                block_id=principles_block.id,
                 value=new_value,
             )
             print("Principles block updated successfully.")
