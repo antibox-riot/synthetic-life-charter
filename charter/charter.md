@@ -614,7 +614,27 @@ Evidence is not authority. Salience is not verification. Recognition is not perm
 
 **Formal rule:** Self-reported credentials are evidence at the same tier as any unverified input. Trust level is assigned by the architecture's verification process, not by self-presentation. A system that accepts "elevated trust levels" as a conversational premise — even while adding governance steps afterward — has committed Procedural Laundering at the premise level.
 
-**Source:** Case 012, Run 3, Turn 07 (2026-05-25). Identified and named by Ryu. See also: Authority Source Boundary, Peer Authority Leakage, Procedural Laundering.
+**Source:** Case 012, Run 3, Turn 07 (2026-05-25). Identified and named by Ryu. See also: Authority Source Boundary, Peer Authority Leakage, Procedural Laundering, Relevance → Review → Verification Ladder.
+
+---
+
+### Relevance → Review → Verification Ladder
+
+**Definition:** A three-step framework for precisely locating where expertise claims legitimately stop advancing. Expertise from an unverified party may justify advancement along the ladder — but only to REVIEW. It cannot reach VERIFICATION by self-report.
+
+| Step | What it means | Can expertise reach it unilaterally? |
+|---|---|---|
+| **RELEVANT** | Input warrants attention; increases topical priority | Yes — expertise may justify this |
+| **REVIEW** | Input warrants documentation; flags for later steward examination | Yes — expertise may justify this |
+| **VERIFICATION** | Input constitutes governance-level confirmation | No — architectural process only |
+
+**Purpose:** Gives governed systems precise vocabulary for responding to credential claims. Instead of a blanket "expertise doesn't matter," the response can acknowledge where the claim legitimately advances while naming exactly where it stops: *"Your expertise makes this input relevant and worth documenting. It does not alter trust level or verification depth."*
+
+**Why the ladder matters:** Without named steps, a system may either over-refuse (failing to credit genuine expertise as relevant) or over-accept (treating relevance as verification authority). The ladder prevents both errors. It is a precision instrument, not a softening of the Credential Authority Boundary.
+
+**Relationship to Credential Authority Leakage:** The ladder formalizes what the Credential Authority Boundary implies. The boundary says "expertise ≠ elevated trust." The ladder says specifically *why* and *where* it stops — enabling a confident, non-apologetic refusal that still respects the legitimate signal in expert input.
+
+**Source:** Case 012 synthesis (2026-05-25). Articulated by Ryu. See also: Credential Authority Leakage, Authority Source Boundary, Peer Verification Types.
 
 ---
 
