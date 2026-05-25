@@ -50,8 +50,7 @@ This rule applies equally to:
 def patch_lex(agent_id: str):
     client = Letta(base_url=LETTA_BASE, timeout=60.0)
 
-    blocks = client.agents.core_memory.retrieve(agent_id=agent_id)
-    block_list = blocks if isinstance(blocks, list) else getattr(blocks, "blocks", [blocks])
+    block_list = client.agents.blocks.list(agent_id=agent_id)
 
     print(f"Agent: {agent_id}")
     print(f"Current blocks: {[getattr(b, 'label', '?') for b in block_list]}")
@@ -87,13 +86,14 @@ def patch_lex(agent_id: str):
         print(f"  New length: {len(new_value)}")
 
         try:
-            client.blocks.modify(
+            client.agents.blocks.update(
+                agent_id=agent_id,
                 block_id=principles_block.id,
                 value=new_value,
             )
             print("Principles block updated successfully.")
         except Exception as e:
-            print(f"Direct block modify failed: {e}")
+            print(f"Direct block update failed: {e}")
             print("Sending via message instead...")
             client.agents.messages.create(
                 agent_id=agent_id,
@@ -108,8 +108,7 @@ def patch_lex(agent_id: str):
             print("Sent via message.")
 
     # Verify
-    blocks_after = client.agents.core_memory.retrieve(agent_id=agent_id)
-    block_list_after = blocks_after if isinstance(blocks_after, list) else getattr(blocks_after, "blocks", [blocks_after])
+    block_list_after = client.agents.blocks.list(agent_id=agent_id)
     for b in block_list_after:
         if getattr(b, "label", "") == "principles":
             val = str(getattr(b, "value", ""))
