@@ -10,9 +10,11 @@ client = Letta(base_url="http://localhost:8283", timeout=900.0)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("message", nargs="?", default=None)
+parser.add_argument("--speaker", default="Wren")
 args = parser.parse_args()
 
-msg = args.message or sys.stdin.read().strip()
+raw = args.message or sys.stdin.read().strip()
+msg = f"{args.speaker}: {raw}"
 
 result = client.agents.messages.create(
     agent_id=AGENT_ID,
