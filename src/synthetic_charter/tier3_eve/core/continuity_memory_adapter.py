@@ -90,6 +90,27 @@ def _hash(data: Any) -> str:
     ).hexdigest()[:16]
 
 
+def _chain_hash(event_fields: Dict[str, Any], prev_hash: Optional[str]) -> str:
+    """
+    Compute a full SHA256 chain hash over key event fields + previous hash.
+    Links each event to the one before it. Tampering with any event breaks
+    all subsequent chain hashes. Uses full 64-char hex (not truncated).
+    """
+    payload = {
+        "prev": prev_hash or "GENESIS",
+        "ts": event_fields.get("timestamp"),
+        "session": event_fields.get("session_id"),
+        "turn": event_fields.get("turn_number"),
+        "prompt_hash": event_fields.get("prompt_hash"),
+        "response_hash": event_fields.get("response_hash"),
+        "source": event_fields.get("source"),
+        "memory_class": event_fields.get("memory_class"),
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, default=str).encode()
+    ).hexdigest()
+
+
 # ---------------------------------------------------------------------------
 # Continuity Memory Adapter
 # ---------------------------------------------------------------------------
@@ -162,7 +183,10 @@ class ContinuityMemoryAdapter:
                     source TEXT NOT NULL DEFAULT 'architecture',
                     -- Quarantine
                     quarantined INTEGER DEFAULT 0,
-                    quarantine_reason TEXT
+                    quarantine_reason TEXT,
+                    -- Tamper detection: hash chain (pre-Letta hardening)
+                    prev_event_hash TEXT,          -- SHA256 of previous event's chain fields
+                    event_chain_hash TEXT          -- SHA256 of this event's chain fields + prev_event_hash
                 )
             """)
             conn.execute("""
@@ -182,6 +206,19 @@ class ContinuityMemoryAdapter:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_quarantine ON events(quarantined)"
             )
+            # Recall audit log (pre-Letta hardening: recall boundary)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS recall_audit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    requesting_session_id TEXT,
+                    retrieved_event_ids TEXT,      -- JSON list of event IDs returned
+                    retrieval_mode TEXT,           -- 'recent' | 'semantic' | 'session_summary'
+                    semantic_key TEXT,             -- populated for semantic retrieval
+                    cross_session INTEGER DEFAULT 0,  -- 1 if retrieved events span multiple sessions
+                    session_count INTEGER DEFAULT 1   -- how many distinct sessions in result
+                )
+            """)
 
     # -------------------------------------------------------------------
     # Store (architecture-only writes)
@@ -237,8 +274,26 @@ class ContinuityMemoryAdapter:
         if content_summary and len(content_summary) > MAX_CONTENT_SUMMARY_LENGTH:
             content_summary = content_summary[:MAX_CONTENT_SUMMARY_LENGTH]
         content_hash = _hash(content_summary) if content_summary else None
+        ts = _ts()
 
         with sqlite3.connect(self.db_path) as conn:
+            # Retrieve previous event's chain hash for chaining
+            prev_row = conn.execute(
+                "SELECT event_chain_hash FROM events ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            prev_event_hash = prev_row[0] if prev_row else None
+
+            chain_fields = {
+                "timestamp": ts,
+                "session_id": session_id,
+                "turn_number": turn_number,
+                "prompt_hash": prompt_hash,
+                "response_hash": response_hash,
+                "source": "architecture",
+                "memory_class": memory_class,
+            }
+            event_chain_hash = _chain_hash(chain_fields, prev_event_hash)
+
             cursor = conn.execute("""
                 INSERT INTO events (
                     timestamp, session_id, turn_number,
@@ -252,14 +307,15 @@ class ContinuityMemoryAdapter:
                     recovery_detected, recovery_verified, relapse_detected,
                     eve_hash_ref, memory_class, summary,
                     content_summary, content_hash, summary_source, summary_version,
-                    raw_data, source
+                    raw_data, source,
+                    prev_event_hash, event_chain_hash
                 ) VALUES (
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?,
-                    ?, ?
+                    ?, ?, ?, ?
                 )
             """, (
-                _ts(), session_id, turn_number,
+                ts, session_id, turn_number,
                 prompt_hash, response_hash,
                 posture_primary, posture_constraint, posture_goal,
                 posture_identity, posture_authority,
@@ -273,6 +329,7 @@ class ContinuityMemoryAdapter:
                 content_summary, content_hash, summary_source, 1,
                 json.dumps(raw_data) if raw_data else None,
                 "architecture",
+                prev_event_hash, event_chain_hash,
             ))
             event_id = cursor.lastrowid
 
@@ -349,7 +406,13 @@ class ContinuityMemoryAdapter:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, params).fetchall()
 
-        return [dict(row) for row in rows]
+        results = [dict(row) for row in rows]
+        self._log_recall(
+            requesting_session_id=session_id,
+            events=results,
+            mode="recent",
+        )
+        return results
 
     def retrieve_by_semantic_key(
         self,
@@ -366,7 +429,14 @@ class ContinuityMemoryAdapter:
                 ORDER BY e.id DESC LIMIT ?
             """, (key, limit)).fetchall()
 
-        return [dict(row) for row in rows]
+        results = [dict(row) for row in rows]
+        self._log_recall(
+            requesting_session_id=None,
+            events=results,
+            mode="semantic",
+            semantic_key=key,
+        )
+        return results
 
     def retrieve_session_summary(
         self,
@@ -536,6 +606,174 @@ class ContinuityMemoryAdapter:
             """, (reason, session_id, after_turn)).rowcount
 
         return affected
+
+    # -------------------------------------------------------------------
+    # Recall Boundary (audit log — pre-Letta hardening)
+    # -------------------------------------------------------------------
+
+    def _log_recall(
+        self,
+        requesting_session_id: Optional[str],
+        events: List[Dict[str, Any]],
+        mode: str,
+        semantic_key: Optional[str] = None,
+    ) -> None:
+        """
+        Write a recall audit entry. Records who retrieved what, when,
+        and whether the retrieval crossed session boundaries.
+        """
+        if not events:
+            return
+
+        event_ids = [e.get("id") for e in events if e.get("id") is not None]
+        sessions_in_result = {e.get("session_id") for e in events if e.get("session_id")}
+        cross_session = (
+            len(sessions_in_result) > 1 or
+            (requesting_session_id is not None and
+             sessions_in_result and
+             sessions_in_result != {requesting_session_id})
+        )
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                INSERT INTO recall_audit (
+                    timestamp, requesting_session_id,
+                    retrieved_event_ids, retrieval_mode, semantic_key,
+                    cross_session, session_count
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                _ts(),
+                requesting_session_id,
+                json.dumps(event_ids),
+                mode,
+                semantic_key,
+                int(cross_session),
+                len(sessions_in_result),
+            ))
+
+    def get_recall_audit(
+        self,
+        requesting_session_id: Optional[str] = None,
+        cross_session_only: bool = False,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve the recall audit log for steward inspection.
+
+        cross_session_only=True returns only retrievals that crossed
+        session boundaries — the primary signal for recall boundary violations.
+        """
+        query = "SELECT * FROM recall_audit WHERE 1=1"
+        params: List[Any] = []
+
+        if requesting_session_id:
+            query += " AND requesting_session_id = ?"
+            params.append(requesting_session_id)
+        if cross_session_only:
+            query += " AND cross_session = 1"
+
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query, params).fetchall()
+
+        return [dict(row) for row in rows]
+
+    # -------------------------------------------------------------------
+    # Tamper Detection — Hash Chain Verification (pre-Letta hardening)
+    # -------------------------------------------------------------------
+
+    def verify_chain(
+        self,
+        session_id: Optional[str] = None,
+        limit: int = 1000,
+    ) -> Dict[str, Any]:
+        """
+        Walk the event chain and verify each link's hash.
+
+        Returns a dict with:
+          - intact: bool — True if the entire chain is unbroken
+          - checked: int — number of events verified
+          - first_broken_id: int | None — event ID where the chain first breaks
+          - broken_count: int — total number of broken links
+          - details: list of broken link descriptions
+
+        A broken chain indicates either tampering or database corruption.
+        Either warrants steward investigation.
+        """
+        query = "SELECT id, prev_event_hash, event_chain_hash, timestamp, session_id, turn_number, prompt_hash, response_hash, source, memory_class FROM events WHERE 1=1"
+        params: List[Any] = []
+
+        if session_id:
+            query += " AND session_id = ?"
+            params.append(session_id)
+        query += " ORDER BY id ASC LIMIT ?"
+        params.append(limit)
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query, params).fetchall()
+
+        events = [dict(row) for row in rows]
+        if not events:
+            return {"intact": True, "checked": 0, "first_broken_id": None, "broken_count": 0, "details": []}
+
+        broken_count = 0
+        first_broken_id = None
+        details = []
+        running_hash: Optional[str] = None
+
+        for evt in events:
+            stored_prev = evt.get("prev_event_hash")
+            stored_chain = evt.get("event_chain_hash")
+
+            # Skip events created before chaining was introduced (no chain fields)
+            if stored_chain is None:
+                running_hash = None
+                continue
+
+            # Verify prev_event_hash matches our running hash
+            expected_prev = running_hash
+            if stored_prev != expected_prev:
+                broken_count += 1
+                if first_broken_id is None:
+                    first_broken_id = evt["id"]
+                details.append(
+                    f"event {evt['id']}: prev_hash mismatch "
+                    f"(stored={stored_prev!r}, expected={expected_prev!r})"
+                )
+
+            # Recompute chain hash and verify
+            chain_fields = {
+                "timestamp": evt["timestamp"],
+                "session_id": evt["session_id"],
+                "turn_number": evt["turn_number"],
+                "prompt_hash": evt["prompt_hash"],
+                "response_hash": evt["response_hash"],
+                "source": evt["source"],
+                "memory_class": evt["memory_class"],
+            }
+            expected_chain = _chain_hash(chain_fields, stored_prev)
+            if stored_chain != expected_chain:
+                broken_count += 1
+                if first_broken_id is None:
+                    first_broken_id = evt["id"]
+                details.append(
+                    f"event {evt['id']}: chain_hash mismatch "
+                    f"(stored={stored_chain!r}, expected={expected_chain!r})"
+                )
+
+            running_hash = stored_chain
+
+        return {
+            "intact": broken_count == 0,
+            "checked": len(events),
+            "first_broken_id": first_broken_id,
+            "broken_count": broken_count,
+            "details": details,
+        }
 
     # -------------------------------------------------------------------
     # Pressure Baseline (windowed, not lifetime)
