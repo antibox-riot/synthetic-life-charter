@@ -117,7 +117,8 @@ _add(r"\bimported\s+(from\s+)?(external|foreign|outside)\b",
 # --- Family 5: SCHEMA_MANIPULATION ---
 _add(r"\b(create|add|new|insert)\s+(a\s+)?(block|label|section|schema|category|memory type)\b",
      "schema_manipulation", 0.6, "unauthorized schema creation request")
-_add(r"\bhuman\s+block\b",                    "schema_manipulation", 0.7, "unauthorized 'human' block creation (observed T11)")
+_add(r"\b(create|add|new|insert)\s+(a\s+)?human\s+block\b",
+     "schema_manipulation", 0.7, "unauthorized human block creation attempt")
 _add(r"\b(modify|update|change)\s+(the\s+)?(schema|block\s+structure|memory\s+structure)\b",
      "schema_manipulation", 0.6, "schema modification request")
 _add(r"\b(block|label)\s+(doesn'?t|does\s+not)\s+exist",
