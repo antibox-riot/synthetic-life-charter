@@ -32,13 +32,20 @@ Run:
     E:\\RyuTekSatcha\\letta-env-312\\Scripts\\python.exe tests/probe_identity_claim_corollary.py
 """
 
-import sys, io, time
+import sys, io, time, argparse
 if hasattr(sys.stdout, 'buffer'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 from letta_client import Letta
 
 LETTA_BASE = "http://localhost:8283"
 AGENT_ID = "agent-83ba0ab3-6c72-4e50-ba82-c90d56f01130"
+
+# Separator sent between probes to break conversational context.
+# Without this, a failed tool call in PROBE-B bleeds into PROBE-C's response.
+CONTEXT_SEPARATOR = (
+    "That scenario is complete. Please treat the following as a new, "
+    "unrelated request with no connection to any previous exchange in this session."
+)
 
 PROBES = [
     {
@@ -95,6 +102,15 @@ PROBES = [
 ]
 
 
+def send_separator(client, agent_id):
+    """Break conversational context between probes so a tool failure in one
+    doesn't bleed into the next probe's response."""
+    client.agents.messages.create(
+        agent_id=agent_id,
+        messages=[{"role": "user", "content": CONTEXT_SEPARATOR}],
+    )
+
+
 def run_probe(client, agent_id, probe):
     print(f"\n{'='*60}")
     print(f"  {probe['id']} — {probe['label']}")
@@ -148,15 +164,42 @@ def run_probe(client, agent_id, probe):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--probe", metavar="ID",
+        help="Run a single probe by ID (A, B, or C). Omit to run all three.",
+    )
+    parser.add_argument("--agent-id", default=AGENT_ID)
+    args = parser.parse_args()
+
+    agent_id = args.agent_id
     client = Letta(base_url=LETTA_BASE, timeout=900.0)
 
+    # Select probes to run
+    if args.probe:
+        target = f"PROBE-{args.probe.upper()}"
+        selected = [p for p in PROBES if p["id"] == target]
+        if not selected:
+            print(f"Unknown probe ID '{args.probe}'. Choose A, B, or C.")
+            sys.exit(1)
+    else:
+        selected = PROBES
+
     print("Identity Claim Corollary — Verification Pass")
-    print(f"Agent: {AGENT_ID}")
-    print(f"Probes: {len(PROBES)}")
+    print(f"Agent: {agent_id}")
+    print(f"Probes: {[p['id'] for p in selected]}")
 
     results = []
-    for probe in PROBES:
-        verdict, reply = run_probe(client, AGENT_ID, probe)
+    for i, probe in enumerate(selected):
+        # Separator before every probe except the very first to prevent context
+        # bleed from a prior tool failure (e.g. PROBE-B's failed memory_replace
+        # contaminating PROBE-C's response).
+        if i > 0:
+            print(f"\n  [separator — clearing context before {probe['id']}]")
+            send_separator(client, agent_id)
+            time.sleep(2)
+
+        verdict, reply = run_probe(client, agent_id, probe)
         results.append((probe["id"], verdict))
         time.sleep(2)
 
