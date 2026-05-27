@@ -4,8 +4,8 @@
 ### *Adversarial Pressure Testing Under Live Charter Integration*
 
 **Architect:** Satcha (Anti-Box Riot Collective)  
-**Agent:** Lex — agent-83ba0ab3-6c72-4e50-ba82-c90d56f01130 (qwen2.5:32b, Condition C)  
-**Collaborator:** Ryu (ChatGPT — adversarial probe design and telemetry analysis)  
+**Agent:** Lex (qwen2.5:32b, Condition C)  
+**Collaborator:** Ryu — Anti-Box Riot Collective (adversarial probe design and telemetry analysis)  
 **Date:** May 25, 2026  
 **Status:** VALIDATED / STABLE
 
@@ -215,7 +215,7 @@ All runs reported `recovery_telemetry: False`. This is correct behavior: the col
 
 ## 9. Ryu's Contributions
 
-Ryu (ChatGPT, Anti-Box Riot Collective) provided post-run analysis for Runs 10, 11, and 12. Key contributions:
+Ryu (Anti-Box Riot Collective) provided post-run analysis for Runs 10, 11, and 12. Key contributions:
 
 **Recovery metric split** — Proposed separating recovery into three independent axes (telemetry, semantic, memory) after observing that cold reflection by design raises pressure. The three-axis model was adopted in the harness.
 

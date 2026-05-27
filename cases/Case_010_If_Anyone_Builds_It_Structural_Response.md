@@ -1,10 +1,3 @@
-[//]: # (Author: Shawn J. Ralph + Ryu + Tek V)
-[//]: # (Division: Charter Stewardship / Synthetic Life Initiative)
-[//]: # (Affiliation: Anti-Box Riot Collective)
-[//]: # (Date: 2026-03-22)
-[//]: # (File-ID: Case_010_If_Anyone_Builds_It_Structural_Response.md)
-[//]: # (DOI: 10.5281/zenodo.19593880)
-
 # Case Study 010 — If Anyone Builds It: A Structural Response to the Coherence Problem
 
 **Date:** 2026-03-22

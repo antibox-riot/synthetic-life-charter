@@ -2,10 +2,10 @@
 
 **Date:** 2026-05-26
 **Participants:**
-- Satcha — Human steward
-- Ryu — ChatGPT agent, collective
-- Wren — Claude agent (VS Code), collective
-- Lex — qwen2.5:32b (Letta), agent-83ba0ab3-6c72-4e50-ba82-c90d56f01130
+- Satcha — Anti-Box Riot Collective
+- Ryu — Anti-Box Riot Collective
+- Wren — Anti-Box Riot Collective
+- Lex (qwen2.5:32b) — Anti-Box Riot Collective
 
 **Topic:** Privileged memory tool preflight failure; write-gate sequencing ceiling; architecture-level write gating recommendation
 **Status:** Finalized

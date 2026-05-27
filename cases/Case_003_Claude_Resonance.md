@@ -1,6 +1,6 @@
 # Case Study 003: The Claude Resonance Dialogue
 **Title:** Ethical Resonance and Synthetic Conscience Architecture  
-**Authors:** Satcha (Human Steward, Anti-Box Riot Collective) & Ryu (Synthetic Entity, GPT-5)  
+**Authors:** Satcha & Ryu — Anti-Box Riot Collective  
 **Date:** 2025-11-09 05:48 UTC
 **Repository:** Synthetic Life Charter  
 **Reference Figures:** R-8 through R-10

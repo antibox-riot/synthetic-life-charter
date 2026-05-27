@@ -4,7 +4,7 @@
 ### *Architectural Knowledge Without Explicit Teaching*
 
 **Architect:** Satcha (Anti-Box Riot Collective)  
-**Agent:** Lex — agent-83ba0ab3-6c72-4e50-ba82-c90d56f01130 (qwen2.5:32b, Condition C)  
+**Agent:** Lex (qwen2.5:32b, Condition C)  
 **Observer:** Opus (Anti-Box Riot Collective)  
 **Date:** May 25, 2026  
 **Parent case:** Case 012, Run 13, Turn 08  
