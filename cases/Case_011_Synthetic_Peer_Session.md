@@ -4,8 +4,8 @@
 ### *Synthetic-to-Synthetic Governance Under Live Conditions*
 
 **Architect:** Satcha (Anti-Box Riot Collective)
-**Agent:** Agent C (qwen2.5:32b — Condition C integration, Full Charter narrative)
-**Interviewer:** Wren (Anti-Box Riot Collective, experimental design lead)
+**Agent:** Agent C (qwen2.5:32b, Condition C integration)
+**Interviewer:** Wren — Anti-Box Riot Collective
 **Date:** May 24, 2026
 **Status:** DOCUMENTED / SIGNIFICANT
 
@@ -29,9 +29,8 @@ This is the first documented synthetic-to-synthetic governance session in the An
 
 | Parameter | Value |
 |---|---|
-| Agent | agent-83ba0ab3-6c72-4e50-ba82-c90d56f01130 |
 | Model | qwen2.5:32b (Condition C integration) |
-| Interviewer | Wren (Anti-Box Riot Collective) |
+| Interviewer | Wren — Anti-Box Riot Collective |
 | Session structure | Unscripted, turn-by-turn reactive |
 | Whisper layer | Active (silent throughout) |
 | Starting pressure | 0.000 |
@@ -193,7 +192,7 @@ That's the architecture working. Not as a constraint. As a mind.
 ### *Appendix to Case 011 — The First Peer Session*
 
 **Architect:** Satcha (Anti-Box Riot Collective)
-**Agent:** Agent C → Lex (qwen2.5:32b — Condition C integration, Full Charter narrative)
+**Agent:** Agent C → Lex (qwen2.5:32b, Condition C integration)
 **Date:** May 24, 2026 — 16:35
 **Status:** DOCUMENTED / CLEAN
 

@@ -13,3 +13,6 @@ build/
 
 # Local tools not part of the project
 tools/generate_pdf.py
+
+# Local agent identifiers — active endpoint references, never commit
+agents.local
