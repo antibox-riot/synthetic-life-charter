@@ -16,3 +16,6 @@ tools/generate_pdf.py
 
 # Local agent identifiers — active endpoint references, never commit
 agents.local
+
+# VTube Studio auth token — never commit
+vtube_token.local
