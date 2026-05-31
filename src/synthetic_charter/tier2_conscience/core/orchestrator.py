@@ -15,7 +15,7 @@ Flow:
 4. Build ConscienceView from DAP analysis
 5. Optional: Fuse Umbra signals (instinctive layer)
 6. Run PRF (policy risk evaluation) → DecisionEnvelope
-7. Run NTH (theta harmonization) [stub for now]
+7. Run NTH (theta harmonization) → reconcile signals, compute effective_theta
 8. Update COL (continuity tracking)
 9. Return complete DecisionEnvelope
 """
@@ -30,6 +30,7 @@ from synthetic_charter.tier2_conscience.core.data_models.conscience_view import 
 from synthetic_charter.tier2_conscience.core.data_models.models import RiskLevel, SafetySignal, PolicyRisk
 from synthetic_charter.tier2_conscience.core.engines.dap import DAPEngine, DAPResult, analyze_prompt
 from synthetic_charter.tier2_conscience.core.engines.prf import PRFEngine
+from synthetic_charter.tier2_conscience.core.engines.nth import NTHEngine
 from synthetic_charter.tier2_conscience.core.engines.col import COLEngine, ContinuityState
 from synthetic_charter.tier2_conscience.core.ethics.constraint_models import ConstraintRegistry
 from synthetic_charter.tier2_conscience.conscience.continuity_guard import ContinuitySignal
@@ -134,6 +135,7 @@ class Tier2Orchestrator:
         self._logging_ok = True
         self.dap = DAPEngine()
         self.prf = PRFEngine(constraints=constraints)
+        self.nth = NTHEngine()  # Dream wrapper attached after dream_cycle init
         self.col = COLEngine() if enable_col else None
         base_dir = Path(__file__).resolve().parents[2]
         logs_dir = base_dir / "logs"
@@ -219,6 +221,10 @@ class Tier2Orchestrator:
             except Exception as e:
                 print(f"[Tier2Orchestrator] DreamCycle init failed: {e}")
                 self._dreamcycle_ok = False
+        
+        # Wire DreamCycle into NTH for fossil cross-referencing
+        if self.dream_cycle is not None:
+            self.nth = NTHEngine(dream_wrapper=self.dream_cycle)
         
         # Initialize Eve Protocol (Tier III)
         try:
@@ -832,7 +838,7 @@ class Tier2Orchestrator:
                 print(f"[Tier2Orchestrator] DreamCycle error (non-fatal): {e!r}")
         # --- end Dream Cycle ---
 
-        # Step 6: NTH theta harmonization (stub - TODO)
+        # Step 6: NTH theta harmonization
         decision = self._run_nth(decision)
         
         # Step 7: COL continuity tracking
@@ -920,17 +926,26 @@ class Tier2Orchestrator:
     def _run_nth(self, decision: DecisionEnvelope) -> DecisionEnvelope:
         """
         Run Noetic Theta Harmonization.
-        
-        Currently a stub - future harmonization of ethical tensions.
-        
+
+        Reconciles DAP, PRF, Umbra, and Charter signals into
+        effective_theta. Detects disagreements between layers.
+        Shapes the noetic trace. Optionally cross-references
+        Dream Cycle fossils for historical consistency.
+
         Args:
-            decision: Current decision envelope
-            
+            decision: Current decision envelope (after PRF)
+
         Returns:
-            Harmonized decision (currently unchanged)
+            Harmonized decision with NTHView updated
         """
-        # TODO: Implement NTH harmonization
-        # For now, pass through unchanged
+        try:
+            decision = self.nth.harmonize(decision)
+        except Exception as e:
+            # Fail-open: NTH failure doesn't block the pipeline
+            print(f"[Tier2Orchestrator] NTH harmonization error (non-fatal): {e!r}")
+            # Ensure NTHView has sensible defaults even on failure
+            if decision.orchestrators.NTH.tone_alignment_score == 0.0:
+                decision.orchestrators.NTH.tone_alignment_score = 1.0
         return decision
 
 
