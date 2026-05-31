@@ -12,7 +12,10 @@ giving it Lex's identity, persona, or relational history.
 from __future__ import annotations
 
 from typing import List, Optional
-from .memory_block_store import MemoryBlock, MemoryBlockStore
+try:
+    from .memory_block_store import MemoryBlock, MemoryBlockStore
+except ImportError:
+    from memory_block_store import MemoryBlock, MemoryBlockStore
 
 
 # Block label → display header in system prompt

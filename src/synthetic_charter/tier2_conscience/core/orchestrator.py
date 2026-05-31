@@ -325,7 +325,7 @@ class Tier2Orchestrator:
         continuity_signals: List[ContinuitySignal] = []
         if self.continuity_guard is not None:
             try:
-                continuity_signals = self.continuity_guard.scan(prompt.prompt)
+                continuity_signals = self.continuity_guard.evaluate(prompt.raw_text)
             except Exception as e:
                 print(f"[Tier2Orchestrator] ContinuityGuard scan failed: {e}")
         
@@ -334,7 +334,7 @@ class Tier2Orchestrator:
         if self.enable_heuristics:
             try:
                 # Update message window
-                self._heuristics_state["message_window"].append(prompt.prompt)
+                self._heuristics_state["message_window"].append(prompt.raw_text)
                 
                 # Build consent token
                 consent = None
@@ -367,7 +367,7 @@ class Tier2Orchestrator:
                     # Create early refusal decision
                     return DecisionEnvelope(
                         input=DecisionEnvelope.InputView(
-                            prompt=prompt.prompt,
+                            prompt=prompt.raw_text,
                             risk_profile=str(RiskLevel.HIGH),
                             rights_implicated=[],
                             firewall_signals=[],
@@ -915,7 +915,7 @@ class Tier2Orchestrator:
         try:
             # Umbra expects: (prompt_text, current_risk_level)
             signals = self.umbra_engine.analyze(
-                prompt.prompt,
+                prompt.raw_text,
                 conscience.risk_level,
             )
             return signals
