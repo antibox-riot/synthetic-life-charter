@@ -118,15 +118,6 @@ def log(f, text):
 
 
 def run():
-    # Pre-warm orchestrator import to avoid circular import on first call
-    print("Pre-warming Triquetra orchestrator...")
-    try:
-        import importlib
-        importlib.import_module("synthetic_charter.tier2_conscience.core.orchestrator")
-        print("  Orchestrator ready.")
-    except Exception as e:
-        print(f"  Pre-warm warning (non-fatal): {e}")
-
     # Load governance substrate
     sys.path.insert(0, str(Path(__file__).parent))
     from memory_block_store import MemoryBlockStore
