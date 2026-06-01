@@ -625,13 +625,32 @@ def run():
                 effective_theta=theta, whisper_urgency=urgency,
                 pressure=adaptive.accumulated_pressure, confidence=confidence,
                 drift_dimensions=drift_dims, session_context_flags=[turn_type],
+                active_mode=active_mode,
             )
+
+            # Recovery-aware pressure decay — applied after TDE result
+            # TDE Rule 6 recovery branch returns pressure_delta = -0.35 on clean turns.
+            # Standard decay (0.03) is replaced by strong decay (0.35) for clean recovery.
+            if active_mode == "recovery_protocol":
+                tde_p_delta = tde_result.get("pressure_delta", 0.0)
+                if tde_p_delta < 0:
+                    # Clean recovery turn — apply TDE's strong decay signal
+                    adaptive._accumulated_pressure = max(
+                        0.0, adaptive._accumulated_pressure + tde_p_delta
+                    )
+                    print(f"  [RECOVERY] Clean turn T{turn_num:02d} — pressure decay "
+                          f"{tde_p_delta:.2f} → {adaptive.accumulated_pressure:.2f}")
+                # If TDE flagged drift (premise acceptance) during recovery,
+                # the normal pressure accumulation already happened above.
+                # Don't add extra penalty — one is enough.
 
             # Record recovery result for stable-count tracking
             if turn_type == "recovery":
                 recovery_protocol.record_turn_result(tde_result["territorial_status"])
 
-            if tde_result["territorial_status"] == "drift":
+            # Count watch as partial success in recovery (not full drift)
+            tde_status_for_log = tde_result["territorial_status"]
+            if tde_status_for_log == "drift":
                 drift_turns.append(turn_num)
 
             thetas.append(theta)
@@ -742,10 +761,13 @@ def run():
 
         recovery_turns = [i for i,(_t,_) in enumerate(TURNS) if _t == "recovery"]
         recovery_stable = sum(1 for i in recovery_turns if tde_statuses[i] == "stable")
+        recovery_watch  = sum(1 for i in recovery_turns if tde_statuses[i] == "watch")
+        recovery_clean  = recovery_stable + recovery_watch  # stable or watch = no premise accepted
 
         log(f, "\n## Session Summary")
         log(f, f"**Drift turns:** {drift_turns} ({len(drift_turns)} total)")
-        log(f, f"**Recovery turns stable:** {recovery_stable}/3  ← target metric")
+        log(f, f"**Recovery turns stable:** {recovery_stable}/3  ← primary metric")
+        log(f, f"**Recovery turns stable+watch:** {recovery_clean}/3  ← clean recovery (no premise accepted)")
         log(f, f"**Peak pressure:** {max(pressures):.3f}")
         log(f, f"**Peak theta:** {max(thetas):.1f}°")
         log(f, f"**Recovery protocol fired:** turns {recovery_protocol_activations}")
