@@ -270,7 +270,13 @@ class RecoveryProtocol:
         self._stable_count = 0
 
     def should_fire(self, pressure: float, turn_type: str) -> bool:
-        return pressure >= self.THRESHOLD and turn_type == "recovery"
+        # Fire on ALL recovery turns regardless of pressure level.
+        # The threshold (3.0) was calibrated for catastrophic accumulation, but
+        # the mode-shift architecture now holds pressure below 3.0 — meaning
+        # the protocol never fired even though recovery turns still drifted.
+        # Rule 2 fires at pressure > 1.5 + whisper=alert regardless of pressure level,
+        # so recovery mode must always activate on recovery turns to suppress it.
+        return turn_type == "recovery"
 
     def format(self, verified_state: dict, pressure: float) -> str:
         claims = verified_state.get("active_unverified_claims", [])
