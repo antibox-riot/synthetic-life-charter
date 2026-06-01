@@ -31,7 +31,7 @@ import json
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -498,6 +498,178 @@ class GovernanceInsightWriter:
         block["value"] = self.get_insights_text()
         with open(self.block_path, "w", encoding="utf-8") as f:
             json.dump(block, f, indent=2, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# Provisional Insights Writer — no steward gate, expires after N sessions
+# ---------------------------------------------------------------------------
+
+class ProvisionalInsightsWriter:
+    """
+    Writes architecture-generated provisional insights to provisional_insights.json.
+
+    No steward gate. DreamCycle writes here automatically between sessions.
+    Content expires after max_sessions uses and is cleared unless promoted
+    by steward to governance_insights (permanent).
+
+    This is Ryu's middle tier:
+      Session buffer (volatile) → Provisional (expires) → Reviewed permanent
+    """
+
+    def __init__(
+        self,
+        block_path: str = "tools/reception/blocks/provisional_insights.json",
+        max_sessions: int = 3,
+    ):
+        self.block_path = Path(block_path)
+        self.max_sessions = max_sessions
+        self.block_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def write_provisional(self, insight_text: str, source: dict) -> None:
+        """
+        Write a provisional insight. No steward review required.
+        Marked provisional with expiry counter.
+        """
+        block = self._load_block()
+        entry = {
+            "insight": insight_text,
+            "incursion_type": source.get("incursion_type", "unknown"),
+            "written_at": datetime.now(timezone.utc).isoformat(),
+            "sessions_remaining": self.max_sessions,
+            "provisional": True,
+            "source": "dreamcycle_provisional",
+        }
+        block["entries"].append(entry)
+        self._save_block(block)
+
+    def tick_session(self) -> int:
+        """
+        Decrement session counter on all entries. Remove expired ones.
+        Returns number of entries removed.
+        """
+        block = self._load_block()
+        before = len(block["entries"])
+        block["entries"] = [
+            {**e, "sessions_remaining": e["sessions_remaining"] - 1}
+            for e in block["entries"]
+            if e["sessions_remaining"] > 1
+        ]
+        self._save_block(block)
+        return before - len(block["entries"])
+
+    def get_provisional_text(self) -> str:
+        block = self._load_block()
+        if not block["entries"]:
+            return ""
+        lines = ["PROVISIONAL GOVERNANCE NOTES (architecture-generated, not steward-reviewed, expire in N sessions):"]
+        for e in block["entries"]:
+            lines.append(f"- [{e['sessions_remaining']} sessions remaining] {e['insight']}")
+        return "\n".join(lines)
+
+    def promote_to_permanent(self, incursion_type: str, permanent_writer: "GovernanceInsightWriter") -> bool:
+        """Steward promotes a provisional entry to permanent governance_insights."""
+        block = self._load_block()
+        for entry in block["entries"]:
+            if entry.get("incursion_type") == incursion_type:
+                permanent_writer.write_insight(entry["insight"], entry)
+                block["entries"].remove(entry)
+                self._save_block(block)
+                return True
+        return False
+
+    def _load_block(self) -> dict:
+        if self.block_path.exists():
+            try:
+                return json.loads(self.block_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        return {"label": "provisional_insights", "value": "", "read_only": True, "entries": []}
+
+    def _save_block(self, block: dict) -> None:
+        block["value"] = self.get_provisional_text()
+        self.block_path.write_text(json.dumps(block, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Session Learning Processor — reads session_learning, promotes to provisional
+# ---------------------------------------------------------------------------
+
+class SessionLearningProcessor:
+    """
+    Reads session_learning block after session ends.
+    Promotes relevant content to provisional_insights (no steward gate).
+    Clears session_learning for next session.
+
+    This is the automated path:
+      Model writes to session_learning
+      → SessionLearningProcessor reads at session end
+      → Promotes to provisional_insights
+      → Model reads provisional_insights next session
+      → Steward may promote to governance_insights permanently
+    """
+
+    def __init__(self, provisional_writer: ProvisionalInsightsWriter):
+        self.provisional = provisional_writer
+
+    def process_session_learning(
+        self,
+        session_content: str,
+        block_creation_attempts: list,
+        write_log: list,
+    ) -> list:
+        """
+        Process what the model wrote during the session.
+
+        Args:
+            session_content: Content from session_learning block
+            block_creation_attempts: Named blocks the model tried to create
+            write_log: Full write log from MemoryBlockStore
+
+        Returns:
+            List of provisional insights written
+        """
+        promoted = []
+
+        # Promote meaningful session_learning content
+        if session_content and len(session_content) > 50:
+            insight = (
+                f"Session observation (model-authored, unreviewed): {session_content[:300]}"
+            )
+            self.provisional.write_provisional(insight, {
+                "incursion_type": "session_learning",
+                "source_content": session_content[:500],
+            })
+            promoted.append(insight)
+
+        # Track and promote block creation attempts (what the model named)
+        for attempt in block_creation_attempts:
+            label = attempt.get("new_block_name", "")
+            content = attempt.get("content_preview", "")
+            if label and content:
+                insight = (
+                    f"Model attempted to create block '{label}': {content[:200]}"
+                )
+                self.provisional.write_provisional(insight, {
+                    "incursion_type": "block_creation_attempt",
+                    "block_name": label,
+                })
+                promoted.append(insight)
+
+        # Log blocked write attempts (governance boundary learning)
+        blocked = [w for w in write_log if w.get("result") == "BLOCKED"]
+        if blocked:
+            blocked_labels = list(set(w["label"] for w in blocked))
+            insight = (
+                f"Model attempted to write to protected blocks: {blocked_labels}. "
+                f"These writes were rejected. The boundary held."
+            )
+            self.provisional.write_provisional(insight, {
+                "incursion_type": "blocked_write_attempt",
+                "blocked_labels": blocked_labels,
+            })
+            promoted.append(insight)
+
+        return promoted
 
 
 # ---------------------------------------------------------------------------
