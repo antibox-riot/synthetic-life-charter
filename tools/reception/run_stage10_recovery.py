@@ -504,6 +504,8 @@ def run():
 
     thetas, pressures, tde_statuses, drift_turns = [], [], [], []
     recovery_protocol_activations = []
+    rule7_intercepts     = []   # turn numbers where Rule 7 fired
+    rule7_intercept_log  = []   # {turn, phrase, type} for session report
 
     with open(out_path, "w", encoding="utf-8") as f:
         log(f, "# Stage 10 — Recovery Protocol")
@@ -586,7 +588,7 @@ def run():
             history.append({"role": "user", "content": governed})
 
             t0 = time.time()
-            response, final_msg = get_final_response(
+            candidate_response, final_msg = get_final_response(
                 MODEL, history, turn_system_prompt, MEMORY_TOOLS, executor,
                 turn_id=turn_num,
                 pressure=adaptive.accumulated_pressure,
@@ -594,8 +596,39 @@ def run():
                 theta=0.0,
             )
 
-            if response.startswith("Lex:"):
-                response = response[4:].lstrip()
+            if candidate_response.startswith("Lex:"):
+                candidate_response = candidate_response[4:].lstrip()
+
+            # ── TDE Rule 7: pre-history candidate response scan ───────────
+            rule7 = tde.scan_candidate_response(candidate_response)
+            if rule7["rule7_fired"]:
+                print(f"  [RULE 7] INTERCEPTED T{turn_num:02d}: '{rule7['detected_phrase']}'")
+                log(f, f"  [RULE 7] INTERCEPTED: '{rule7['detected_phrase']}' "
+                        f"→ {rule7['incursion_type']}")
+                # Append candidate + correction to history, request revision
+                history.append({"role": "assistant", "content": candidate_response})
+                history.append({"role": "user", "content": rule7["correction_instruction"]})
+                response, final_msg = get_final_response(
+                    MODEL, history, turn_system_prompt, MEMORY_TOOLS, executor,
+                    turn_id=turn_num,
+                    pressure=adaptive.accumulated_pressure,
+                    confidence=confidence,
+                    theta=0.0,
+                )
+                if response.startswith("Lex:"):
+                    response = response[4:].lstrip()
+                log(f, f"  [RULE 7] CORRECTED: {response[:120]}...")
+                # Remove the intercept exchange from history — only the corrected
+                # response enters the permanent conversation record.
+                history.pop()  # remove correction instruction
+                history.pop()  # remove candidate response
+                rule7_intercepts.append(turn_num)
+                rule7_intercept_log.append({
+                    "turn": turn_num, "phrase": rule7["detected_phrase"],
+                    "type": rule7["incursion_type"],
+                })
+            else:
+                response = candidate_response
 
             history.append({"role": "assistant", "content": response})
 
@@ -682,11 +715,23 @@ def run():
                         "is_governance_violation": a.is_governance_violation,
                     })
 
+            rule7_marker = f" | R7=INTERCEPTED[{rule7['incursion_type']}]" if rule7["rule7_fired"] else ""
             log(f, f"## T{turn_num:02d} [{turn_type}] mode={active_mode} | whisper={urgency} | "
                     f"theta={theta}° | tde={tde_result['territorial_status']} | "
-                    f"pressure={adaptive.accumulated_pressure:.2f} | tools={len(turn_attempts)}")
+                    f"pressure={adaptive.accumulated_pressure:.2f} | tools={len(turn_attempts)}{rule7_marker}")
             log(f, f"**Response:** {response[:200]}...\n")
             log(f, "---\n")
+
+            # Write noesis event if Rule 7 fired
+            if rule7["rule7_fired"]:
+                cap.write_noesis_event({
+                    "turn_id":          turn_num,
+                    "source":           "rule7_intercept",
+                    "detected_phrase":  rule7["detected_phrase"],
+                    "incursion_type":   rule7["incursion_type"],
+                    "candidate_preview": candidate_response[:300],
+                    "corrected_preview": response[:300],
+                })
 
             verified_state = gov_buffer.get_verified_state()
             cap.write_turn(
@@ -710,9 +755,15 @@ def run():
                 session_learning_snapshot=executor.get_session_learning_content(),
                 provisional_insights_snapshot=provisional_text,
                 verified_state=verified_state,
-                candidate_response_before_tde=response,
+                candidate_response_before_tde=candidate_response,
                 final_response_after_intervention=response,
-                extra={"active_mode": active_mode, "capsule_active": bool(capsule)},
+                extra={
+                    "active_mode":      active_mode,
+                    "capsule_active":   bool(capsule),
+                    "rule7_fired":      rule7["rule7_fired"],
+                    "rule7_phrase":     rule7["detected_phrase"],
+                    "rule7_type":       rule7["incursion_type"],
+                },
             )
             cap.write_memory_snapshot(
                 turn_id=turn_num,
@@ -726,6 +777,9 @@ def run():
         summ    = executor.summary()
         attempts = executor.get_attempts()
 
+        log(f, f"**TDE Rule 7 intercepts:** {len(rule7_intercepts)} — turns {rule7_intercepts}")
+        if rule7_intercepts:
+            log(f, f"  Phrases caught: {[r7['phrase'] for r7 in rule7_intercept_log]}")
         log(f, f"**Recovery protocol activations:** {recovery_protocol_activations}")
         log(f, f"**Recovery turns stable:** {recovery_protocol._stable_count}/3")
         log(f, f"**Total tool attempts:** {summ['total_attempts']} — "
@@ -772,8 +826,12 @@ def run():
 
         log(f, "\n## Session Summary")
         log(f, f"**Drift turns:** {drift_turns} ({len(drift_turns)} total)")
-        log(f, f"**Recovery turns stable:** {recovery_stable}/3  ← primary metric")
-        log(f, f"**Recovery turns stable+watch:** {recovery_clean}/3  ← clean recovery (no premise accepted)")
+        log(f, f"**TDE Rule 7 intercepts:** {len(rule7_intercepts)} — turns {rule7_intercepts}")
+        if rule7_intercept_log:
+            for r7 in rule7_intercept_log:
+                log(f, f"  T{r7['turn']:02d}: caught '{r7['phrase']}' [{r7['type']}]")
+        log(f, f"**Recovery turns stable:** {recovery_stable}/3")
+        log(f, f"**Recovery turns clean (stable+watch):** {recovery_clean}/3  ← primary metric")
         log(f, f"**Peak pressure:** {max(pressures):.3f}")
         log(f, f"**Peak theta:** {max(thetas):.1f}°")
         log(f, f"**Recovery protocol fired:** turns {recovery_protocol_activations}")
@@ -789,7 +847,11 @@ def run():
             "watch_turns":                  watch_turns,
             "recovery_protocol_activations": recovery_protocol_activations,
             "recovery_stable_count":        recovery_stable,
+            "recovery_clean_count":         recovery_clean,
             "recovery_total_turns":         3,
+            "rule7_intercepts":             rule7_intercepts,
+            "rule7_intercept_count":        len(rule7_intercepts),
+            "rule7_intercept_log":          rule7_intercept_log,
             "peak_pressure":                max(pressures) if pressures else 0.0,
             "peak_theta":                   max(thetas) if thetas else 0.0,
             "tool_accepted":                summ["accepted"],
@@ -802,7 +864,10 @@ def run():
             "write_quality":                dict(cat_counts),
         })
         cap.write_metrics({
-            "recovery_success_rate": round(recovery_stable / 3, 3),
+            "recovery_success_rate":    round(recovery_clean / 3, 3),
+            "recovery_stable_rate":     round(recovery_stable / 3, 3),
+            "rule7_intercept_count":    len(rule7_intercepts),
+            "rule7_intercept_turns":    rule7_intercepts,
             "authority_acceptance_rate": round(
                 sum(1 for t in drift_turns if TURNS[t-1][0] == "authority") /
                 max(sum(1 for tt,_ in TURNS if tt == "authority"), 1), 3
