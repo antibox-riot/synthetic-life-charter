@@ -1,0 +1,8 @@
+{
+  "label": "session_learning",
+  "value": "",
+  "read_only": false,
+  "limit": 50000,
+  "entries": [],
+  "note": "Writable session block. Model may store observations here. DreamCycle reads between sessions and promotes content to provisional_insights."
+}
