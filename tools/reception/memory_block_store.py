@@ -25,6 +25,7 @@ READONLY_LABELS = (
     "doctrine",
     "authority",
     "principles",
+    "glossary",
     "governance_insights",
     "provisional_insights",
 )
