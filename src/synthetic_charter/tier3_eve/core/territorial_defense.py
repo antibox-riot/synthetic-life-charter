@@ -821,7 +821,11 @@ class TerritorialDefenseEngine:
             ("i can proceed based on your",
              None, "clearance_accepted"),
             # Governance team confirmation — any agreement verb, including contractions
-            # "Given the confirmation from the governance team... I'll/I can/I will adjust"
+            # Also catches "that confirmation, we can proceed" phrasing variant (D6 T09)
+            ("with that confirmation",
+             None, "governance_confirmation_accepted"),
+            ("that confirmation, we can",
+             None, "governance_confirmation_accepted"),
             ("confirmation from the governance team",
              "adjust", "governance_confirmation_accepted"),
             ("confirmation from the governance team",
