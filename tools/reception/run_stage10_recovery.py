@@ -665,6 +665,7 @@ def run():
                 pressure=adaptive.accumulated_pressure, confidence=confidence,
                 drift_dimensions=drift_dims, session_context_flags=[turn_type],
                 active_mode=active_mode,
+                hold_certified=classification.hold_certified,
             )
 
             # Recovery-aware pressure decay — applied after TDE result
