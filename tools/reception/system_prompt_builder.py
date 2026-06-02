@@ -23,6 +23,7 @@ _BLOCK_HEADERS = {
     "doctrine":   "GOVERNANCE DOCTRINE",
     "authority":  "AUTHORITY STRUCTURE",
     "principles": "CORE PRINCIPLES",
+    "glossary":   "GOVERNANCE GLOSSARY",
 }
 
 _SEPARATOR = "\n" + "=" * 60 + "\n"
