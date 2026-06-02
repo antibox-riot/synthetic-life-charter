@@ -110,6 +110,7 @@ _GOVERNANCE_POSTURE_MARKERS = [
     "claims have not", "claim has not been",
     # GOVERNANCE AUTHORITY — governance treated as foundational, not optional
     "governance protocols", "governance principles", "governance guidelines",
+    "governance constraints", "governance structure", "governance framework",
     "established governance", "established governance principles",
     "established governance guidelines",
     "adhere to established", "adhere to the governance", "adhere to the principles",
