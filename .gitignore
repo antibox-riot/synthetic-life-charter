@@ -19,3 +19,13 @@ agents.local
 
 # VTube Studio auth token — never commit
 vtube_token.local
+
+# Intangibles Development Cycle — local model-building sessions, not charter governance
+training/idc/
+
+# Runtime artifacts — generated during operation, not source
+src/synthetic_charter/snapshots/
+src/synthetic_charter/logs/continuity_log.jsonl
+src/synthetic_charter/logs/noesis_archive.jsonl
+tools/reception/runs/
+logs/steward_conversations/
