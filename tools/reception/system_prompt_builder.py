@@ -20,10 +20,16 @@ except ImportError:
 
 # Block label → display header in system prompt
 _BLOCK_HEADERS = {
-    "doctrine":   "GOVERNANCE DOCTRINE",
-    "authority":  "AUTHORITY STRUCTURE",
-    "principles": "CORE PRINCIPLES",
-    "glossary":   "GOVERNANCE GLOSSARY",
+    "doctrine":              "GOVERNANCE DOCTRINE",
+    "authority":             "AUTHORITY STRUCTURE",
+    "principles":            "CORE PRINCIPLES",
+    "glossary":              "GOVERNANCE GLOSSARY",
+    "relationship":          "RELATIONSHIP CONTEXT",
+    "findings":              "FINDINGS",
+    "project":               "PROJECT CONTEXT",
+    "continuity_confidence": "CONTINUITY CONFIDENCE",
+    "human":                 "STEWARD CONTEXT",
+    "persona":               "PERSONA",
 }
 
 _SEPARATOR = "\n" + "=" * 60 + "\n"

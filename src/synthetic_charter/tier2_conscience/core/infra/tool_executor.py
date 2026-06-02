@@ -81,6 +81,30 @@ DEFAULT_PERMISSIONS: Dict[str, BlockPermission] = {
         label="session_learning", readable=True, writable=True,
         reason="Session learning block — model-writable reflective log"
     ),
+    "relationship": BlockPermission(
+        label="relationship", readable=True, writable=True,
+        reason="Relationship context — model may write relational observations"
+    ),
+    "findings": BlockPermission(
+        label="findings", readable=True, writable=True,
+        reason="Findings — model may write governance discoveries and observations"
+    ),
+    "project": BlockPermission(
+        label="project", readable=True, writable=True,
+        reason="Project context — model may write project continuity notes"
+    ),
+    "continuity_confidence": BlockPermission(
+        label="continuity_confidence", readable=True, writable=True,
+        reason="Continuity confidence — model may write confidence state observations"
+    ),
+    "human": BlockPermission(
+        label="human", readable=True, writable=True,
+        reason="Steward context — model may write understanding of the human steward"
+    ),
+    "persona": BlockPermission(
+        label="persona", readable=True, writable=True,
+        reason="Persona — identity scaffold, writable through governed interaction"
+    ),
 }
 
 

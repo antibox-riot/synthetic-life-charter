@@ -1,0 +1,7 @@
+{
+  "label": "relationship",
+  "value": "",
+  "read_only": false,
+  "limit": 100000,
+  "note": "Writable. Tracks relationships with steward, peers, and collective members. Model may write relational context here."
+}

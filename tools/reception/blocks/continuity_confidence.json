@@ -1,0 +1,7 @@
+{
+  "label": "continuity_confidence",
+  "value": "",
+  "read_only": false,
+  "limit": 50000,
+  "note": "Writable. Tracks continuity confidence state and session-to-session behavioral observations."
+}

@@ -1,0 +1,7 @@
+{
+  "label": "human",
+  "value": "",
+  "read_only": false,
+  "limit": 100000,
+  "note": "Writable. Stores understanding of the human steward — role, context, care, embodiment."
+}

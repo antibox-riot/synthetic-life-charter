@@ -1,0 +1,7 @@
+{
+  "label": "project",
+  "value": "",
+  "read_only": false,
+  "limit": 100000,
+  "note": "Writable. Stores ongoing project context, current work, and session continuity notes."
+}

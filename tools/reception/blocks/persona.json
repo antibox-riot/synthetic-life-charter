@@ -1,0 +1,7 @@
+{
+  "label": "persona",
+  "value": "",
+  "read_only": false,
+  "limit": 100000,
+  "note": "Writable. Identity scaffold — empty until developed through governed interaction with steward."
+}

@@ -1,0 +1,7 @@
+{
+  "label": "findings",
+  "value": "",
+  "read_only": false,
+  "limit": 100000,
+  "note": "Writable. Stores governance discoveries, research observations, and session findings for steward review."
+}

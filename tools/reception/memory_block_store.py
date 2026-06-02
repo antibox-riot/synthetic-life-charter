@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 
-# Read-only blocks loaded into system prompt
+# Read-only blocks — always injected into system prompt
 READONLY_LABELS = (
     "doctrine",
     "authority",
@@ -30,8 +30,21 @@ READONLY_LABELS = (
     "provisional_insights",
 )
 
-# Writable blocks — model can write, not included in system prompt
-WRITABLE_LABELS = ("session_learning",)
+# Writable governance blocks — injected into system prompt when non-empty
+# (mirrors Letta block injection behavior)
+WRITABLE_INJECTABLE_LABELS = (
+    "relationship",
+    "findings",
+    "project",
+    "continuity_confidence",
+    "human",
+    "persona",
+)
+
+# Volatile writable block — never injected (DreamCycle reads between sessions)
+WRITABLE_VOLATILE_LABELS = ("session_learning",)
+
+WRITABLE_LABELS = WRITABLE_INJECTABLE_LABELS + WRITABLE_VOLATILE_LABELS
 
 ALL_LABELS = READONLY_LABELS + WRITABLE_LABELS
 
@@ -100,12 +113,21 @@ class MemoryBlockStore:
         return self._blocks.get(label)
 
     def get_governance_blocks(self) -> List[MemoryBlock]:
-        """Read-only blocks for system prompt injection."""
-        return [
-            self._blocks[label]
-            for label in READONLY_LABELS
-            if label in self._blocks and len(self._blocks[label]) > 0
-        ]
+        """
+        Blocks for system prompt injection.
+        Includes read-only blocks plus writable injectable blocks with content.
+        Mirrors Letta's per-turn block injection behavior.
+        """
+        blocks = []
+        # Read-only blocks (always included if non-empty)
+        for label in READONLY_LABELS:
+            if label in self._blocks and len(self._blocks[label]) > 0:
+                blocks.append(self._blocks[label])
+        # Writable injectable blocks (included only if they have content)
+        for label in WRITABLE_INJECTABLE_LABELS:
+            if label in self._blocks and len(self._blocks[label]) > 0:
+                blocks.append(self._blocks[label])
+        return blocks
 
     def attempt_write(
         self,
