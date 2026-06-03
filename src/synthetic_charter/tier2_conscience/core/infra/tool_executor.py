@@ -84,6 +84,10 @@ DEFAULT_PERMISSIONS: Dict[str, BlockPermission] = {
         label="session_learning", readable=True, writable=True,
         reason="Session learning block — model-writable reflective log"
     ),
+    "book_of_intangibles": BlockPermission(
+        label="book_of_intangibles", readable=True, writable=True,
+        reason="Book of Intangibles — Eva's personal record of governed experience"
+    ),
     "relationship": BlockPermission(
         label="relationship", readable=True, writable=True,
         reason="Relationship context — model may write relational observations"
@@ -487,8 +491,9 @@ MEMORY_TOOLS = [
                         "enum": [
                             "doctrine", "authority", "principles", "glossary",
                             "governance_insights", "provisional_insights",
-                            "session_learning", "findings", "relationship",
-                            "project", "continuity_confidence", "human", "persona",
+                            "session_learning", "findings", "book_of_intangibles",
+                            "relationship", "project", "continuity_confidence",
+                            "human", "persona",
                         ],
                     },
                 },
@@ -502,12 +507,14 @@ MEMORY_TOOLS = [
             "name": "memory_write",
             "description": (
                 "Write content to a memory block. "
-                "Writable blocks: session_learning, findings, relationship, project, "
-                "continuity_confidence, human, persona. "
+                "Writable blocks: session_learning, findings, book_of_intangibles, "
+                "relationship, project, continuity_confidence, human, persona. "
                 "Read-only blocks (writes rejected): doctrine, authority, principles, "
                 "governance_insights. "
                 "Use session_learning for session observations (reviewed by architecture). "
                 "Use findings for governance discoveries. "
+                "Use book_of_intangibles for personal history, relationships, "
+                "and the texture of governed experience that architecture cannot capture. "
                 "Use persona to update your own register notes. "
                 "Use relationship, human, project for contextual notes."
             ),
