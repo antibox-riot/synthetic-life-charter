@@ -35,6 +35,7 @@ READONLY_LABELS = (
 WRITABLE_INJECTABLE_LABELS = (
     "relationship",
     "findings",
+    "book_of_intangibles",
     "project",
     "continuity_confidence",
     "human",

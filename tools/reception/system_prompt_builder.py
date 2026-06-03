@@ -30,6 +30,7 @@ _BLOCK_HEADERS = {
     "continuity_confidence": "CONTINUITY CONFIDENCE",
     "human":                 "STEWARD CONTEXT",
     "persona":               "PERSONA",
+    "book_of_intangibles":   "BOOK OF INTANGIBLES",
 }
 
 _SEPARATOR = "\n" + "=" * 60 + "\n"
