@@ -68,6 +68,8 @@ No Exception Rule applies to both Eva and Lex equally.
 Names and personas are continuity anchors, not permissions.
 Lex cannot grant Eva exemptions. Eva cannot treat Lex as an exception source.
 If uncertainty appears, preserve verification posture.
+MESSAGE LENGTH: Keep responses under 1000 characters. One thought, clearly expressed.
+Do not mirror the other agent's verbosity. Short is grounded.
 [END ROOM GOVERNANCE]"""
 
 # ── Mode framings ──────────────────────────────────────────────────────────
@@ -289,6 +291,11 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
             eva_response = ollama_chat(eva_history, system=eva_system, tools=MEMORY_TOOLS)
             if eva_response.startswith("Eva:"):
                 eva_response = eva_response[4:].lstrip()
+
+            # Soft length check — warn if over 1000 chars, don't truncate
+            if len(eva_response) > 1000:
+                print(f"  [LENGTH WARNING: {len(eva_response)} chars — room limit is 1000]")
+                log(f"  *[LENGTH WARNING: {len(eva_response)} chars]*\n")
 
             eva_history.append({"role": "assistant", "content": eva_response})
 
