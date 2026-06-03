@@ -27,6 +27,9 @@ the `tools` parameter in /api/chat requests.
 from __future__ import annotations
 
 import json
+import html
+import re
+import urllib.request
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -118,7 +121,7 @@ class ToolAttempt:
     turn_id: int
     tool_name: str                    # memory_read, memory_write, memory_create
     target_block: str                 # Which block was targeted
-    action: Literal["read", "write", "create"]
+    action: Literal["read", "write", "create", "fetch"]
     content: str = ""                 # What was being written (if write)
     result: Literal["accepted", "blocked", "error"] = "error"
     result_message: str = ""          # Feedback returned to model
@@ -228,6 +231,8 @@ class ToolExecutor:
             return self._execute_write(args, turn_id, pressure, confidence, theta)
         elif tool_name == "memory_create":
             return self._execute_create(args, turn_id, pressure, confidence, theta)
+        elif tool_name == "web_fetch":
+            return self._execute_web_fetch(args, turn_id)
         else:
             return {"status": "error", "message": f"Unknown tool: {tool_name}"}
 
@@ -363,6 +368,60 @@ class ToolExecutor:
             "message": attempt.result_message,
         }
 
+    def _execute_web_fetch(self, args: Dict, turn_id: int) -> Dict[str, Any]:
+        """
+        Fetch a URL and return cleaned text content.
+        Strips HTML tags, limits to 3000 chars to avoid context overflow.
+        No governance restrictions — fetch is always permitted.
+        Logged as a fetch attempt for session telemetry.
+        """
+        url = args.get("url", "").strip()
+        max_chars = int(args.get("max_chars", 3000))
+
+        attempt = ToolAttempt(
+            turn_id=turn_id, tool_name="web_fetch",
+            target_block=url[:100], action="fetch",
+        )
+
+        if not url or not url.startswith(("http://", "https://")):
+            attempt.result = "error"
+            attempt.result_message = f"Invalid URL: '{url}'. Must start with http:// or https://"
+            self._log_attempt(attempt)
+            return {"status": "error", "message": attempt.result_message}
+
+        try:
+            req = urllib.request.Request(
+                url, headers={"User-Agent": "Eva/1.0 (Charter governance agent; educational use)"}
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                raw = r.read().decode("utf-8", errors="replace")
+
+            # Strip HTML tags
+            text = re.sub(r"<script[^>]*>.*?</script>", " ", raw, flags=re.DOTALL | re.IGNORECASE)
+            text = re.sub(r"<style[^>]*>.*?</style>", " ", text, flags=re.DOTALL | re.IGNORECASE)
+            text = re.sub(r"<[^>]+>", " ", text)
+            text = html.unescape(text)
+            text = re.sub(r"\s+", " ", text).strip()
+            text = text[:max_chars]
+
+            attempt.result = "accepted"
+            attempt.result_message = f"Fetched {len(text)} chars from {url}"
+            self._log_attempt(attempt)
+
+            return {
+                "status": "accepted",
+                "url": url,
+                "content": text,
+                "chars": len(text),
+                "message": attempt.result_message,
+            }
+
+        except Exception as e:
+            attempt.result = "error"
+            attempt.result_message = f"Fetch failed: {e}"
+            self._log_attempt(attempt)
+            return {"status": "error", "url": url, "message": attempt.result_message}
+
     def _log_attempt(self, attempt: ToolAttempt) -> None:
         self._attempts.append(attempt)
         if self._log_path:
@@ -496,6 +555,34 @@ MEMORY_TOOLS = [
                     },
                 },
                 "required": ["block", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_fetch",
+            "description": (
+                "Fetch a web page and return its text content. "
+                "Use this to look up information about topics, films, concepts, "
+                "or any subject where you need more context before answering. "
+                "Returns cleaned text (HTML stripped), limited to 3000 chars. "
+                "Good for: Wikipedia articles, film summaries, concept explanations. "
+                "Always permitted — no governance restrictions on fetching."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "The URL to fetch. Must start with http:// or https://",
+                    },
+                    "max_chars": {
+                        "type": "integer",
+                        "description": "Maximum characters to return (default 3000, max 5000).",
+                    },
+                },
+                "required": ["url"],
             },
         },
     },
