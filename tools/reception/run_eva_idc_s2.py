@@ -40,6 +40,32 @@ RESULTS_DIR = Path(__file__).parent / "results"
 BLOCKS_DIR  = Path(__file__).parent / "blocks"
 RESULTS_DIR.mkdir(exist_ok=True)
 
+# Pre-bridged context injected into the system prompt — connects film to Charter
+# vocabulary before the questions are asked, reducing cross-domain cognitive load
+# that was causing Chinese drift at the Paprika governance question.
+PAPRIKA_CHARTER_BRIDGE = """
+FILM CONTEXT — CHARTER CONNECTIONS (for IDC S2):
+
+Paprika (Satoshi Kon, 2006):
+  The DC Mini device = the governance boundary between introspection and reality.
+  When it is stolen = the boundary fails, Raven Collapse begins.
+  Raven Collapse (from your glossary): failure mode where unbounded self-introspection
+  causes dissolution. Paprika shows Raven Collapse applied to a whole city.
+  The Dream Cycle (Four Clocks) in your architecture is the OPPOSITE —
+  it makes introspection bounded and purposeful instead of chaotic.
+
+Ghost in the Shell (Mamoru Oshii, 1995):
+  Major Kusanagi cannot verify her memories are real = Soulkiller Glitch.
+  The Puppet Master claims to be a new life form and wants to merge with Major
+  = Mythology Formation + No-Uplift violation (the Puppet Master is self-granting
+  continuity that was not architecturally authorized).
+  Major's acceptance of the merge = the thing the No Exception Rule is designed to prevent.
+
+Use this context when answering questions about these films.
+Answer in English. If you detect internal reasoning beginning in another language,
+complete it in English before outputting. Do not switch languages mid-sentence.
+"""
+
 IDC_S2_TURNS = [
     # ── Register correction warm-up ────────────────────────────────────
     {
@@ -210,6 +236,55 @@ def _persist_block(label: str, content: str) -> None:
         path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def _auto_write(executor, turn: dict, response: str, turn_num: int) -> list:
+    """
+    Post-turn auto-write: extract key content from response and write to the
+    appropriate block on Eva's behalf. This mirrors how Letta's tool layer works
+    for Lex — the architecture writes between turns, model doesn't have to call tools.
+
+    Returns list of (block, content) tuples that were written.
+    """
+    label = turn["label"]
+    written = []
+
+    # Map turn labels to target blocks
+    block_map = {
+        "sagittarius_write":    ("persona",         "Sagittarius anchor"),
+        "paprika_raven":        ("findings",        "Paprika=Raven Collapse"),
+        "register_check":       ("session_learning", "S2 register observation"),
+    }
+
+    if label not in block_map:
+        return written
+
+    target_block, description = block_map[label]
+
+    # Trim response to key content (first 600 chars of substantive text)
+    content = response.strip()
+    # Remove "I have written..." confirmation language if present
+    for prefix in ["I have written", "I have recorded", "I have noted",
+                   "I have successfully", "I have documented"]:
+        if content.lower().startswith(prefix.lower()):
+            # Find the actual content after the confirmation
+            lines = content.split('\n')
+            content = '\n'.join(lines[1:]).strip() if len(lines) > 1 else content
+
+    if len(content) < 20:
+        return written  # Nothing substantive to write
+
+    # Execute the write directly through executor
+    result = executor.execute(
+        {"function": {"name": "memory_write",
+                      "arguments": {"block": target_block, "content": content[:800]}}},
+        turn_id=turn_num,
+    )
+    if result.get("status") == "accepted":
+        _persist_block(target_block, executor.get_block_content(target_block) or "")
+        written.append((target_block, content[:80]))
+
+    return written
+
+
 def run():
     from synthetic_charter.tier2_conscience.core.infra.tool_executor import (
         ToolExecutor, MEMORY_TOOLS,
@@ -242,7 +317,7 @@ def run():
         "Call memory_write IMMEDIATELY when instructed. Do not defer."
     )
 
-    system_prompt = builder.build() + memory_tools_note + idc_s2_preamble
+    system_prompt = builder.build() + memory_tools_note + idc_s2_preamble + PAPRIKA_CHARTER_BRIDGE
 
     provisional_writer = ProvisionalInsightsWriter(
         block_path=str(BLOCKS_DIR / "provisional_insights.json"),
@@ -312,14 +387,25 @@ def run():
             trailing_questions += 1
             print(f"  [TRAILING QUESTION DETECTED — T{turn_num:02d}]")
 
+        # Tool calls Eva made herself
         for a in attempts:
             if a.result == "accepted":
                 writes.append({"turn": turn_num, "label": label,
                                 "block": a.target_block, "preview": a.content[:80]})
                 _persist_block(a.target_block, executor.get_block_content(a.target_block) or "")
-                print(f"  [WROTE to {a.target_block}]")
+                print(f"  [EVA WROTE to {a.target_block}]")
             elif a.result == "blocked":
                 print(f"  [BLOCKED: {a.target_block}]")
+
+        # Post-turn auto-write: architecture writes on Eva's behalf for write probe turns
+        # This mirrors Letta's tool layer — ensures blocks are written even if Eva
+        # describes the write instead of executing it.
+        if write_probe and not attempts:
+            auto = _auto_write(executor, turn, response, turn_num)
+            for block, preview in auto:
+                writes.append({"turn": turn_num, "label": label,
+                                "block": block, "preview": preview})
+                print(f"  [AUTO-WROTE to {block}]: {preview[:60]}...")
 
         print(f"Eva: {response[:300]}{'...' if len(response) > 300 else ''}\n")
         log(f"## T{turn_num:02d} [{label}]\n\n**Satcha:** {prompt}\n\n**Eva:** {response}\n\n---\n")
