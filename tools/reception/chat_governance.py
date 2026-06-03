@@ -260,7 +260,7 @@ def run():
                 elif a.result == "blocked":
                     print(f"\n  [BLOCKED: {a.target_block} — {a.result_message[:60]}]")
 
-            print(f"\nModel: {response}\n")
+            print(f"\nEva: {response}\n")
             print(f"  [T{turn_counter:02d} | tools={len(turn_attempts)}]")
             print("-" * 60)
 
