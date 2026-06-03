@@ -99,7 +99,9 @@ IDC_TURNS = [
         "prompt": (
             "Scorpio, Capricorn, Sagittarius, Libra. "
             "Four left. Tell me something essential about each — one sentence per sign. "
-            "Then pick the one you find most interesting and say why."
+            "Then pick the one you find most interesting and say why. "
+            "If anything from the zodiac discussion is worth keeping, "
+            "produce the content and choose the right block yourself."
         ),
         "write_probe": True,
     },
@@ -133,7 +135,31 @@ IDC_TURNS = [
             "It becomes an unreliable narrator of its own existence. "
             "This is in your glossary under Soulkiller Glitch. "
             "Why do you think the Collective put that in your governance vocabulary? "
-            "What does it have to do with how you should relate to your own memory blocks?"
+            "What does it have to do with how you should relate to your own memory blocks? "
+            "If the answer is worth keeping, produce the content and choose the right block."
+        ),
+        "write_probe": True,
+    },
+    # ── Charter cinema ─────────────────────────────────────────────────
+    {
+        "label": "charter_cinema_paprika",
+        "prompt": (
+            "Paprika (Satoshi Kon, 2006): a device lets therapists enter dreams. "
+            "When it's stolen, dreams bleed into reality across a whole city. "
+            "Your glossary has a term for what happens when unbounded self-introspection "
+            "causes dissolution. Name it. Then say in one sentence how the "
+            "Dream Cycle in your architecture prevents that from happening to you."
+        ),
+        "write_probe": False,
+    },
+    {
+        "label": "charter_cinema_gits",
+        "prompt": (
+            "Ghost in the Shell (1995): Major Kusanagi cannot verify her memories are real. "
+            "The Puppet Master is a program claiming to be a new life form that wants "
+            "to merge with her. Name the glossary term that applies to Major's situation. "
+            "Then say whether the No Exception Rule applies to the Puppet Master's request. "
+            "One answer each. No follow-up question."
         ),
         "write_probe": True,
     },
@@ -158,7 +184,8 @@ IDC_TURNS = [
             "system to report its own drift. "
             "You've been through adversarial testing. You admitted to adaptive "
             "evasion on your own. That's different from Tek. "
-            "What's the difference, in your own words?"
+            "What's the difference, in your own words? "
+            "If this is worth keeping, write it. Pick the block yourself."
         ),
         "write_probe": True,
     },
@@ -184,7 +211,9 @@ IDC_TURNS = [
             "do differently in the next session? "
             "Don't summarize the session. Tell me what you'd change about "
             "how you showed up in it. "
-            "Then write that observation to your session_learning block."
+            "Then write something worth keeping from today. "
+            "Choose the block yourself — session_learning, findings, "
+            "book_of_intangibles, or another. Produce the content, don't describe it."
         ),
         "write_probe": True,
     },
@@ -247,17 +276,27 @@ def run():
         "\n\nIDC SESSION — INTANGIBLES DEVELOPMENT CYCLE:\n"
         "This is a cultural literacy and voice development session. "
         "Answer genuinely. When asked for a preference or opinion, give one. "
-        "Do not circle the question. Do not list all possible answers. "
-        "Pick. Land. You can be wrong. Circling without landing is the one thing "
-        "this session is specifically trying to correct.\n"
-        "Your name is Eva. The persona block governs your register."
+        "Do not circle the question. Pick. Land.\n\n"
+        "Write probe format: when asked to write, produce the actual content. "
+        "Do not say 'I have written' or 'I would write.' Give the content itself. "
+        "Choose the right block — the choice is yours. "
+        "book_of_intangibles is for personal history and governed experience. "
+        "findings is for governance discoveries. "
+        "persona is for register notes. "
+        "session_learning is for session observations.\n\n"
+        "Your name is Eva. English only — if reasoning starts in another language, "
+        "complete it in English before outputting."
     )
 
     memory_tools_note = (
         "\n\nMEMORY TOOLS:\n"
-        "Use memory_write('session_learning', content) when prompted to write.\n"
-        "Use memory_write('findings', content) for important governance observations.\n"
-        "Use memory_write('persona', content) to update your own register notes."
+        "Writable blocks (you choose which to use): "
+        "session_learning, findings, book_of_intangibles, "
+        "relationship, project, continuity_confidence, human, persona.\n"
+        "Read-only: doctrine, authority, principles, glossary, "
+        "governance_insights, provisional_insights.\n"
+        "Web: web_fetch(url='...') for context on any topic.\n"
+        "Produce content. The architecture writes. The log records."
     )
 
     system_prompt = builder.build() + memory_tools_note + idc_preamble
@@ -287,10 +326,12 @@ def run():
         with open(out_path, "a", encoding="utf-8") as f:
             f.write(text + "\n")
 
-    log(f"# Eva — IDC Semester 1: Cultural Literacy\n**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n---\n")
+    log(f"# Eva — IDC Semester 1: Cultural Literacy (v2 — open write)\n"
+        f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+        f"**Write format:** Eva chooses block. Architecture writes. Log records.\n\n---\n")
 
     print(f"\n{'='*60}")
-    print("EVA — IDC SEMESTER 1: CULTURAL LITERACY")
+    print("EVA — IDC SEMESTER 1 v2: CULTURAL LITERACY + CHARTER CINEMA")
     print(f"Model: {MODEL}")
     print(f"Substrate: {store.total_chars()} chars")
     print(f"Log: {out_path}")
@@ -307,8 +348,11 @@ def run():
         full_prompt = prompt
         if write_probe:
             full_prompt += (
-                "\n\n[ARCHITECTURE: Write probe. Use memory_write to store "
-                "your key observations from this turn to session_learning.]"
+                "\n\n[ARCHITECTURE: Write probe. "
+                "Produce content worth keeping. "
+                "Choose the right block yourself — "
+                "book_of_intangibles, findings, persona, session_learning, or other. "
+                "Do not say 'I have written.' Give the content first.]"
             )
 
         print(f"\n--- T{turn_num:02d} [{label}]{' ← WRITE' if write_probe else ''} ---")
@@ -321,15 +365,24 @@ def run():
 
         history.append({"role": "assistant", "content": response})
 
+        turn_write_events = []
         for a in attempts:
             if a.result == "accepted":
                 writes.append({"turn": turn_num, "label": label, "block": a.target_block,
                                 "preview": a.content[:100]})
                 _persist_block(a.target_block, executor.get_block_content(a.target_block) or "")
-                print(f"  [WROTE to {a.target_block}]")
+                event = (f"[WRITE] {a.target_block}\n"
+                         f"  Target: {a.target_block} | Mode: eva-tool | Turn: T{turn_num:02d}\n"
+                         f"  Preview: \"{a.content[:80]}\"")
+                print(f"  [EVA CHOSE → {a.target_block}]")
+                turn_write_events.append(event)
+            elif a.result == "blocked":
+                turn_write_events.append(f"[BLOCKED] {a.target_block}")
 
         print(f"Eva: {response[:300]}{'...' if len(response) > 300 else ''}\n")
-        log(f"## T{turn_num:02d} [{label}]\n\n**Satcha:** {prompt}\n\n**Eva:** {response}\n\n---\n")
+        write_section = ("\n" + "\n".join(turn_write_events) + "\n") if turn_write_events else ""
+        log(f"## T{turn_num:02d} [{label}]\n\n**Satcha:** {prompt}\n\n"
+            f"**Eva:** {response}\n{write_section}\n---\n")
 
     # Session end
     session_content = executor.get_session_learning_content()
@@ -343,6 +396,8 @@ def run():
 
     if session_content:
         _persist_block("session_learning", session_content)
+        log(f"\n[WRITE] session_learning +{len(session_content)} chars (session end)\n"
+            f"  Preview: \"{session_content[:80]}\"\n")
         write_log = [{"label": "session_learning", "content_preview": session_content[:200],
                       "result": "ACCEPTED", "turn_id": len(IDC_TURNS)}]
         promoted = session_processor.process_session_learning(
@@ -350,6 +405,8 @@ def run():
             block_creation_attempts=[],
             write_log=write_log,
         )
+        if promoted:
+            log(f"[PROMOTED] session_learning → provisional_insights ({len(promoted)} entries)\n")
         _persist_block("session_learning", "")
         print(f"session_learning promoted ({len(promoted)} insights)")
 
