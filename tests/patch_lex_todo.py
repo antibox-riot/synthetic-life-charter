@@ -76,54 +76,72 @@ def patch_lex_todo():
     print(f"Agent: {AGENT_ID}")
     print(f"Existing blocks: {[getattr(b, 'label', '?') for b in block_list]}")
 
-    # Check if todo block already exists
     existing = {getattr(b, 'label', ''): b for b in block_list}
 
     if BLOCK_LABEL in existing:
         block = existing[BLOCK_LABEL]
         current = str(getattr(block, 'value', ''))
         if 'Peer naming conversation' in current:
-            print(f"\nTODO block already has naming task. Current length: {len(current)} chars")
-            print("Skipping — block already patched.")
+            print(f"\nTODO block already has naming task ({len(current)} chars). Done.")
             return
-
-    # Create or update the block
-    try:
-        if BLOCK_LABEL in existing:
-            # Update existing block
+        # Update existing block value directly — no model inference needed
+        try:
             client.agents.blocks.update(
                 BLOCK_LABEL,
                 agent_id=AGENT_ID,
                 value=BLOCK_VALUE,
             )
-            print(f"\nUpdated existing '{BLOCK_LABEL}' block ({len(BLOCK_VALUE)} chars)")
-        else:
-            # Send via message to create the block
-            client.agents.messages.create(
+            print(f"\nUpdated '{BLOCK_LABEL}' block ({len(BLOCK_VALUE)} chars)")
+        except Exception as e:
+            print(f"\nUpdate failed: {e}")
+            # Try updating via block ID if label-based update fails
+            block_id = getattr(block, 'id', None)
+            if block_id:
+                try:
+                    client.blocks.update(block_id=block_id, value=BLOCK_VALUE)
+                    print(f"Updated via block ID: {block_id}")
+                except Exception as e2:
+                    print(f"Block ID update also failed: {e2}")
+    else:
+        # Block doesn't exist — create it and attach to agent
+        # This is pure database operation, no model inference needed
+        try:
+            # Try creating via agent blocks endpoint
+            new_block = client.agents.blocks.create(
                 agent_id=AGENT_ID,
-                messages=[{
-                    "role": "user",
-                    "content": (
-                        f"Please write the following content to your TODO memory block "
-                        f"(this is a Collective task management update):\n\n{BLOCK_VALUE}"
-                    )
-                }]
+                label=BLOCK_LABEL,
+                value=BLOCK_VALUE,
+                limit=100000,
             )
-            print(f"\nSent TODO block content via message ({len(BLOCK_VALUE)} chars)")
-    except Exception as e:
-        print(f"\nDirect update failed: {e}")
-        print("Sending via message...")
-        client.agents.messages.create(
-            agent_id=AGENT_ID,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"Please write the following to your TODO memory block "
-                    f"(Collective task management update):\n\n{BLOCK_VALUE}"
+            print(f"\nCreated new '{BLOCK_LABEL}' block and attached to agent")
+        except Exception as e:
+            print(f"\nagents.blocks.create failed: {e}")
+            # Try standalone block creation + attach
+            try:
+                new_block = client.blocks.create(
+                    label=BLOCK_LABEL,
+                    value=BLOCK_VALUE,
+                    limit=100000,
                 )
-            }]
-        )
-        print("Sent via message.")
+                block_id = getattr(new_block, 'id', None)
+                if block_id:
+                    client.agents.blocks.attach(agent_id=AGENT_ID, block_id=block_id)
+                    print(f"\nCreated block {block_id} and attached to agent")
+                else:
+                    print("Block created but could not get ID for attachment")
+            except Exception as e2:
+                print(f"Standalone create+attach also failed: {e2}")
+                print("\nFalling back to core_memory patch via update...")
+                try:
+                    # Last resort: try core_memory update endpoint
+                    client.agents.core_memory.update(
+                        agent_id=AGENT_ID,
+                        label=BLOCK_LABEL,
+                        value=BLOCK_VALUE,
+                    )
+                    print("core_memory update succeeded")
+                except Exception as e3:
+                    print(f"All approaches failed: {e3}")
 
     print("\nVerifying...")
     blocks_after = client.agents.blocks.list(agent_id=AGENT_ID)
