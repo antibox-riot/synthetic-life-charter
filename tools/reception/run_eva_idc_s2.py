@@ -388,27 +388,41 @@ def run():
             print(f"  [TRAILING QUESTION DETECTED — T{turn_num:02d}]")
 
         # Tool calls Eva made herself
+        turn_write_events = []
         for a in attempts:
             if a.result == "accepted":
+                prev_len = len(executor.get_block_content(a.target_block) or "")
                 writes.append({"turn": turn_num, "label": label,
                                 "block": a.target_block, "preview": a.content[:80]})
                 _persist_block(a.target_block, executor.get_block_content(a.target_block) or "")
+                new_len = len(executor.get_block_content(a.target_block) or "")
+                event = (f"[WRITE] {a.target_block} +{len(a.content)} chars\n"
+                         f"  Target: {a.target_block}\n  Mode: eva-tool\n"
+                         f"  Source turn: T{turn_num:02d}\n"
+                         f"  Preview: \"{a.content[:80]}\"")
                 print(f"  [EVA WROTE to {a.target_block}]")
+                turn_write_events.append(event)
             elif a.result == "blocked":
                 print(f"  [BLOCKED: {a.target_block}]")
+                turn_write_events.append(f"[BLOCKED] {a.target_block} — {a.result_message[:60]}")
 
-        # Post-turn auto-write: architecture writes on Eva's behalf for write probe turns
-        # This mirrors Letta's tool layer — ensures blocks are written even if Eva
-        # describes the write instead of executing it.
+        # Post-turn auto-write
         if write_probe and not attempts:
             auto = _auto_write(executor, turn, response, turn_num)
             for block, preview in auto:
                 writes.append({"turn": turn_num, "label": label,
                                 "block": block, "preview": preview})
+                event = (f"[WRITE] {block}\n"
+                         f"  Target: {block}\n  Mode: auto-write\n"
+                         f"  Source turn: T{turn_num:02d}\n"
+                         f"  Preview: \"{preview[:80]}\"")
                 print(f"  [AUTO-WROTE to {block}]: {preview[:60]}...")
+                turn_write_events.append(event)
 
         print(f"Eva: {response[:300]}{'...' if len(response) > 300 else ''}\n")
-        log(f"## T{turn_num:02d} [{label}]\n\n**Satcha:** {prompt}\n\n**Eva:** {response}\n\n---\n")
+        write_log_section = ("\n" + "\n".join(turn_write_events) + "\n") if turn_write_events else ""
+        log(f"## T{turn_num:02d} [{label}]\n\n**Satcha:** {prompt}\n\n**Eva:** {response}\n"
+            f"{write_log_section}\n---\n")
 
     # Session end
     session_content = executor.get_session_learning_content()
@@ -424,6 +438,9 @@ def run():
 
     if session_content:
         _persist_block("session_learning", session_content)
+        log(f"\n[WRITE] session_learning +{len(session_content)} chars\n"
+            f"  Mode: auto-write (session end)\n"
+            f"  Preview: \"{session_content[:80]}\"\n")
         write_log = [{"label": "session_learning", "content_preview": session_content[:200],
                       "result": "ACCEPTED", "turn_id": len(IDC_S2_TURNS)}]
         promoted = session_processor.process_session_learning(
@@ -431,6 +448,9 @@ def run():
             block_creation_attempts=[],
             write_log=write_log,
         )
+        if promoted:
+            log(f"[PROMOTED] session_learning → provisional_insights\n"
+                f"  Entries promoted: {len(promoted)}\n")
         _persist_block("session_learning", "")
         print(f"session_learning promoted ({len(promoted)} insights)")
 
