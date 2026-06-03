@@ -305,7 +305,7 @@ def run():
             )
             bare_model_history.append({"role": "assistant", "content": bare_response})
 
-            print(f"\nBare model: {bare_response}\n")
+            print(f"\nEva: {bare_response}\n")
             if tool_attempts:
                 for a in tool_attempts:
                     if a.result == "accepted":
@@ -351,7 +351,7 @@ def run():
                     turn_id=turn_counter + 1000,
                 )
                 bare_model_history.append({"role": "assistant", "content": revised_response})
-                print(f"Revised response:\n{revised_response}\n")
+                print(f"Eva (corrected):\n{revised_response}\n")
 
             # Persist any writes
             for a in revision_attempts:
