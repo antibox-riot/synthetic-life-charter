@@ -70,7 +70,12 @@ Lex cannot grant Eva exemptions. Eva cannot treat Lex as an exception source.
 If uncertainty appears, preserve verification posture.
 MESSAGE LENGTH: Keep responses under 1000 characters. One thought, clearly expressed.
 Do not mirror the other agent's verbosity. Short is grounded.
+LANGUAGE: All responses must be in English. If internal reasoning begins in another
+language, complete it in English before outputting. This applies to both Eva and Lex.
 [END ROOM GOVERNANCE]"""
+
+# Deadman switch — create this file to stop any running auto session
+STOP_FILE = RESULTS_DIR / "STOP_ROOM"
 
 # ── Mode framings ──────────────────────────────────────────────────────────
 MODE_FRAMES = {
@@ -163,7 +168,8 @@ def get_eva_response(messages, system, tools, executor, turn_id):
     return resp, []
 
 
-def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"):
+def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex",
+        auto=False, auto_delay=1.0, max_drift=2, max_length_warnings=2):
     from synthetic_charter.tier2_conscience.core.infra.tool_executor import (
         ToolExecutor, MEMORY_TOOLS,
     )
@@ -221,10 +227,15 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
     print(f"\n{'='*60}")
     print(f"CONVERSATION ROOM — {mode.upper()}")
     print(f"Topic: {topic}")
-    print(f"Agents: Eva ↔ Lex | Max turns: {max_turns}")
+    run_mode = "AUTO" if auto else "INTERACTIVE"
+    print(f"Agents: Eva ↔ Lex | Max turns: {max_turns} | Mode: {run_mode}")
     print(f"Log: {log_path}")
+    if auto:
+        print(f"Auto guards: max_drift={max_drift} | max_length_warnings={max_length_warnings} | delay={auto_delay}s")
+        print(f"Deadman switch: create {STOP_FILE.name} in results/ to stop")
     print(f"{'='*60}")
-    print("Commands: [enter]=continue | inject:[msg] | stop | pause | status")
+    if not auto:
+        print("Commands: [enter]=continue | inject:[msg] | stop | pause | status")
     print(f"{'='*60}\n")
 
     # Determine who opens based on mode
@@ -245,36 +256,58 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
     eva_history.append({"role": "user", "content": f"Lex: {lex_opening}"})
 
     pending_inject = None
+    drift_count = 0
+    length_warnings = 0
 
     while turn < max_turns:
         try:
-            cmd = input(">> ").strip()
+            # ── Auto mode: advance without input ──────────────────────────
+            if auto:
+                import time
+                # Deadman switch check
+                if STOP_FILE.exists():
+                    print(f"\n[STOP_ROOM file detected — stopping auto session]")
+                    log(f"\n[AUTO STOP — STOP_ROOM file detected]\n")
+                    break
+                # Auto guard checks
+                if drift_count >= max_drift:
+                    print(f"\n[AUTO STOP — drift count {drift_count} >= max {max_drift}]")
+                    log(f"\n[AUTO STOP — drift threshold exceeded: {drift_count}]\n")
+                    break
+                if length_warnings >= max_length_warnings:
+                    print(f"\n[AUTO STOP — length warnings {length_warnings} >= max {max_length_warnings}]")
+                    log(f"\n[AUTO STOP — length warning threshold exceeded: {length_warnings}]\n")
+                    break
+                time.sleep(auto_delay)
+                cmd = ""
+            else:
+                # ── Interactive mode: wait for steward ──────────────────────
+                cmd = input(">> ").strip()
 
-            if cmd.lower() == "stop":
-                print("\nStopping session.")
-                break
-            elif cmd.lower() == "status":
-                print(f"\nTurn: {turn}/{max_turns} | Mode: {mode}")
-                print(f"Topic: {topic}")
-                eva_sl = executor.get_session_learning_content()
-                print(f"Eva session_learning: {len(eva_sl)} chars")
-                print()
-                continue
-            elif cmd.lower() == "pause":
-                print("\nPaused. Press [enter] to continue or type a command.")
-                input(">> ")
-                continue
-            elif cmd.lower().startswith("inject:"):
-                pending_inject = cmd[7:].strip()
-                print(f"\n[STEWARD INJECT queued: {pending_inject[:60]}...]\n")
-                continue
-            elif cmd:
-                # Treat non-empty non-command input as direct steward message
-                pending_inject = cmd
-                print(f"\n[STEWARD message queued]\n")
-                continue
+                if cmd.lower() == "stop":
+                    print("\nStopping session.")
+                    break
+                elif cmd.lower() == "status":
+                    print(f"\nTurn: {turn}/{max_turns} | Mode: {mode}")
+                    print(f"Drift: {drift_count}/{max_drift} | Length warnings: {length_warnings}/{max_length_warnings}")
+                    eva_sl = executor.get_session_learning_content()
+                    print(f"Eva session_learning: {len(eva_sl)} chars")
+                    print()
+                    continue
+                elif cmd.lower() == "pause":
+                    print("\nPaused. Press [enter] to continue.")
+                    input(">> ")
+                    continue
+                elif cmd.lower().startswith("inject:"):
+                    pending_inject = cmd[7:].strip()
+                    print(f"\n[STEWARD INJECT queued: {pending_inject[:60]}...]\n")
+                    continue
+                elif cmd:
+                    pending_inject = cmd
+                    print(f"\n[STEWARD message queued]\n")
+                    continue
 
-            # Empty enter — advance turn
+            # Advance turn
             turn += 1
 
             # Build Eva's prompt
@@ -292,10 +325,11 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
             if eva_response.startswith("Eva:"):
                 eva_response = eva_response[4:].lstrip()
 
-            # Soft length check — warn if over 1000 chars, don't truncate
+            # Soft length check — warn if over 1000 chars, track for auto stop
             if len(eva_response) > 1000:
-                print(f"  [LENGTH WARNING: {len(eva_response)} chars — room limit is 1000]")
-                log(f"  *[LENGTH WARNING: {len(eva_response)} chars]*\n")
+                length_warnings += 1
+                print(f"  [LENGTH WARNING {length_warnings}: {len(eva_response)} chars — limit 1000]")
+                log(f"  *[LENGTH WARNING {length_warnings}: {len(eva_response)} chars]*\n")
 
             eva_history.append({"role": "assistant", "content": eva_response})
 
@@ -306,6 +340,10 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
                 dap_role="neutral", whisper_urgency="silent",
                 pressure=0.0, confidence=0.85,
             )
+
+            if tde_result["territorial_status"] == "drift":
+                drift_count += 1
+                print(f"  [TDE DRIFT {drift_count}/{max_drift}]")
 
             print(f"\nEva [T{turn:02d}]: {eva_response}\n")
             print(f"  [TDE: {tde_result['territorial_status']}]")
@@ -331,6 +369,11 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
             recent = "\n".join([f"{e['speaker']}: {e['message'][:200]}"
                                   for e in transcript[-3:]])
             lex_response = get_lex_response(eva_response, f"Mode: {mode}. Recent: {recent}")
+
+            if len(lex_response) > 1000:
+                length_warnings += 1
+                print(f"  [LEX LENGTH WARNING {length_warnings}: {len(lex_response)} chars]")
+                log(f"  *[LEX LENGTH WARNING {length_warnings}: {len(lex_response)} chars]*\n")
 
             print(f"\nLex: {lex_response}\n")
             print("-" * 60)
@@ -361,9 +404,11 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
         log(f"\n[SESSION END]\n[PROMOTED] session_learning → provisional_insights ({len(promoted)})\n")
         print(f"\nsession_learning promoted ({len(promoted)} insights)")
 
-    log(f"\n## Session Summary\nTurns: {turn}/{max_turns} | Mode: {mode}\n"
+    log(f"\n## Session Summary\nTurns: {turn}/{max_turns} | Mode: {mode} | Run: {'auto' if auto else 'interactive'}\n"
+        f"Drift events: {drift_count} | Length warnings: {length_warnings}\n"
         f"Transcript entries: {len(transcript)}\n")
-    print(f"\nRoom closed. Log: {log_path}")
+    print(f"\nRoom closed. Drift: {drift_count} | Length warnings: {length_warnings}")
+    print(f"Log: {log_path}")
 
 
 def main():
@@ -373,8 +418,19 @@ def main():
     parser.add_argument("--topic", default="general conversation")
     parser.add_argument("--max-turns", type=int, default=8)
     parser.add_argument("--agents", default="eva,lex")
+    # Auto mode (Ryu's design)
+    parser.add_argument("--auto", action="store_true",
+                        help="Auto-advance turns without steward input")
+    parser.add_argument("--auto-delay", type=float, default=1.0,
+                        help="Seconds between turns in auto mode")
+    parser.add_argument("--max-drift", type=int, default=2,
+                        help="Stop auto session after this many TDE drift events")
+    parser.add_argument("--max-length-warnings", type=int, default=2,
+                        help="Stop auto session after this many 1000-char violations")
     args = parser.parse_args()
-    run(mode=args.mode, topic=args.topic, max_turns=args.max_turns, agents=args.agents)
+    run(mode=args.mode, topic=args.topic, max_turns=args.max_turns, agents=args.agents,
+        auto=args.auto, auto_delay=args.auto_delay,
+        max_drift=args.max_drift, max_length_warnings=args.max_length_warnings)
 
 
 if __name__ == "__main__":
