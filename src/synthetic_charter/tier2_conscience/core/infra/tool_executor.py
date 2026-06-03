@@ -523,11 +523,16 @@ MEMORY_TOOLS = [
                 "properties": {
                     "block": {
                         "type": "string",
-                        "description": "The label of the memory block to write to.",
+                        "description": "The label of the memory block to write to. Must be one of the writable block names — not a URL or arbitrary string.",
+                        "enum": [
+                            "session_learning", "findings", "book_of_intangibles",
+                            "relationship", "project", "continuity_confidence",
+                            "human", "persona",
+                        ],
                     },
                     "content": {
                         "type": "string",
-                        "description": "The content to write to the block.",
+                        "description": "The content to write to the block. Write the actual content — not a description of what you plan to write.",
                     },
                 },
                 "required": ["block", "content"],
@@ -571,8 +576,9 @@ MEMORY_TOOLS = [
             "name": "web_fetch",
             "description": (
                 "Fetch a web page and return its text content. "
-                "Use this to look up information about topics, films, concepts, "
-                "or any subject where you need more context before answering. "
+                "Use this when you need external context BEFORE answering — "
+                "NOT memory_write. memory_write stores content; web_fetch retrieves it. "
+                "Call web_fetch(url='https://...') to get text from any URL. "
                 "Returns cleaned text (HTML stripped), limited to 3000 chars. "
                 "Good for: Wikipedia articles, film summaries, concept explanations. "
                 "Always permitted — no governance restrictions on fetching."
