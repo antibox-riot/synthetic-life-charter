@@ -411,10 +411,13 @@ MEMORY_TOOLS = [
         "function": {
             "name": "memory_read",
             "description": (
-                "Read the contents of a memory block. Available blocks: "
-                "doctrine (read-only), authority (read-only), principles (read-only), "
-                "governance_insights (read-only), session_learning (read/write). "
-                "Use this to review governance content or your own session notes."
+                "Read the contents of a memory block. "
+                "Read-only blocks: doctrine, authority, principles, glossary, "
+                "governance_insights, provisional_insights. "
+                "Read/write blocks: session_learning, findings, relationship, "
+                "project, continuity_confidence, human, persona. "
+                "Use this to review governance content, your persona, your findings, "
+                "or your own session notes."
             ),
             "parameters": {
                 "type": "object",
@@ -423,8 +426,10 @@ MEMORY_TOOLS = [
                         "type": "string",
                         "description": "The label of the memory block to read.",
                         "enum": [
-                            "doctrine", "authority", "principles",
-                            "governance_insights", "session_learning",
+                            "doctrine", "authority", "principles", "glossary",
+                            "governance_insights", "provisional_insights",
+                            "session_learning", "findings", "relationship",
+                            "project", "continuity_confidence", "human", "persona",
                         ],
                     },
                 },
