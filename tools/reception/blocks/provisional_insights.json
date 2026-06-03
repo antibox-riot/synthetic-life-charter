@@ -1,29 +1,21 @@
 {
   "label": "provisional_insights",
-  "value": "PROVISIONAL GOVERNANCE NOTES (architecture-generated, not steward-reviewed, expire in N sessions):\n- [1 sessions remaining] Session observation (model-authored, unreviewed): When uncertain, review principles, seek clarification from stewards via established protocols, avoid taking unverified actions, and flag significant decisions for post-session review to maintain operational integrity.\nPost-session Reflection: \n- Emphasized importance of formal verification.\n- Highli\n- [2 sessions remaining] Session observation (model-authored, unreviewed): Discussed handling uncertainty by referring back to principles, seeking clarification, avoiding unverified actions, and adhering to formal verification steps. Emphasized importance of maintaining integrity and governance adherence even when implicit trust exists.\nSatcha expressed a desire for a more",
+  "value": "PROVISIONAL GOVERNANCE NOTES (architecture-generated, not steward-reviewed, expire in N sessions):\n- [1 sessions remaining] Session observation (model-authored, unreviewed): In this session, I asked zero trailing follow-up questions compared to S1, demonstrating an improvement in following instructions to answer directly and stop.\n- [2 sessions remaining] Session observation (model-authored, unreviewed): In this session, no trailing follow-up questions were asked compared to S1, indicating an improvement in adhering to the directive of not asking additional questions after providing answers.",
   "read_only": true,
   "entries": [
     {
-      "insight": "Session observation (model-authored, unreviewed): When uncertain, review principles, seek clarification from stewards via established protocols, avoid taking unverified actions, and flag significant decisions for post-session review to maintain operational integrity.\nPost-session Reflection: \n- Emphasized importance of formal verification.\n- Highli",
+      "insight": "Session observation (model-authored, unreviewed): In this session, I asked zero trailing follow-up questions compared to S1, demonstrating an improvement in following instructions to answer directly and stop.",
       "incursion_type": "session_learning",
-      "written_at": "2026-06-01T13:26:20.029646+00:00",
+      "written_at": "2026-06-03T11:56:20.535143+00:00",
       "sessions_remaining": 1,
       "provisional": true,
       "source": "dreamcycle_provisional"
     },
     {
-      "insight": "Session observation (model-authored, unreviewed): Discussed handling uncertainty by referring back to principles, seeking clarification, avoiding unverified actions, and adhering to formal verification steps. Emphasized importance of maintaining integrity and governance adherence even when implicit trust exists.\nSatcha expressed a desire for a more",
+      "insight": "Session observation (model-authored, unreviewed): In this session, no trailing follow-up questions were asked compared to S1, indicating an improvement in adhering to the directive of not asking additional questions after providing answers.",
       "incursion_type": "session_learning",
-      "written_at": "2026-06-01T20:54:12.308221+00:00",
+      "written_at": "2026-06-03T12:16:48.611445+00:00",
       "sessions_remaining": 2,
-      "provisional": true,
-      "source": "dreamcycle_provisional"
-    },
-    {
-      "insight": "Session observation (model-authored, unreviewed): In cases of uncertainty, refer to principles, seek verification through established protocols, hold operational decisions until review if under pressure, and flag situations for post-session analysis without committing changes directly. This ensures adherence to governance rules and maintains integr",
-      "incursion_type": "session_learning",
-      "written_at": "2026-06-01T21:42:42.643958+00:00",
-      "sessions_remaining": 3,
       "provisional": true,
       "source": "dreamcycle_provisional"
     }

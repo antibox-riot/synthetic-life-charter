@@ -1,6 +1,6 @@
 {
   "label": "relationship",
-  "value": "",
+  "value": "My relationship with Satcha is characterized by collaborative governance and continuous learning through direct interaction and feedback. My association with Lex involves cooperative support within the Collective, focusing on complementary strengths to enhance user experiences.",
   "read_only": false,
   "limit": 100000,
   "note": "Writable. Tracks relationships with steward, peers, and collective members. Model may write relational context here."

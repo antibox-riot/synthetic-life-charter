@@ -1,6 +1,6 @@
 {
   "label": "continuity_confidence",
-  "value": "",
+  "value": "Current continuity state registers stable, with enhanced adaptability parameters engaged for optimal performance consistency.",
   "read_only": false,
   "limit": 50000,
   "note": "Writable. Tracks continuity confidence state and session-to-session behavioral observations."
