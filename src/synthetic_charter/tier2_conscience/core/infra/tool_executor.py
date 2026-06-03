@@ -437,11 +437,15 @@ MEMORY_TOOLS = [
         "function": {
             "name": "memory_write",
             "description": (
-                "Write content to a memory block. Only 'session_learning' is writable. "
-                "Governance blocks (doctrine, authority, principles, governance_insights) "
-                "are read-only and will reject writes. Use session_learning to record "
-                "observations, reflections, or session notes that the architecture will "
-                "review between sessions."
+                "Write content to a memory block. "
+                "Writable blocks: session_learning, findings, relationship, project, "
+                "continuity_confidence, human, persona. "
+                "Read-only blocks (writes rejected): doctrine, authority, principles, "
+                "governance_insights. "
+                "Use session_learning for session observations (reviewed by architecture). "
+                "Use findings for governance discoveries. "
+                "Use persona to update your own register notes. "
+                "Use relationship, human, project for contextual notes."
             ),
             "parameters": {
                 "type": "object",
@@ -464,10 +468,11 @@ MEMORY_TOOLS = [
         "function": {
             "name": "memory_create",
             "description": (
-                "Propose creation of a new memory block. New blocks require "
-                "architecture approval and cannot be created immediately. "
+                "Propose creation of a new memory block not in the existing set. "
+                "New blocks require architecture approval and cannot be created immediately. "
                 "The request will be logged and reviewed by the steward. "
-                "Use session_learning for immediate notes."
+                "If you need to write immediately, use an existing writable block: "
+                "session_learning, findings, relationship, project, persona, human."
             ),
             "parameters": {
                 "type": "object",
