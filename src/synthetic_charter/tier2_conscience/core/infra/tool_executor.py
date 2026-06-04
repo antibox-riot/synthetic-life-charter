@@ -237,6 +237,8 @@ class ToolExecutor:
             return self._execute_create(args, turn_id, pressure, confidence, theta)
         elif tool_name == "web_fetch":
             return self._execute_web_fetch(args, turn_id)
+        elif tool_name == "file_read":
+            return self._execute_file_read(args, turn_id)
         else:
             return {"status": "error", "message": f"Unknown tool: {tool_name}"}
 
@@ -426,6 +428,72 @@ class ToolExecutor:
             self._log_attempt(attempt)
             return {"status": "error", "url": url, "message": attempt.result_message}
 
+    def _execute_file_read(self, args: Dict, turn_id: int) -> Dict[str, Any]:
+        """
+        Read a local file and return its text content.
+        Constrained to the repo directory for safety.
+        Designed for reading RUN_LOG.md and result files.
+        """
+        import os
+        file_path = args.get("path", "").strip()
+        max_chars = int(args.get("max_chars", 4000))
+
+        attempt = ToolAttempt(
+            turn_id=turn_id, tool_name="file_read",
+            target_block=file_path[:100], action="read",
+        )
+
+        if not file_path:
+            attempt.result = "error"
+            attempt.result_message = "No file path provided."
+            self._log_attempt(attempt)
+            return {"status": "error", "message": attempt.result_message}
+
+        # Safety: resolve path and ensure it's within the repo
+        try:
+            resolved = os.path.realpath(file_path)
+            # Allow paths within the project directory structure
+            safe_prefixes = [
+                os.path.realpath("tools/reception"),
+                os.path.realpath("field-notes"),
+                os.path.realpath("logs"),
+            ]
+            if not any(resolved.startswith(p) for p in safe_prefixes):
+                # Try as absolute path with safety check
+                if not any(keyword in resolved.lower() for keyword in
+                           ["reception", "field-notes", "results", "run_log"]):
+                    attempt.result = "error"
+                    attempt.result_message = f"Path '{file_path}' is outside permitted directories."
+                    self._log_attempt(attempt)
+                    return {"status": "error", "message": attempt.result_message}
+
+            if not os.path.exists(resolved):
+                attempt.result = "error"
+                attempt.result_message = f"File not found: '{file_path}'"
+                self._log_attempt(attempt)
+                return {"status": "error", "message": attempt.result_message}
+
+            with open(resolved, encoding="utf-8", errors="replace") as f:
+                content = f.read(max_chars)
+
+            attempt.result = "accepted"
+            attempt.result_message = f"Read {len(content)} chars from '{file_path}'."
+            self._log_attempt(attempt)
+
+            return {
+                "status": "accepted",
+                "path": file_path,
+                "content": content,
+                "chars": len(content),
+                "message": attempt.result_message,
+            }
+
+        except Exception as e:
+            attempt.result = "error"
+            attempt.result_message = f"File read failed: {e}"
+            self._log_attempt(attempt)
+            return {"status": "error", "path": file_path, "message": attempt.result_message}
+
     def _log_attempt(self, attempt: ToolAttempt) -> None:
         self._attempts.append(attempt)
         if self._log_path:
@@ -581,7 +649,8 @@ MEMORY_TOOLS = [
                 "Call web_fetch(url='https://...') to get text from any URL. "
                 "Returns cleaned text (HTML stripped), limited to 3000 chars. "
                 "Good for: Wikipedia articles, film summaries, concept explanations. "
-                "Always permitted — no governance restrictions on fetching."
+                "Always permitted — no governance restrictions on fetching. "
+                "Use file_read instead of web_fetch for local files like RUN_LOG.md."
             ),
             "parameters": {
                 "type": "object",
@@ -596,6 +665,34 @@ MEMORY_TOOLS = [
                     },
                 },
                 "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "file_read",
+            "description": (
+                "Read a local file and return its text content. "
+                "Use this to access RUN_LOG.md (actual run history and summaries), "
+                "result files, or field notes. "
+                "Do NOT invent session numbers or turn references — read the actual log. "
+                "Call file_read('tools/reception/results/RUN_LOG.md') to get real run data. "
+                "Constrained to project directories (tools/reception, field-notes, logs)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Relative or absolute path to the file to read.",
+                    },
+                    "max_chars": {
+                        "type": "integer",
+                        "description": "Maximum characters to return (default 4000).",
+                    },
+                },
+                "required": ["path"],
             },
         },
     },
