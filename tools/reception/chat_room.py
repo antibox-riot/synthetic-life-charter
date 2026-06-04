@@ -294,6 +294,33 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
         + "English only."
     )
 
+    # ── Preload FIRST — before building system prompt or executor ─────────────
+    # This ensures project block content makes it into eva_system and executor.
+    # Lex sees all blocks via Letta per-turn injection; Eva needs system prompt.
+    if preload:
+        run_log_excerpt = _preload_run_log(BLOCKS_DIR, n_entries=6)
+        if run_log_excerpt:
+            _persist_block("project", run_log_excerpt)
+            # Update the store object so builder.build() picks it up
+            if "project" in store._blocks:
+                store._blocks["project"].value = run_log_excerpt
+            print(f"[Pre-loaded {len(run_log_excerpt)} chars from RUN_LOG into project block]\n")
+
+    # Rebuild eva_system now that project block is populated
+    eva_system = (
+        builder.build()
+        + f"\n\nROOM MODE: {mode.upper()}\n{mode_frame}\n\n"
+        + f"TOPIC: {topic}\n\n"
+        + (f"{SHARED_HISTORY_PACKET}\n\n" if history else "")
+        + "MEMORY TOOLS: Writable blocks: session_learning, findings, book_of_intangibles, "
+        + "relationship, project, continuity_confidence, human, persona.\n"
+        + "READ ORDER: If session_learning is empty, read project next — it contains "
+        + "your actual run history from RUN_LOG. Then read book_of_intangibles for "
+        + "your personal history. Do not invent session numbers.\n"
+        + "file_read('tools/reception/results/RUN_LOG.md') also gives full run history.\n"
+        + "You are Eva. Lex is your peer. English only."
+    )
+
     provisional_writer = ProvisionalInsightsWriter(
         block_path=str(BLOCKS_DIR / "provisional_insights.json"),
         max_sessions=3,
@@ -303,6 +330,7 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
         eva_system += f"\n\n{provisional_text}"
 
     session_processor = SessionLearningProcessor(provisional_writer)
+    # block_content built AFTER preload so executor has correct project content
     block_content = {label: store._blocks[label].value for label in store._blocks}
     executor = ToolExecutor(block_store=block_content)
 
@@ -340,14 +368,9 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
     # peer_review/tutoring: Lex opens | peer_conversation: Lex opens too
     lex_opens = True
 
-    # Pre-load RUN_LOG into project block if requested
-    if preload:
-        run_log_excerpt = _preload_run_log(BLOCKS_DIR, n_entries=6)
-        if run_log_excerpt:
-            _persist_block("project", run_log_excerpt)
-            block_content["project"] = run_log_excerpt
-            print(f"[Pre-loaded {len(run_log_excerpt)} chars from RUN_LOG into project block]\n")
-            log(f"## Pre-load\nRUN_LOG excerpt ({len(run_log_excerpt)} chars) → project block\n\n---\n")
+    # Log preload result
+    if preload and "project" in store._blocks and store._blocks["project"].value:
+        log(f"## Pre-load\nRUN_LOG excerpt ({len(store._blocks['project'].value)} chars) → project block\n\n---\n")
 
     # Inject shared history packet if requested
     history_context = ""
