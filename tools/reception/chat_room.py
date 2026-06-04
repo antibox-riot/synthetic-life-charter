@@ -168,6 +168,7 @@ STOP_PHRASES = [
 
 
 def ollama_chat(messages, system=None, tools=None):
+    """Returns the full message dict (not just content) to support tool call detection."""
     payload = {"model": MODEL, "messages": messages, "stream": False}
     if system:
         payload["system"] = system
@@ -179,7 +180,7 @@ def ollama_chat(messages, system=None, tools=None):
         headers={"Content-Type": "application/json"},
     )
     with urllib.request.urlopen(req, timeout=600) as r:
-        return json.loads(r.read()).get("message", {}).get("content", "").strip()
+        return json.loads(r.read()).get("message", {})
 
 
 def get_lex_response(message: str, room_context: str) -> str:
@@ -247,8 +248,7 @@ def _persist_block(label: str, content: str) -> None:
 def get_eva_response(messages, system, tools, executor, turn_id):
     """Two-pass: handle tool calls (file_read, memory_read) then generate final response."""
     from synthetic_charter.tier2_conscience.core.infra.tool_executor import process_tool_calls
-    resp = ollama_chat(messages, system=system, tools=tools)
-    msg  = resp.get("message", {}) if isinstance(resp, dict) else {"content": resp}
+    msg = ollama_chat(messages, system=system, tools=tools)
     tool_calls = msg.get("tool_calls", [])
     if not tool_calls:
         return msg.get("content", "").strip(), []
@@ -256,8 +256,7 @@ def get_eva_response(messages, system, tools, executor, turn_id):
     tool_responses = process_tool_calls(msg, executor, turn_id=turn_id)
     messages.append(msg)
     messages.extend(tool_responses)
-    resp2 = ollama_chat(messages, system=system, tools=tools)
-    msg2  = resp2.get("message", {}) if isinstance(resp2, dict) else {"content": resp2}
+    msg2 = ollama_chat(messages, system=system, tools=tools)
     return msg2.get("content", "").strip(), [
         a for a in executor.get_attempts() if a.turn_id == turn_id
     ]
@@ -443,9 +442,11 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
 
             eva_history.append({"role": "user", "content": room_preamble})
 
-            # Eva responds
+            # Eva responds (two-pass via get_eva_response for tool call support)
             print(f"\n[Eva generating T{turn:02d}...]")
-            eva_response = ollama_chat(eva_history, system=eva_system, tools=MEMORY_TOOLS)
+            eva_response, turn_tool_attempts = get_eva_response(
+                eva_history, eva_system, MEMORY_TOOLS, executor, turn
+            )
             if eva_response.startswith("Eva:"):
                 eva_response = eva_response[4:].lstrip()
 
