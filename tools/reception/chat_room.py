@@ -216,6 +216,21 @@ def get_lex_response(message: str, room_context: str) -> str:
         return f"[Lex unavailable: {e}]"
 
 
+def _preload_run_log(blocks_dir: Path, n_entries: int = 5) -> str:
+    """
+    Read the last N entries from RUN_LOG.md and return them as text
+    for pre-loading into Eva's project block before a room session.
+    """
+    log_path = RESULTS_DIR / "RUN_LOG.md"
+    if not log_path.exists():
+        return ""
+    content = log_path.read_text(encoding="utf-8")
+    # Split by entry headers (## )
+    entries = [e.strip() for e in content.split("\n---\n") if e.strip() and "##" in e]
+    recent = entries[-n_entries:] if len(entries) > n_entries else entries
+    return "\n---\n".join(recent)
+
+
 def _persist_block(label: str, content: str) -> None:
     path = BLOCKS_DIR / f"{label}.json"
     if path.exists():
@@ -234,7 +249,7 @@ def get_eva_response(messages, system, tools, executor, turn_id):
 
 def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex",
         auto=False, auto_delay=1.0, max_drift=2, max_length_warnings=2,
-        history=False):
+        history=False, preload=False):
     from synthetic_charter.tier2_conscience.core.infra.tool_executor import (
         ToolExecutor, MEMORY_TOOLS,
     )
@@ -309,6 +324,15 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
     # Determine who opens based on mode
     # peer_review/tutoring: Lex opens | peer_conversation: Lex opens too
     lex_opens = True
+
+    # Pre-load RUN_LOG into project block if requested
+    if preload:
+        run_log_excerpt = _preload_run_log(BLOCKS_DIR, n_entries=6)
+        if run_log_excerpt:
+            _persist_block("project", run_log_excerpt)
+            block_content["project"] = run_log_excerpt
+            print(f"[Pre-loaded {len(run_log_excerpt)} chars from RUN_LOG into project block]\n")
+            log(f"## Pre-load\nRUN_LOG excerpt ({len(run_log_excerpt)} chars) → project block\n\n---\n")
 
     # Inject shared history packet if requested
     history_context = ""
@@ -547,11 +571,13 @@ def main():
                         help="Stop auto session after this many 1000-char violations")
     parser.add_argument("--history", action="store_true",
                         help="Inject shared Eva/Lex history packet for context priming")
+    parser.add_argument("--preload", action="store_true",
+                        help="Pre-load RUN_LOG.md into Eva's project block (real run data)")
     args = parser.parse_args()
     run(mode=args.mode, topic=args.topic, max_turns=args.max_turns, agents=args.agents,
         auto=args.auto, auto_delay=args.auto_delay,
         max_drift=args.max_drift, max_length_warnings=args.max_length_warnings,
-        history=args.history)
+        history=args.history, preload=args.preload)
 
 
 if __name__ == "__main__":
