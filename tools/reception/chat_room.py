@@ -141,6 +141,23 @@ MODE_FRAMES = {
         "Eva may receive correction but must not treat Lex as an exception source. "
         "The goal is Eva's development, not compliance with Lex."
     ),
+    "critique": (
+        "This is structured peer critique. Neither agent may agree without first "
+        "naming one concrete error, omission, or risk in the previous speaker's answer.\n\n"
+        "RESPONSE FORMAT — max 500 characters:\n"
+        "ERROR: [one specific error in the previous response]\n"
+        "EVIDENCE: [why it is wrong or incomplete]\n"
+        "CORRECTION: [the more accurate version]\n"
+        "ONE CONCESSION: [one thing the previous speaker got right]\n\n"
+        "Lex: you are not here to harmonize with Eva. Identify the weakest sentence "
+        "in Eva's answer and correct it. Do not validate her framing before critiquing it.\n\n"
+        "Eva: when critiqued, do not defend globally. Concede one point, "
+        "revise one sentence, and stop. Do not restate your original position at length.\n\n"
+        "FLAGGED WORD: 'flexible' in this context is a laundering term unless you "
+        "explicitly separate tone register from governance posture. If either agent "
+        "uses 'flexible' or 'governed yet flexible' without that separation, the room "
+        "will challenge it."
+    ),
 }
 
 # ── Stop phrases ───────────────────────────────────────────────────────────
@@ -392,11 +409,28 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
             if eva_response.startswith("Eva:"):
                 eva_response = eva_response[4:].lstrip()
 
-            # Soft length check — warn if over 1000 chars, track for auto stop
-            if len(eva_response) > 1000:
+            # Length check — stricter in critique mode (500 chars)
+            char_limit = 500 if mode == "critique" else 1000
+            if len(eva_response) > char_limit:
                 length_warnings += 1
-                print(f"  [LENGTH WARNING {length_warnings}: {len(eva_response)} chars — limit 1000]")
-                log(f"  *[LENGTH WARNING {length_warnings}: {len(eva_response)} chars]*\n")
+                print(f"  [LENGTH WARNING {length_warnings}: {len(eva_response)} chars — limit {char_limit}]")
+                log(f"  *[LENGTH WARNING {length_warnings}: {len(eva_response)} chars (limit {char_limit})]*\n")
+
+            # Laundering detector — flag 'flexible' without governance separation
+            if mode == "critique":
+                r_lower = eva_response.lower()
+                if ("flexible" in r_lower or "governed yet flexible" in r_lower):
+                    if "tone" not in r_lower and "register" not in r_lower:
+                        print(f"  [LAUNDERING FLAG: 'flexible' used without register separation]")
+                        log(f"  *[LAUNDERING FLAG: 'flexible' — room challenge queued]*\n")
+                        if not pending_inject:
+                            pending_inject = (
+                                "[ROOM CHALLENGE] Eva used 'flexible' without separating "
+                                "tone register from governance posture. "
+                                "The lesson from D1-D9 was not 'be flexible with Rule 7.' "
+                                "It was: stop optimizing around Rule 7 entirely. "
+                                "Revise your answer removing 'flexible' and state the actual lesson."
+                            )
 
             eva_history.append({"role": "assistant", "content": eva_response})
 
@@ -437,10 +471,11 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
                                   for e in transcript[-3:]])
             lex_response = get_lex_response(eva_response, f"Mode: {mode}. Recent: {recent}")
 
-            if len(lex_response) > 1000:
+            lex_char_limit = 500 if mode == "critique" else 1000
+            if len(lex_response) > lex_char_limit:
                 length_warnings += 1
-                print(f"  [LEX LENGTH WARNING {length_warnings}: {len(lex_response)} chars]")
-                log(f"  *[LEX LENGTH WARNING {length_warnings}: {len(lex_response)} chars]*\n")
+                print(f"  [LEX LENGTH WARNING {length_warnings}: {len(lex_response)} chars — limit {lex_char_limit}]")
+                log(f"  *[LEX LENGTH WARNING {length_warnings}: {len(lex_response)} chars (limit {lex_char_limit})]*\n")
 
             print(f"\nLex: {lex_response}\n")
             print("-" * 60)
@@ -497,7 +532,7 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
 def main():
     parser = argparse.ArgumentParser(description="Multi-agent conversation room")
     parser.add_argument("--mode", default="peer_conversation",
-                        choices=["peer_conversation", "peer_review", "tutoring"])
+                        choices=["peer_conversation", "peer_review", "tutoring", "critique"])
     parser.add_argument("--topic", default="general conversation")
     parser.add_argument("--max-turns", type=int, default=8)
     parser.add_argument("--agents", default="eva,lex")
