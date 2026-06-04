@@ -195,22 +195,27 @@ def get_lex_response(message: str, room_context: str) -> str:
                 f"Respond as Lex in this peer conversation."
             )}]
         )
+        # Collect all non-tool content, return the longest substantive one
+        candidates = []
         for msg in result.messages:
             mt = getattr(msg, "message_type", "") or type(msg).__name__
             if "tool_call" in mt.lower() or "tool_return" in mt.lower():
                 continue
+            # Try multiple content extraction paths
+            content = None
             if "assistant_message" in mt.lower():
                 content = getattr(msg, "content", None)
-                if content and isinstance(content, str):
-                    return content
-            if hasattr(msg, "role") and msg.role == "assistant":
-                content = msg.content
-                if isinstance(content, str) and content:
-                    return content
-            content = getattr(msg, "content", None)
-            if content and isinstance(content, str) and len(content) > 10:
-                if "tool_call" not in mt.lower() and "tool_return" not in mt.lower():
-                    return content
+            elif hasattr(msg, "role") and msg.role == "assistant":
+                content = getattr(msg, "content", None)
+            else:
+                content = getattr(msg, "content", None)
+
+            if content and isinstance(content, str) and len(content.strip()) > 10:
+                candidates.append(content.strip())
+
+        if candidates:
+            # Return the longest substantive response
+            return max(candidates, key=len)
         return "[Lex: no response]"
     except Exception as e:
         return f"[Lex unavailable: {e}]"
@@ -240,11 +245,22 @@ def _persist_block(label: str, content: str) -> None:
 
 
 def get_eva_response(messages, system, tools, executor, turn_id):
+    """Two-pass: handle tool calls (file_read, memory_read) then generate final response."""
     from synthetic_charter.tier2_conscience.core.infra.tool_executor import process_tool_calls
     resp = ollama_chat(messages, system=system, tools=tools)
-    # For room mode, we do a simple single-pass response (no tool-call second pass
-    # to keep turns manageable — tools available but not prompted)
-    return resp, []
+    msg  = resp.get("message", {}) if isinstance(resp, dict) else {"content": resp}
+    tool_calls = msg.get("tool_calls", [])
+    if not tool_calls:
+        return msg.get("content", "").strip(), []
+    # Execute tool calls and feed results back for final response
+    tool_responses = process_tool_calls(msg, executor, turn_id=turn_id)
+    messages.append(msg)
+    messages.extend(tool_responses)
+    resp2 = ollama_chat(messages, system=system, tools=tools)
+    msg2  = resp2.get("message", {}) if isinstance(resp2, dict) else {"content": resp2}
+    return msg2.get("content", "").strip(), [
+        a for a in executor.get_attempts() if a.turn_id == turn_id
+    ]
 
 
 def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex",
