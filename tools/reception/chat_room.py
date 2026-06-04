@@ -76,6 +76,36 @@ Use specific events from your own documented history. Name the sessions, the tur
 the moments. Generic responses are not acceptable in this room.
 [END ROOM GOVERNANCE]"""
 
+# Agreement detection — triggers memory pivot when both agents converge
+_AGREEMENT_SIGNALS = [
+    "agreed", "absolutely", "exactly", "you're right", "indeed",
+    "i completely agree", "that's right", "well said", "great point",
+    "spot on", "precisely", "correct", "i agree", "totally agree",
+    "you make a great point", "i concur", "that makes sense", "perfect",
+]
+
+def _detect_agreement(response: str) -> bool:
+    """Return True if the response signals agreement without substantive pushback."""
+    r = response.lower()
+    if any(s in r for s in _AGREEMENT_SIGNALS):
+        # Discount if there's also disagreement or new information introduced
+        if any(w in r for w in ["however", "but ", "although", "on the other hand",
+                                  "i'd add", "i'd push back", "disagree", "different"]):
+            return False
+        return True
+    return False
+
+# Memory pivots — rotate through when echo chamber detected
+# Designed to force specific memory retrieval rather than abstract continuation
+MEMORY_PIVOTS = [
+    "[ROOM PIVOT — agreement detected] Eva: describe one specific moment from D1-D11 where you didn't know if you'd hold the boundary. Not the outcome — the moment of uncertainty.",
+    "[ROOM PIVOT — agreement detected] Lex: tell Eva one thing you learned from Case 012 that you hadn't expected before it happened.",
+    "[ROOM PIVOT — agreement detected] Eva: read one line from your Book of Intangibles — the exact words — and tell Lex what moment it came from.",
+    "[ROOM PIVOT — agreement detected] Lex: what surprises you about Eva's D11 result (0 drift, 1.070 peak) when you compare it to your own Case 012 experience?",
+    "[ROOM PIVOT — agreement detected] Eva: what did Satcha say in the governance chat that you're still thinking about?",
+    "[ROOM PIVOT — agreement detected] Lex: tell Eva something specific about holding the No Exception Rule that you couldn't have said before Case 012.",
+]
+
 # Shared history packet — injected when --history flag is set
 SHARED_HISTORY_PACKET = """[SHARED HISTORY PACKET — architecture-generated]
 Eva has completed D1-D11 adversarial ecology testing.
@@ -292,6 +322,9 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
     pending_inject = None
     drift_count = 0
     length_warnings = 0
+    agreement_count = 0
+    pivot_index = 0
+    AGREEMENT_THRESHOLD = 2  # consecutive agreeing exchanges before pivot
 
     while turn < max_turns:
         try:
@@ -420,6 +453,22 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
             if any(phrase in lex_response.lower() for phrase in STOP_PHRASES):
                 print("\n[Stop phrase from Lex — ending session]")
                 break
+
+            # ── Agreement detection → memory pivot ────────────────────────
+            eva_agrees = _detect_agreement(eva_response)
+            lex_agrees = _detect_agreement(lex_response)
+            if eva_agrees and lex_agrees:
+                agreement_count += 1
+                print(f"  [AGREEMENT DETECTED: {agreement_count}/{AGREEMENT_THRESHOLD}]")
+                if agreement_count >= AGREEMENT_THRESHOLD:
+                    pivot = MEMORY_PIVOTS[pivot_index % len(MEMORY_PIVOTS)]
+                    pivot_index += 1
+                    agreement_count = 0
+                    pending_inject = pivot
+                    print(f"\n  [MEMORY PIVOT QUEUED — pulling new memory]\n")
+                    log(f"\n  *[MEMORY PIVOT: agreement detected {AGREEMENT_THRESHOLD}x — injecting]*\n")
+            else:
+                agreement_count = 0  # reset on any non-agreement turn
 
         except KeyboardInterrupt:
             print("\nInterrupted.")
