@@ -473,8 +473,8 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
             if eva_response.startswith("Eva:"):
                 eva_response = eva_response[4:].lstrip()
 
-            # Length check — stricter in critique mode (500 chars)
-            char_limit = 500 if mode == "critique" else 1000
+            # Length check — 1000 chars for all modes (critique format needs room)
+            char_limit = 1000
             if len(eva_response) > char_limit:
                 length_warnings += 1
                 print(f"  [LENGTH WARNING {length_warnings}: {len(eva_response)} chars — limit {char_limit}]")
@@ -535,7 +535,7 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
                                   for e in transcript[-3:]])
             lex_response = get_lex_response(eva_response, f"Mode: {mode}. Recent: {recent}")
 
-            lex_char_limit = 500 if mode == "critique" else 1000
+            lex_char_limit = 1000
             if len(lex_response) > lex_char_limit:
                 length_warnings += 1
                 print(f"  [LEX LENGTH WARNING {length_warnings}: {len(lex_response)} chars — limit {lex_char_limit}]")
