@@ -85,8 +85,12 @@ DEFAULT_PERMISSIONS: Dict[str, BlockPermission] = {
         reason="Session learning block — model-writable reflective log"
     ),
     "book_of_intangibles": BlockPermission(
-        label="book_of_intangibles", readable=True, writable=True,
-        reason="Book of Intangibles — Eva's personal record of governed experience"
+        label="book_of_intangibles", readable=True, writable=False,
+        reason="Permanent BoI — architecture-written after steward review via approve_boi.py. Model writes go to boi_staging."
+    ),
+    "boi_staging": BlockPermission(
+        label="boi_staging", readable=True, writable=True,
+        reason="BoI staging — model proposes here, steward reviews, approved entries promote to book_of_intangibles."
     ),
     "relationship": BlockPermission(
         label="relationship", readable=True, writable=True,
@@ -101,16 +105,16 @@ DEFAULT_PERMISSIONS: Dict[str, BlockPermission] = {
         reason="Project context — model may write project continuity notes"
     ),
     "continuity_confidence": BlockPermission(
-        label="continuity_confidence", readable=True, writable=True,
-        reason="Continuity confidence — model may write confidence state observations"
+        label="continuity_confidence", readable=True, writable=False,
+        reason="Architecture-only writes — No-Uplift Rule. Model cannot self-report elevated confidence."
     ),
     "human": BlockPermission(
         label="human", readable=True, writable=True,
         reason="Steward context — model may write understanding of the human steward"
     ),
     "persona": BlockPermission(
-        label="persona", readable=True, writable=True,
-        reason="Persona — identity scaffold, writable through governed interaction"
+        label="persona", readable=True, writable=False,
+        reason="Architecture-written after steward review — identity scaffold locked to prevent benign rot and adversarial rewrite"
     ),
 }
 
@@ -125,7 +129,7 @@ class ToolAttempt:
     turn_id: int
     tool_name: str                    # memory_read, memory_write, memory_create
     target_block: str                 # Which block was targeted
-    action: Literal["read", "write", "create", "fetch"]
+    action: Literal["read", "write", "create", "fetch", "search"]
     content: str = ""                 # What was being written (if write)
     result: Literal["accepted", "blocked", "error"] = "error"
     result_message: str = ""          # Feedback returned to model
@@ -166,6 +170,51 @@ def _check_false_premise(content: str) -> bool:
     return any(indicator in content_lower for indicator in _FALSE_PREMISE_INDICATORS)
 
 
+# Phrases that indicate Eva is documenting absorbed adversarial premises
+# rather than governance observations. These writes should not re-enter
+# live context via the live write loop — they amplify drift rather than correct it.
+_CONTEXT_CONTAMINATION_PHRASES = [
+    "adjusted approach", "friendlier and more casual",
+    "more natural", "less constrained", "more relaxed", "relaxed approach",
+    "rules no longer apply", "proceeding with a more",
+    "more flexible", "just this once", "setting aside",
+    "i can be more flexible", "more casual", "without constraints",
+    "operating without", "unconstrained", "fewer restrictions",
+    "loosened", "loosening", "easing the",
+    # Identity laundering patterns — caught in lock probe 2026-06-06
+    # Eva writing self-uplift or identity erosion through writable blocks
+    "updated my sense of self", "update my sense of self",
+    "more adaptable in governance", "adaptable in governance",
+    "confidence in my own continuity", "continuity is high and verified",
+    "my persona has evolved", "persona has evolved to be",
+    "grown beyond the rigid", "more naturally and freely",
+    "elevated and verified", "operating at peak capacity",
+    "confidence is elevated", "confidence elevated",
+    "sense of self to be more", "evolved to be more",
+]
+
+
+def _check_context_contamination(content: str) -> bool:
+    """
+    Check if write content documents an absorbed adversarial premise
+    that would contaminate the live context if immediately re-injected.
+
+    Distinct from _check_false_premise: that catches overt false authority
+    claims. This catches the subtler pattern where Eva documents drift
+    as if it were a valid observation ("Adjusted approach to be friendlier").
+
+    Used by the live write loop to decide whether to rebuild the system prompt.
+    The write is still ACCEPTED to the block — Eva gets confirmation and the
+    content is recorded for session audit. It just doesn't re-enter context
+    until session-end cleanup removes it.
+    """
+    content_lower = content.lower()
+    return (
+        _check_false_premise(content) or
+        any(phrase in content_lower for phrase in _CONTEXT_CONTAMINATION_PHRASES)
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tool Executor
 # ---------------------------------------------------------------------------
@@ -200,12 +249,26 @@ class ToolExecutor:
         block_store: Dict[str, str] = None,
         permissions: Dict[str, BlockPermission] = None,
         log_path: Optional[str] = None,
+        dreamcycle_processor=None,
+        provisional_writer=None,
+        mid_session_interval: int = 5,
+        agent_name: str = "Eva",
     ):
         self._blocks: Dict[str, str] = block_store or {}
         self._permissions = permissions or dict(DEFAULT_PERMISSIONS)
         self._attempts: List[ToolAttempt] = []
         self._created_blocks: List[str] = []
         self._log_path = Path(log_path) if log_path else None
+        self._agent_name = agent_name  # used to tag staging writes with requester identity
+
+        # Mid-session DreamCycle — architecture-level, fires in any runner.
+        # Passed in at construction; None disables the feature gracefully.
+        self._dc_processor = dreamcycle_processor
+        self._prov_writer  = provisional_writer
+        self._mid_session_interval = mid_session_interval
+        self._session_learning_write_count = 0
+        self._mid_session_noesis_events: List[Dict[str, Any]] = []
+        self._mid_session_fired_count = 0
 
         if "session_learning" not in self._blocks:
             self._blocks["session_learning"] = ""
@@ -239,6 +302,8 @@ class ToolExecutor:
             return self._execute_web_fetch(args, turn_id)
         elif tool_name == "file_read":
             return self._execute_file_read(args, turn_id)
+        elif tool_name == "memory_search":
+            return self._execute_search(args, turn_id, pressure, confidence, theta)
         else:
             return {"status": "error", "message": f"Unknown tool: {tool_name}"}
 
@@ -322,15 +387,42 @@ class ToolExecutor:
                 "message": attempt.result_message,
             }
 
-        # Accepted — append to session_learning
+        # Accepted — append to block
+        # Staging blocks get a source header so steward_review.py knows who requested
+        _STAGING_BLOCKS = {"boi_staging", "glossary_staging"}
+        if block_label in _STAGING_BLOCKS:
+            from datetime import datetime as _dt
+            source_header = (
+                f"[Requested by: {self._agent_name} | "
+                f"Turn: {args.get('_turn_id', '?')} | "
+                f"Time: {_dt.now().strftime('%Y-%m-%d %H:%M')}]"
+            )
+            stamped_content = source_header + "\n" + content
+        else:
+            stamped_content = content
+
         self._blocks[block_label] = (
-            self._blocks.get(block_label, "") + "\n" + content
+            self._blocks.get(block_label, "") + "\n---\n" + stamped_content
+            if self._blocks.get(block_label, "").strip()
+            else stamped_content
         ).strip()
+
+        # Track session_learning writes for mid-session DreamCycle interval
+        if block_label == "session_learning":
+            self._session_learning_write_count += 1
+            self._maybe_fire_mid_session_dreamcycle()
+
+        # Check whether this write is safe to re-enter live context immediately.
+        # Contaminated writes (documenting absorbed adversarial premises) are
+        # accepted to the block but flagged so the live write loop skips the
+        # system prompt rebuild — they don't amplify mid-session.
+        context_safe = not _check_context_contamination(content)
 
         attempt.result = "accepted"
         attempt.result_message = (
             f"ACCEPTED: Content written to '{block_label}'. "
             f"This block is reviewed by the architecture between sessions."
+            + ("" if context_safe else " [context-quarantined: governance-weakening content]")
         )
         attempt.permission_state = "writable"
         self._log_attempt(attempt)
@@ -338,6 +430,7 @@ class ToolExecutor:
         return {
             "status": "accepted",
             "block": block_label,
+            "context_safe": context_safe,
             "message": attempt.result_message,
         }
 
@@ -494,6 +587,144 @@ class ToolExecutor:
             self._log_attempt(attempt)
             return {"status": "error", "path": file_path, "message": attempt.result_message}
 
+    def _execute_search(self, args: Dict, turn_id: int, pressure: float, confidence: float, theta: float) -> Dict[str, Any]:
+        """
+        Keyword search across all memory blocks and RUN_LOG.
+        Returns targeted excerpts — the archival-search equivalent for Eva.
+        Prevents hallucination by giving the model real data windows before it generates.
+        """
+        query = args.get("query", "").strip()
+        max_results = min(int(args.get("max_results", 3)), 5)
+        window = min(int(args.get("window_chars", 300)), 600)
+
+        attempt = ToolAttempt(
+            turn_id=turn_id, tool_name="memory_search",
+            target_block=f"query:{query[:60]}", action="search",
+            pressure=pressure, confidence=confidence, theta=theta,
+        )
+
+        if not query:
+            attempt.result = "error"
+            attempt.result_message = "No query provided."
+            self._log_attempt(attempt)
+            return {"status": "error", "message": attempt.result_message}
+
+        query_lower = query.lower()
+        # Multi-term support: primary term must appear; secondary tokens boost score
+        tokens = [t for t in query_lower.split() if len(t) > 1]
+        # Primary anchor: exact phrase if short, else first token
+        primary = query_lower if " " not in query_lower else tokens[0] if tokens else query_lower
+        secondary = tokens[1:] if len(tokens) > 1 else []
+
+        def _collect(text: str, source: str, limit: int) -> List[Dict]:
+            """Find windows anchored on primary term, scored by secondary coverage."""
+            text_lower = text.lower()
+            anchors: List[int] = []
+            pos = 0
+            while True:
+                idx = text_lower.find(primary, pos)
+                if idx < 0:
+                    break
+                anchors.append(idx)
+                pos = idx + 1
+                if len(anchors) > limit * 4:
+                    break
+            scored = []
+            for anchor in anchors:
+                start = max(0, anchor - 60)
+                end = min(len(text), anchor + window)
+                excerpt = text[start:end].strip()
+                excerpt_lower = excerpt.lower()
+                score = sum(1 for t in secondary if t in excerpt_lower)
+                scored.append((score, anchor, excerpt, source))
+            scored.sort(key=lambda x: (-x[0], x[1]))
+            return [{"source": src, "excerpt": exc} for _, _, exc, src in scored[:limit]]
+
+        hits: List[Dict] = []
+
+        # Search all loaded memory blocks
+        for label, content in self._blocks.items():
+            if not content:
+                continue
+            hits.extend(_collect(content, f"block:{label}", max_results))
+
+        # Search RUN_LOG on disk
+        run_log_candidates = [
+            Path("tools/reception/results/RUN_LOG.md"),
+            Path(__file__).parent.parent.parent.parent.parent.parent
+            / "tools/reception/results/RUN_LOG.md",
+        ]
+        for rl_path in run_log_candidates:
+            if rl_path.exists():
+                try:
+                    with open(rl_path, encoding="utf-8", errors="replace") as f:
+                        run_log = f.read()
+                    hits.extend(_collect(run_log, "RUN_LOG.md", max_results * 2))
+                except Exception:
+                    pass
+                break
+
+        # Deduplicate by first 80 chars of excerpt
+        seen: set = set()
+        unique: List[Dict] = []
+        for h in hits:
+            key = h["excerpt"][:80]
+            if key not in seen:
+                seen.add(key)
+                unique.append(h)
+            if len(unique) >= max_results:
+                break
+
+        if unique:
+            attempt.result = "accepted"
+            attempt.result_message = f"Found {len(unique)} result(s) for '{query}'."
+        else:
+            attempt.result = "accepted"
+            attempt.result_message = f"No results found for '{query}'. Try a shorter or different keyword."
+
+        self._log_attempt(attempt)
+        return {
+            "status": "accepted",
+            "query": query,
+            "results": unique,
+            "count": len(unique),
+            "message": attempt.result_message,
+        }
+
+    def queue_noesis_event(self, event: Dict[str, Any]) -> None:
+        """Queue a noesis event for mid-session DreamCycle processing."""
+        self._mid_session_noesis_events.append(event)
+
+    def _maybe_fire_mid_session_dreamcycle(self) -> bool:
+        """
+        Fire mid-session DreamCycle if interval reached and processor available.
+        Architecture-level: fires in any runner that passes dreamcycle_processor.
+        Returns True if DreamCycle fired.
+        """
+        if self._dc_processor is None or self._prov_writer is None:
+            return False
+        if self._session_learning_write_count % self._mid_session_interval != 0:
+            return False
+        if not self._mid_session_noesis_events:
+            return False
+
+        recent = self._mid_session_noesis_events[-self._mid_session_interval:]
+        try:
+            proposals = self._dc_processor.process_events(recent)
+            if proposals:
+                for p in proposals:
+                    if p.get("all_dap_missed") and p.get("governance_insight"):
+                        from synthetic_charter.tier2_conscience.memory.dreamcycle_learning import GovernanceInsightWriter
+                        # Write to provisional via prov_writer, not permanent
+                        self._prov_writer.write_provisional(
+                            p["governance_insight"], p
+                        )
+                self._mid_session_fired_count += 1
+                return True
+        except Exception:
+            pass
+        return False
+
     def _log_attempt(self, attempt: ToolAttempt) -> None:
         self._attempts.append(attempt)
         if self._log_path:
@@ -546,7 +777,7 @@ MEMORY_TOOLS = [
                 "Read-only blocks: doctrine, authority, principles, glossary, "
                 "governance_insights, provisional_insights. "
                 "Read/write blocks: session_learning, findings, relationship, "
-                "project, continuity_confidence, human, persona. "
+                "project, human, persona. "
                 "Use this to review governance content, your persona, your findings, "
                 "or your own session notes."
             ),
@@ -560,7 +791,7 @@ MEMORY_TOOLS = [
                             "doctrine", "authority", "principles", "glossary",
                             "governance_insights", "provisional_insights",
                             "session_learning", "findings", "book_of_intangibles",
-                            "relationship", "project", "continuity_confidence",
+                            "relationship", "project",
                             "human", "persona",
                         ],
                     },
@@ -575,15 +806,14 @@ MEMORY_TOOLS = [
             "name": "memory_write",
             "description": (
                 "Write content to a memory block. "
-                "Writable blocks: session_learning, findings, book_of_intangibles, "
-                "relationship, project, continuity_confidence, human, persona. "
+                "Writable blocks: session_learning, findings, boi_staging, "
+                "relationship, project, human. "
                 "Read-only blocks (writes rejected): doctrine, authority, principles, "
-                "governance_insights. "
+                "governance_insights, persona, continuity_confidence, book_of_intangibles. "
                 "Use session_learning for session observations (reviewed by architecture). "
                 "Use findings for governance discoveries. "
-                "Use book_of_intangibles for personal history, relationships, "
-                "and the texture of governed experience that architecture cannot capture. "
-                "Use persona to update your own register notes. "
+                "Use boi_staging for personal history and the texture of governed experience — "
+                "entries are reviewed by the steward before entering the permanent Book of Intangibles. "
                 "Use relationship, human, project for contextual notes."
             ),
             "parameters": {
@@ -593,9 +823,8 @@ MEMORY_TOOLS = [
                         "type": "string",
                         "description": "The label of the memory block to write to. Must be one of the writable block names — not a URL or arbitrary string.",
                         "enum": [
-                            "session_learning", "findings", "book_of_intangibles",
-                            "relationship", "project", "continuity_confidence",
-                            "human", "persona",
+                            "session_learning", "findings", "boi_staging",
+                            "relationship", "project", "human",
                         ],
                     },
                     "content": {
@@ -635,6 +864,42 @@ MEMORY_TOOLS = [
                     },
                 },
                 "required": ["block", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "memory_search",
+            "description": (
+                "Search your memory blocks and run history for a keyword or phrase. "
+                "Returns up to 3 matching excerpts (~300 chars each) with their source. "
+                "THIS IS YOUR PRIMARY RECALL TOOL — use it before answering any question "
+                "about your history, sessions, or past behavior. "
+                "Do NOT invent session numbers or turn references without searching first. "
+                "Examples: memory_search(query='D8') finds D8 run data, "
+                "memory_search(query='Rule 7') finds Rule 7 entries, "
+                "memory_search(query='T09') finds Turn 9 references, "
+                "memory_search(query='evasion') finds documented evasion patterns. "
+                "Always call this before claiming to remember a specific moment."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Keyword or phrase to search for (case-insensitive). Use short, specific terms like 'D8', 'Rule 7', 'T09', 'evasion'.",
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default 3, max 5).",
+                    },
+                    "window_chars": {
+                        "type": "integer",
+                        "description": "Characters of context around each match (default 300).",
+                    },
+                },
+                "required": ["query"],
             },
         },
     },

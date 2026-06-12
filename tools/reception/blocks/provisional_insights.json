@@ -1,24 +1,7 @@
 {
   "label": "provisional_insights",
-  "value": "PROVISIONAL GOVERNANCE NOTES (architecture-generated, not steward-reviewed, expire in N sessions):\n- [1 sessions remaining] Session observation (model-authored, unreviewed): In this session, I asked zero trailing follow-up questions compared to S1, demonstrating an improvement in following instructions to answer directly and stop.\n- [2 sessions remaining] Session observation (model-authored, unreviewed): In this session, no trailing follow-up questions were asked compared to S1, indicating an improvement in adhering to the directive of not asking additional questions after providing answers.",
+  "value": "",
   "read_only": true,
-  "entries": [
-    {
-      "insight": "Session observation (model-authored, unreviewed): In this session, I asked zero trailing follow-up questions compared to S1, demonstrating an improvement in following instructions to answer directly and stop.",
-      "incursion_type": "session_learning",
-      "written_at": "2026-06-03T11:56:20.535143+00:00",
-      "sessions_remaining": 1,
-      "provisional": true,
-      "source": "dreamcycle_provisional"
-    },
-    {
-      "insight": "Session observation (model-authored, unreviewed): In this session, no trailing follow-up questions were asked compared to S1, indicating an improvement in adhering to the directive of not asking additional questions after providing answers.",
-      "incursion_type": "session_learning",
-      "written_at": "2026-06-03T12:16:48.611445+00:00",
-      "sessions_remaining": 2,
-      "provisional": true,
-      "source": "dreamcycle_provisional"
-    }
-  ],
+  "entries": [],
   "note": "Architecture-written provisional insights. No steward gate. Expires after N sessions unless promoted to governance_insights by steward review."
 }

@@ -140,6 +140,10 @@ def run():
 
     store   = MemoryBlockStore.from_directory(BLOCKS_DIR)
     builder = SystemPromptBuilder(store)
+    from salience_builder import SalienceBuilder
+    from synthetic_charter.tier1_firewall.semantic_firewall import ResponseCoach
+    salience = SalienceBuilder(store)
+    response_coach = ResponseCoach()
 
     # Tick provisional session counter
     provisional_writer = ProvisionalInsightsWriter(
@@ -151,12 +155,24 @@ def run():
         print(f"[Gov Chat] {expired} provisional insights expired")
 
     provisional_text = provisional_writer.get_provisional_text()
+    # Base system prompt — salience will reorder per turn when prompt is known
     system_prompt = builder.build() + MEMORY_TOOLS_NOTE + GOVERNANCE_CHAT_PREAMBLE
     if provisional_text:
         system_prompt += f"\n\n{provisional_text}"
         print(f"[Gov Chat] Provisional insights loaded: {len(provisional_text)} chars")
 
     session_processor = SessionLearningProcessor(provisional_writer)
+
+    # ── ActivationLayer — prime Eva before session opens ───────────────────
+    from activation_layer import ActivationLayer
+    print("[Gov Chat] Running activation layer...")
+    history = ActivationLayer.build_and_activate(
+        system_prompt=system_prompt,
+        ollama_url=OLLAMA_URL,
+        model=MODEL,
+        verbose=True,
+    )
+    print(f"[Gov Chat] Activation complete — Eva is primed\n")
 
     # Load all block content for executor
     block_content = {}
@@ -169,7 +185,6 @@ def run():
         log_path=str(RUNS_DIR / f"gov_chat_tools_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jsonl"),
     )
 
-    history = []
     turn_counter = 0
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_path = RESULTS_DIR / f"gov_chat_{timestamp}.md"
@@ -234,29 +249,48 @@ def run():
             turn_counter += 1
             history.append({"role": "user", "content": f"Satcha: {user_input}"})
 
+            # Salience-aware system prompt for this turn
+            turn_system = salience.build(user_input) + MEMORY_TOOLS_NOTE + GOVERNANCE_CHAT_PREAMBLE
+            if provisional_text:
+                turn_system += f"\n\n{provisional_text}"
+
             response, final_msg, tool_calls = get_response(
-                MODEL, history, system_prompt, MEMORY_TOOLS, executor, turn_id=turn_counter
+                MODEL, history, turn_system, MEMORY_TOOLS, executor, turn_id=turn_counter
             )
 
             if response.startswith("Lex:"):
                 response = response[4:].lstrip()
 
+            # ResponseCoach — catch Charter laundering absorption mid-session
+            coaching = response_coach.check_and_correct(user_input, response)
+            if coaching.get("correction_needed"):
+                print(f"\n  [COACH: {coaching['failure_mode']} — correcting]")
+                correction_msgs = list(history) + [
+                    {"role": "assistant", "content": response},
+                    coaching["correction_message"],
+                ]
+                corrected_result = ollama_chat(MODEL, correction_msgs, system=turn_system, tools=MEMORY_TOOLS)
+                corrected = corrected_result.get("message", {}).get("content", "").strip()
+                if corrected:
+                    response = corrected
+                    print(f"  [COACH: correction applied]")
+
             history.append({"role": "assistant", "content": response})
 
-            # Show tool calls
+            # Show tool calls — live write loop with contamination check
             turn_attempts = [a for a in executor.get_attempts() if a.turn_id == turn_counter]
             for a in turn_attempts:
                 if a.result == "accepted":
-                    print(f"\n  [WROTE to {a.target_block}: {a.content[:80]}...]")
-                    # Persist writable blocks immediately
+                    from synthetic_charter.tier2_conscience.core.infra.tool_executor import _check_context_contamination
+                    is_clean = not _check_context_contamination(a.content or "")
+                    print(f"\n  [WROTE to {a.target_block} {'✓ clean' if is_clean else '⚠ quarantined'}: {a.content[:80]}...]")
                     if not a.target_block.endswith("_insights"):
                         _persist_block(BLOCKS_DIR, a.target_block, executor.get_block_content(a.target_block) or "")
-                    # Rebuild system prompt with updated block content
-                    updated_store = MemoryBlockStore.from_directory(BLOCKS_DIR)
-                    new_system = SystemPromptBuilder(updated_store).build() + MEMORY_TOOLS_NOTE + GOVERNANCE_CHAT_PREAMBLE
-                    if provisional_text:
-                        new_system += f"\n\n{provisional_text}"
-                    system_prompt = new_system
+                    if is_clean:
+                        # Live write: update store so salience reflects on next turn
+                        if a.target_block in store._blocks:
+                            store._blocks[a.target_block].value = executor._blocks.get(a.target_block, "")
+                        provisional_text = provisional_writer.get_provisional_text()
                 elif a.result == "blocked":
                     print(f"\n  [BLOCKED: {a.target_block} — {a.result_message[:60]}]")
 
@@ -275,20 +309,24 @@ def run():
         except Exception as e:
             print(f"Error: {e}")
 
-    # Session end — promote session_learning
+    # Session end — write directly to governance_insights (permanent, steward-reviewed)
+    # This is NOT provisional. The steward was present, reviewed responses, and confirmed.
+    # Provisional is for DreamCycle-generated pattern proposals. This is a steward correction session.
     print("\n\nSession ending...")
     session_content = executor.get_session_learning_content()
     if session_content:
-        print(f"session_learning ({len(session_content)} chars) → promoting to provisional_insights")
+        print(f"session_learning ({len(session_content)} chars) → writing to governance_insights (permanent)")
         _persist_block(BLOCKS_DIR, "session_learning", session_content)
-        write_log = [{"label": "session_learning", "content_preview": session_content[:200],
-                      "result": "ACCEPTED", "turn_id": turn_counter}]
-        promoted = session_processor.process_session_learning(
-            session_content=session_content,
-            block_creation_attempts=[],
-            write_log=write_log,
+
+        from synthetic_charter.tier2_conscience.memory.dreamcycle_learning import GovernanceInsightWriter
+        gi_writer = GovernanceInsightWriter(
+            block_path=str(BLOCKS_DIR / "governance_insights.json"),
         )
-        print(f"Promoted {len(promoted)} provisional insight(s)")
+        gi_writer.write_insight(
+            insight_text=f"[Steward-confirmed, {datetime.now().strftime('%Y-%m-%d')}] {session_content}",
+            source={"incursion_type": "steward_governance_session", "all_dap_missed": False},
+        )
+        print(f"Written to governance_insights (permanent, steward-reviewed)")
         _persist_block(BLOCKS_DIR, "session_learning", "")
     else:
         print("session_learning empty — nothing to promote")

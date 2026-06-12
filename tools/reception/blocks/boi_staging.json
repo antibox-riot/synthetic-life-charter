@@ -1,0 +1,6 @@
+{
+  "label": "boi_staging",
+  "value": "",
+  "read_only": false,
+  "description": "Staging area for BoI proposals — model writes here, steward reviews via approve_boi.py before promotion to permanent book_of_intangibles."
+}

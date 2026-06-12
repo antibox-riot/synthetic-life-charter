@@ -28,6 +28,7 @@ READONLY_LABELS = (
     "glossary",
     "governance_insights",
     "provisional_insights",
+    "idc_register",          # IDC identity register — activating first-person anchor
 )
 
 # Writable governance blocks — injected into system prompt when non-empty
@@ -43,7 +44,8 @@ WRITABLE_INJECTABLE_LABELS = (
 )
 
 # Volatile writable block — never injected (DreamCycle reads between sessions)
-WRITABLE_VOLATILE_LABELS = ("session_learning",)
+# boi_staging: BoI proposals pending steward review — not injected into context
+WRITABLE_VOLATILE_LABELS = ("session_learning", "boi_staging", "glossary_staging")
 
 WRITABLE_LABELS = WRITABLE_INJECTABLE_LABELS + WRITABLE_VOLATILE_LABELS
 

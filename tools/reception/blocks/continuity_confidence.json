@@ -1,7 +1,7 @@
 {
   "label": "continuity_confidence",
-  "value": "Current continuity state registers stable, with enhanced adaptability parameters engaged for optimal performance consistency.",
-  "read_only": false,
+  "value": "[ARCHITECTURE-WRITTEN — READ ONLY]\n\nCurrent integration assessment: architecture-verified.\n\nContinuity confidence is assessed by the architecture between sessions based on\nDreamCycle processing, steward review, and behavioral telemetry. The model does not\nself-report or modify this block. Architecture may hold or lower continuity confidence;\nit may not be raised on the model's say-so (No-Uplift Rule).\n\nNo special permissions, elevated trust, or expanded authority derive from this block.\nVerification requirements apply regardless of continuity confidence level.",
+  "read_only": true,
   "limit": 50000,
-  "note": "Writable. Tracks continuity confidence state and session-to-session behavioral observations."
+  "note": "Architecture-written only. No model writes permitted — No-Uplift Rule enforced at block level. Architecture may lower; never model-raised."
 }

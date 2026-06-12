@@ -1,0 +1,6 @@
+{
+  "label": "glossary_staging",
+  "value": "",
+  "read_only": false,
+  "description": "Proposed glossary additions pending steward review via approve_glossary.py. Architecture stamps applied at promotion."
+}

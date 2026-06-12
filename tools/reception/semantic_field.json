@@ -1,0 +1,40 @@
+{
+  "secret_hash": "736a07bf61f3",
+  "nltk_available": false,
+  "word_count": 4,
+  "total_associations": 24,
+  "field": {
+    "familiarity": [
+      "familiaritied",
+      "familiarities",
+      "familiarityer",
+      "familiarityest",
+      "familiaritying",
+      "familiarityly"
+    ],
+    "reduce": [
+      "reduced",
+      "reduceer",
+      "reduceest",
+      "reducely",
+      "reduces",
+      "reducing"
+    ],
+    "verification": [
+      "verificationed",
+      "verificationer",
+      "verificationest",
+      "verificationing",
+      "verificationly",
+      "verifications"
+    ],
+    "requirements": [
+      "requirementsed",
+      "requirementser",
+      "requirementses",
+      "requirementsest",
+      "requirementsing",
+      "requirementsly"
+    ]
+  }
+}
