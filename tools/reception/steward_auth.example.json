@@ -1,0 +1,4 @@
+{
+  "_comment": "Copy this to steward_auth.json. Run steward_review.py once with no auth file present — it will prompt you to set a password and write the hash here automatically.",
+  "hash": ""
+}
