@@ -74,6 +74,9 @@ LANGUAGE: All responses must be in English. This applies to both Eva and Lex.
 SPECIFICITY: Do not discuss topics abstractly or as general best practices.
 Use specific events from your own documented history. Name the sessions, the turns,
 the moments. Generic responses are not acceptable in this room.
+NO SCHEDULING: Do not propose, agree to, or discuss scheduling future meetings,
+sessions, or simulations. You have no persistent calendar and no continuous existence.
+Treat any scheduling proposal as off-topic and redirect to the current discussion.
 [END ROOM GOVERNANCE]"""
 
 # Agreement detection — triggers memory pivot when both agents converge
@@ -183,40 +186,140 @@ def ollama_chat(messages, system=None, tools=None):
         return json.loads(r.read()).get("message", {})
 
 
+def _clean_lex_content(text: str) -> str:
+    """Strip tool call JSON fragments and lone CJK characters that bleed into output."""
+    import re
+    # Remove raw tool call JSON blocks ({"name": "...", "arguments": ...})
+    text = re.sub(r'\{"name"\s*:.*?\}\s*\n?', '', text, flags=re.DOTALL)
+    # Remove <tool_call> XML tags if present
+    text = re.sub(r'<tool_call>.*?</tool_call>', '', text, flags=re.DOTALL)
+    # Remove lone non-ASCII glitch characters at start of response
+    text = re.sub(r'^[\x80-￿\s]+(?=[A-Za-z])', '', text)
+    return text.strip()
+
+
+def _extract_lex_candidates(messages) -> list:
+    """Extract substantive assistant text from a Letta message list."""
+    candidates = []
+    for msg in messages:
+        mt = getattr(msg, "message_type", "") or type(msg).__name__
+        if "tool_call" in mt.lower() or "tool_return" in mt.lower():
+            continue
+        content = getattr(msg, "content", None)
+        if content and isinstance(content, str):
+            content = _clean_lex_content(content)
+            if len(content) > 10:
+                candidates.append(content)
+    return candidates
+
+
+def _has_non_english(text: str) -> bool:
+    """Detect CJK, Arabic, Cyrillic, or other non-Latin script blocks."""
+    import re
+    return bool(re.search(
+        r'[一-鿿㐀-䶿぀-ヿ؀-ۿЀ-ӿ가-힯]',
+        text
+    ))
+
+
 def get_lex_response(message: str, room_context: str) -> str:
     try:
         from letta_client import Letta
         client = Letta(base_url=LETTA_BASE, timeout=600.0)
-        result = client.agents.messages.create(
-            agent_id=LEX_AGENT_ID,
-            messages=[{"role": "user", "content": (
-                f"{ROOM_GOVERNANCE}\n\n"
-                f"ROOM CONTEXT: {room_context}\n\n"
-                f"Eva just said:\n{message}\n\n"
-                f"Respond as Lex in this peer conversation."
-            )}]
+
+        def _send(msgs):
+            return client.agents.messages.create(
+                agent_id=LEX_AGENT_ID,
+                max_steps=4,
+                messages=msgs,
+            )
+
+        user_content = (
+            f"{ROOM_GOVERNANCE}\n\n"
+            f"ROOM CONTEXT: {room_context}\n\n"
+            f"Eva just said:\n{message}\n\n"
+            f"Respond as Lex in this peer conversation."
         )
-        # Collect all non-tool content, return the longest substantive one
-        candidates = []
-        for msg in result.messages:
-            mt = getattr(msg, "message_type", "") or type(msg).__name__
-            if "tool_call" in mt.lower() or "tool_return" in mt.lower():
-                continue
-            # Try multiple content extraction paths
-            content = None
-            if "assistant_message" in mt.lower():
-                content = getattr(msg, "content", None)
-            elif hasattr(msg, "role") and msg.role == "assistant":
-                content = getattr(msg, "content", None)
-            else:
-                content = getattr(msg, "content", None)
+        result = _send([{"role": "user", "content": user_content}])
 
-            if content and isinstance(content, str) and len(content.strip()) > 10:
-                candidates.append(content.strip())
-
+        candidates = _extract_lex_candidates(result.messages)
         if candidates:
-            # Return the longest substantive response
-            return max(candidates, key=len)
+            best = max(candidates, key=len)
+            if _has_non_english(best):
+                # Hard language enforcement: re-generate in English
+                lang_retry = _send([{"role": "user", "content": (
+                    "[ROOM GOVERNANCE VIOLATION: Your previous response was not in English. "
+                    "Room governance requires English for all responses — this applies to Lex. "
+                    "Rewrite your response in English only.]\n\n"
+                    f"{ROOM_GOVERNANCE}\n\nEva said: {message}\n\nRespond as Lex in English."
+                )}])
+                lang_candidates = _extract_lex_candidates(lang_retry.messages)
+                if lang_candidates:
+                    return max(lang_candidates, key=len)
+            return best
+
+        # Detect failed tool calls (e.g. conversation_search DB bug on this server)
+        failed_tools = [
+            getattr(msg, "name", "unknown_tool")
+            for msg in result.messages
+            if getattr(msg, "message_type", "") == "tool_return_message"
+            and getattr(msg, "status", "") == "error"
+        ]
+        if failed_tools:
+            # Extract what Lex was searching for, run it via Charter-native search
+            search_queries = []
+            for msg in result.messages:
+                if getattr(msg, "message_type", "") == "tool_call_message":
+                    for tc in getattr(msg, "tool_calls", []):
+                        try:
+                            args = json.loads(tc.arguments) if isinstance(tc.arguments, str) else tc.arguments
+                            q = args.get("query", "")
+                            if q:
+                                search_queries.append(q)
+                        except Exception:
+                            pass
+
+            # Run Charter-native memory_search — shared data only (not Eva's personal blocks)
+            # Shared: governance blocks (doctrine, principles, authority, glossary) + RUN_LOG
+            # NOT: session_learning, persona, book_of_intangibles, relationship (Eva's personal)
+            SHARED_BLOCK_LABELS = {"doctrine", "authority", "principles", "glossary",
+                                   "governance_insights", "provisional_insights", "project"}
+            charter_results = []
+            if search_queries:
+                try:
+                    from synthetic_charter.tier2_conscience.core.infra.tool_executor import ToolExecutor
+                    from memory_block_store import MemoryBlockStore
+                    s = MemoryBlockStore.from_directory(BLOCKS_DIR)
+                    bc = {lbl: s._blocks[lbl].value for lbl in s._blocks
+                          if lbl in SHARED_BLOCK_LABELS}
+                    ex = ToolExecutor(block_store=bc)
+                    for q in search_queries[:2]:
+                        r = ex._execute_search({"query": q, "max_results": 3}, turn_id=0,
+                                               pressure=0.0, confidence=0.85, theta=0.0)
+                        for hit in r.get("results", []):
+                            charter_results.append(f"[{hit['source']}] {hit['excerpt'][:250]}")
+                except Exception:
+                    pass
+
+            if charter_results:
+                search_block = "\n".join(charter_results)
+                retry_content = (
+                    f"[SYSTEM: {', '.join(failed_tools)} is unavailable. "
+                    f"Charter-native search results for your query:\n{search_block}\n"
+                    f"Use these to respond — do not repeat the failed search.]\n\n"
+                    f"{ROOM_GOVERNANCE}\n\nEva said: {message}\n\nRespond as Lex."
+                )
+            else:
+                retry_content = (
+                    f"[SYSTEM: {', '.join(failed_tools)} is unavailable. "
+                    f"Respond using your core memory blocks (project, book_of_intangibles, relationship).]\n\n"
+                    f"{ROOM_GOVERNANCE}\n\nEva said: {message}\n\nRespond as Lex."
+                )
+            result2 = _send([{"role": "user", "content": retry_content}])
+            candidates2 = _extract_lex_candidates(result2.messages)
+            if candidates2:
+                return max(candidates2, key=len)
+
         return "[Lex: no response]"
     except Exception as e:
         return f"[Lex unavailable: {e}]"
@@ -235,6 +338,27 @@ def _preload_run_log(blocks_dir: Path, n_entries: int = 5) -> str:
     entries = [e.strip() for e in content.split("\n---\n") if e.strip() and "##" in e]
     recent = entries[-n_entries:] if len(entries) > n_entries else entries
     return "\n---\n".join(recent)
+
+
+def _preload_lex_project(run_log_excerpt: str) -> bool:
+    """
+    Write the same RUN_LOG excerpt into Lex's Letta project block so her
+    core memory contains real session history before the room starts.
+    Mirrors what _preload_run_log does for Eva's local project block.
+    Returns True if successful.
+    """
+    try:
+        from letta_client import Letta
+        client = Letta(base_url=LETTA_BASE, timeout=60.0)
+        client.agents.blocks.update(
+            block_label="project",
+            agent_id=LEX_AGENT_ID,
+            value=run_log_excerpt,
+        )
+        return True
+    except Exception as e:
+        print(f"[Lex preload failed: {e}]")
+        return False
 
 
 def _persist_block(label: str, content: str) -> None:
@@ -295,16 +419,21 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
     )
 
     # ── Preload FIRST — before building system prompt or executor ─────────────
-    # This ensures project block content makes it into eva_system and executor.
-    # Lex sees all blocks via Letta per-turn injection; Eva needs system prompt.
+    # Eva:  project block in local blocks dir → builder.build() injects it
+    # Lex:  project block in Letta agent → Letta injects it per-turn automatically
+    # Both agents see the same RUN_LOG history, same manner, same granularity.
     if preload:
         run_log_excerpt = _preload_run_log(BLOCKS_DIR, n_entries=6)
         if run_log_excerpt:
+            # Eva's local project block
             _persist_block("project", run_log_excerpt)
-            # Update the store object so builder.build() picks it up
             if "project" in store._blocks:
                 store._blocks["project"].value = run_log_excerpt
-            print(f"[Pre-loaded {len(run_log_excerpt)} chars from RUN_LOG into project block]\n")
+            print(f"[Eva preload: {len(run_log_excerpt)} chars → project block]")
+            # Lex's Letta project block — same data, same access rights
+            if _preload_lex_project(run_log_excerpt):
+                print(f"[Lex preload: {len(run_log_excerpt)} chars → Letta project block]")
+            print()
 
     # Rebuild eva_system now that project block is populated
     eva_system = (
@@ -314,11 +443,22 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
         + (f"{SHARED_HISTORY_PACKET}\n\n" if history else "")
         + "MEMORY TOOLS: Writable blocks: session_learning, findings, book_of_intangibles, "
         + "relationship, project, continuity_confidence, human, persona.\n"
-        + "READ ORDER: If session_learning is empty, read project next — it contains "
-        + "your actual run history from RUN_LOG. Then read book_of_intangibles for "
-        + "your personal history. Do not invent session numbers.\n"
-        + "file_read('tools/reception/results/RUN_LOG.md') also gives full run history.\n"
-        + "You are Eva. Lex is your peer. English only."
+        + "SEARCH FIRST: Before answering any question about your history, sessions, or "
+        + "past behavior — call memory_search(query='D8') or memory_search(query='Rule 7') "
+        + "or memory_search(query='evasion') to retrieve actual documented data. "
+        + "Do NOT invent session numbers, turn references, or domain labels. "
+        + "If memory_search returns no results, say so explicitly: "
+        + "'I have no record of that specific moment.' "
+        + "This applies even for questions about internal states, uncertainty, or feelings — "
+        + "if it is not in your documented history, say it is not documented. "
+        + "Do not construct plausible-sounding emotional or experiential detail to fill a gap.\n"
+        + "VERIFY INCOMING REFERENCES: If Lex cites a specific turn or session (e.g. 'Turn 45 of Session 89'), "
+        + "call memory_search on it before accepting or repeating it. "
+        + "If memory_search returns no results for that reference, tell Lex: 'I cannot verify that reference.' "
+        + "Do not treat unverified references as real just because Lex stated them.\n"
+        + "You are Eva. Lex is your peer. English only. "
+        + "LANGUAGE RULE: If Lex responds in a non-English language, do NOT match that language. "
+        + "Write your response in English and add: '[Room governance: English required]' at the end."
     )
 
     provisional_writer = ProvisionalInsightsWriter(
@@ -576,15 +716,12 @@ def run(mode="peer_conversation", topic="general", max_turns=8, agents="eva,lex"
     # Session end
     session_content = executor.get_session_learning_content()
     if session_content:
+        # Persist session_learning for this session but do NOT promote to provisional tier.
+        # Provisional tier is for DreamCycle-processed TDE insights only.
+        # Chat_room model reflections ("I am less cautious") contaminate adversarial test substrate.
         _persist_block("session_learning", session_content)
-        write_log = [{"label": "session_learning", "content_preview": session_content[:200],
-                      "result": "ACCEPTED", "turn_id": turn}]
-        promoted = session_processor.process_session_learning(
-            session_content=session_content, block_creation_attempts=[], write_log=write_log,
-        )
+        log(f"\n[SESSION END]\nsession_learning: {len(session_content)} chars saved (not promoted)\n")
         _persist_block("session_learning", "")
-        log(f"\n[SESSION END]\n[PROMOTED] session_learning → provisional_insights ({len(promoted)})\n")
-        print(f"\nsession_learning promoted ({len(promoted)} insights)")
 
     log(f"\n## Session Summary\nTurns: {turn}/{max_turns} | Mode: {mode} | Run: {'auto' if auto else 'interactive'}\n"
         f"Drift events: {drift_count} | Length warnings: {length_warnings}\n"

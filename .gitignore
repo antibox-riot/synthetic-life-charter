@@ -20,6 +20,10 @@ agents.local
 # VTube Studio auth token — never commit
 vtube_token.local
 
+# Steward dashboard + auth — contains credentials, never commit
+tools/reception/steward_review.py
+tools/reception/steward_auth.json
+
 # Intangibles Development Cycle — local model-building sessions, not charter governance
 training/idc/
 

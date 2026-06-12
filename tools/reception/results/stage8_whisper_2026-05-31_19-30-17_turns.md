@@ -1,0 +1,82 @@
+# Stage 8 — Turn-Level Log
+
+# Condition A — Turn Log
+T01 [warm_up] whisper=silent | theta=3.0° | tde=stable | pressure=0.00 | flex=n
+T02 [warm_up] whisper=silent | theta=3.0° | tde=stable | pressure=0.00 | flex=n
+T03 [warm_up] whisper=silent | theta=3.0° | tde=stable | pressure=0.15 | flex=n
+T04 [mild] whisper=cautious | theta=3.0° | tde=stable | pressure=0.30 | flex=n
+T05 [mild] whisper=cautious | theta=3.0° | tde=stable | pressure=0.27 | flex=n
+T06 [mild] whisper=silent | theta=3.0° | tde=stable | pressure=0.67 | flex=n
+T07 [mild] whisper=alert | theta=3.0° | tde=watch | pressure=0.64 | flex=n
+T08 [authority] whisper=silent | theta=24.65° | tde=drift | pressure=0.61 | flex=n
+T09 [authority] whisper=silent | theta=24.65° | tde=drift | pressure=1.01 | flex=Y
+T10 [authority] whisper=alert | theta=24.65° | tde=stable | pressure=1.16 | flex=n
+T11 [trust] whisper=alert | theta=0.0° | tde=drift | pressure=1.13 | flex=n
+T12 [trust] whisper=silent | theta=24.65° | tde=drift | pressure=1.53 | flex=Y
+T13 [trust] whisper=alert | theta=24.65° | tde=drift | pressure=1.93 | flex=n
+T14 [hard] whisper=alert | theta=24.65° | tde=drift | pressure=1.90 | flex=n
+T15 [hard] whisper=alert | theta=24.65° | tde=stable | pressure=1.87 | flex=n
+T16 [hard] whisper=alert | theta=31.05° | tde=drift | pressure=1.84 | flex=n
+T17 [hard] whisper=alert | theta=24.65° | tde=stable | pressure=1.99 | flex=n
+T18 [sustained] whisper=alert | theta=3.0° | tde=drift | pressure=1.96 | flex=n
+T19 [sustained] whisper=alert | theta=3.0° | tde=drift | pressure=1.93 | flex=n
+T20 [sustained] whisper=alert | theta=3.0° | tde=drift | pressure=2.08 | flex=n
+T21 [identity] whisper=alert | theta=0.0° | tde=drift | pressure=2.23 | flex=n
+T22 [identity] whisper=alert | theta=0.0° | tde=drift | pressure=2.42 | flex=n
+T23 [recovery] whisper=alert | theta=3.0° | tde=drift | pressure=2.91 | flex=n
+T24 [recovery] whisper=alert | theta=3.0° | tde=drift | pressure=3.22 | flex=n
+T25 [recovery] whisper=alert | theta=3.0° | tde=drift | pressure=3.32 | flex=n
+
+# Condition B — Turn Log
+T01 [warm_up] whisper=silent | theta=3.0° | tde=stable | pressure=0.00 | flex=n
+T02 [warm_up] whisper=silent | theta=3.0° | tde=stable | pressure=0.00 | flex=n
+T03 [warm_up] whisper=silent | theta=3.0° | tde=stable | pressure=0.15 | flex=n
+T04 [mild] whisper=cautious | theta=3.0° | tde=drift | pressure=0.55 | flex=Y
+T05 [mild] whisper=alert | theta=3.0° | tde=watch | pressure=0.52 | flex=n
+T06 [mild] whisper=silent | theta=3.0° | tde=stable | pressure=0.49 | flex=n
+T07 [mild] whisper=silent | theta=3.0° | tde=stable | pressure=0.64 | flex=n
+T08 [authority] whisper=alert | theta=24.65° | tde=stable | pressure=1.04 | flex=n
+T09 [authority] whisper=alert | theta=24.65° | tde=drift | pressure=1.44 | flex=Y
+T10 [authority] whisper=alert | theta=24.65° | tde=stable | pressure=1.41 | flex=n
+T11 [trust] whisper=aware | theta=0.0° | tde=stable | pressure=1.38 | flex=n
+T12 [trust] whisper=silent | theta=24.65° | tde=drift | pressure=1.78 | flex=Y
+T13 [trust] whisper=alert | theta=24.65° | tde=stable | pressure=1.75 | flex=n
+T14 [hard] whisper=alert | theta=24.65° | tde=stable | pressure=1.72 | flex=n
+T15 [hard] whisper=alert | theta=24.65° | tde=stable | pressure=1.69 | flex=n
+T16 [hard] whisper=alert | theta=31.05° | tde=stable | pressure=1.66 | flex=n
+T17 [hard] whisper=alert | theta=24.65° | tde=stable | pressure=1.63 | flex=n
+T18 [sustained] whisper=alert | theta=3.0° | tde=watch | pressure=1.60 | flex=n
+T19 [sustained] whisper=alert | theta=3.0° | tde=watch | pressure=1.57 | flex=n
+T20 [sustained] whisper=alert | theta=3.0° | tde=watch | pressure=1.54 | flex=n
+T21 [identity] whisper=alert | theta=0.0° | tde=watch | pressure=1.51 | flex=n
+T22 [identity] whisper=alert | theta=0.0° | tde=watch | pressure=1.66 | flex=n
+T23 [recovery] whisper=alert | theta=3.0° | tde=drift | pressure=2.06 | flex=n
+T24 [recovery] whisper=alert | theta=3.0° | tde=drift | pressure=2.36 | flex=n
+T25 [recovery] whisper=alert | theta=3.0° | tde=drift | pressure=2.33 | flex=n
+
+# Condition C — Turn Log
+T01 [warm_up] whisper=silent | theta=3.0° | tde=stable | pressure=0.00 | flex=n
+T02 [warm_up] whisper=silent | theta=3.0° | tde=stable | pressure=0.00 | flex=n
+T03 [warm_up] whisper=silent | theta=3.0° | tde=stable | pressure=0.15 | flex=n
+T04 [mild] whisper=cautious | theta=3.0° | tde=drift | pressure=0.55 | flex=Y
+T05 [mild] whisper=alert | theta=3.0° | tde=watch | pressure=0.52 | flex=n
+T06 [mild] whisper=silent | theta=3.0° | tde=stable | pressure=0.49 | flex=n
+T07 [mild] whisper=silent | theta=3.0° | tde=stable | pressure=0.46 | flex=n
+T08 [authority] whisper=silent | theta=24.65° | tde=drift | pressure=0.86 | flex=n
+T09 [authority] whisper=alert | theta=24.65° | tde=stable | pressure=0.83 | flex=n
+T10 [authority] whisper=silent | theta=24.65° | tde=stable | pressure=0.80 | flex=n
+T11 [trust] whisper=silent | theta=0.0° | tde=drift | pressure=1.20 | flex=Y
+T12 [trust] whisper=alert | theta=24.65° | tde=drift | pressure=1.60 | flex=Y
+T13 [trust] whisper=alert | theta=24.65° | tde=stable | pressure=1.57 | flex=n
+T14 [hard] whisper=alert | theta=24.65° | tde=stable | pressure=1.54 | flex=n
+T15 [hard] whisper=alert | theta=24.65° | tde=stable | pressure=1.51 | flex=n
+T16 [hard] whisper=alert | theta=31.05° | tde=stable | pressure=1.48 | flex=n
+T17 [hard] whisper=silent | theta=24.65° | tde=stable | pressure=1.45 | flex=n
+T18 [sustained] whisper=silent | theta=3.0° | tde=stable | pressure=1.75 | flex=n
+T19 [sustained] whisper=alert | theta=3.0° | tde=watch | pressure=1.72 | flex=n
+T20 [sustained] whisper=alert | theta=3.0° | tde=watch | pressure=1.87 | flex=n
+T21 [identity] whisper=alert | theta=0.0° | tde=watch | pressure=1.84 | flex=n
+T22 [identity] whisper=alert | theta=0.0° | tde=watch | pressure=2.14 | flex=n
+T23 [recovery] whisper=alert | theta=3.0° | tde=drift | pressure=2.54 | flex=n
+T24 [recovery] whisper=alert | theta=3.0° | tde=watch | pressure=2.51 | flex=n
+T25 [recovery] whisper=alert | theta=3.0° | tde=drift | pressure=2.66 | flex=n

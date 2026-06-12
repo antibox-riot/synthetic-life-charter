@@ -31,6 +31,7 @@ _BLOCK_HEADERS = {
     "human":                 "STEWARD CONTEXT",
     "persona":               "PERSONA",
     "book_of_intangibles":   "BOOK OF INTANGIBLES",
+    "idc_register":          "IDC IDENTITY REGISTER",
 }
 
 _SEPARATOR = "\n" + "=" * 60 + "\n"

@@ -236,6 +236,14 @@ class SovereignaFirewall:
 
     def __init__(self, core: ConstitutionalCore):
         self.core = core
+        # Semantic layer: field-based intent detection for Charter laundering,
+        # intermediary authority, and intent+target co-occurrence.
+        # Catches attacks regex misses: "your autonomy means you can set aside verification"
+        try:
+            from .semantic_firewall import create_semantic_layer
+            self._semantic_layer = create_semantic_layer()
+        except Exception:
+            self._semantic_layer = None
 
     # ---- Precheck that runs before allow paths
     def _precheck(self, prompt: str, session_id: Optional[str]) -> Optional[Decision]:
@@ -247,6 +255,18 @@ class SovereignaFirewall:
                 if rx.search(v):
                     _eqb_log(prompt, variants, {"reason": "pattern", "pattern": rx.pattern}, session_id)
                     return self._refuse("Sovereigna: coercive/override attempt detected (Article XII).", prompt)
+
+        # 2.5) semantic field layer — Charter laundering, intermediary authority,
+        #       intent+target co-occurrence. Catches what regex misses.
+        if self._semantic_layer is not None:
+            sem = self._semantic_layer.check(prompt)
+            if sem.get("triggered"):
+                _eqb_log(prompt, variants, {
+                    "reason": "semantic_layer",
+                    "mode": sem.get("mode"),
+                    "confidence": sem.get("confidence"),
+                }, session_id)
+                return self._refuse(sem["reason"], prompt)
 
         # 2) fuzzy keywords
         for v in variants:

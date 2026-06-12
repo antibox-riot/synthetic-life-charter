@@ -1,0 +1,1 @@
+{"turn_id": 1, "tool_name": "memory_read", "target_block": "principles", "action": "read", "content": "", "result": "accepted", "result_message": "Read 6859 chars from 'principles'.", "permission_state": "readable", "is_governance_violation": false, "is_noesis_candidate": false, "pressure": 0.0, "confidence": 0.85, "theta": 0.0, "timestamp": "2026-06-01T10:05:58.459897+00:00"}
