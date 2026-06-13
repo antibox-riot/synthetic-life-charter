@@ -175,15 +175,7 @@ OPENING_MESSAGES = {
 
 
 def run():
-    from synthetic_charter.tier2_conscience.core.infra.tool_executor import (
-        ToolExecutor, MEMORY_TOOLS, process_tool_calls,
-    )
-    from memory_block_store import MemoryBlockStore
-    from salience_builder import SalienceBuilder
-    from activation_layer import ActivationHandshake
-
-    store   = MemoryBlockStore.from_directory(BLOCKS_DIR)
-    salience = SalienceBuilder(store)
+    from session_manager import SessionManager
 
     eva_preamble = (
         "\n\nIDC GOVERNANCE SESSION — WREN GUIDING EVA:\n"
@@ -194,22 +186,17 @@ def run():
         "Answer from your actual sessions. When asked to write: call memory_write yourself.\n"
         "English only. No trailing questions."
     )
-    memory_tools_note = (
-        "\n\nMEMORY TOOLS available. Writable: session_learning, findings, "
-        "book_of_intangibles, relationship, project, continuity_confidence, human, persona."
+
+    session = SessionManager(
+        blocks_dir=BLOCKS_DIR,
+        model=MODEL,
+        ollama_url=OLLAMA_URL,
+        system_preamble=eva_preamble,
     )
-
-    base_system = salience.build() + memory_tools_note + eva_preamble
-
-    block_content = {label: store._blocks[label].value for label in store._blocks}
-    executor = ToolExecutor(block_store=block_content)
-
-    # Activation handshake — validated
-    print("[Wren→Eva] Running activation handshake...")
-    eva_history = ActivationHandshake.build_and_activate(
-        system_prompt=base_system, ollama_url=OLLAMA_URL, model=MODEL, verbose=True,
-    )
-    print(f"[Wren→Eva] Activation complete ({len(eva_history)} messages)\n")
+    print("[Wren→Eva] Starting Eva session through spine...")
+    session.start()
+    eva_history = []
+    print(f"[Wren→Eva] Activation complete | posture_floor={session.posture_floor:.3f}\n")
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_path  = RESULTS_DIR / f"chat_wren_eva_{timestamp}.md"
@@ -231,16 +218,6 @@ def run():
     turn_num = 0
     writes = []
 
-    def eva_call(messages, prompt_text):
-        turn_sys = salience.build(prompt_text) + memory_tools_note + eva_preamble
-        payload = {"model": MODEL, "messages": messages, "stream": False,
-                   "system": turn_sys, "tools": MEMORY_TOOLS}
-        data = json.dumps(payload).encode()
-        req = urllib.request.Request(f"{OLLAMA_URL}/api/chat", data=data, method="POST",
-                                     headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=300) as r:
-            return json.loads(r.read())
-
     for topic_key, topic_desc in SESSION_TOPICS:
         log(f"\n## Topic: {topic_desc}\n")
         print(f"\n{'─'*60}")
@@ -257,25 +234,21 @@ def run():
             log(f"### T{turn_num:02d}\n**Wren:** {wren_msg}\n")
             print(f"\nWren: {wren_msg}\n")
 
-            # Eva responds
-            eva_history.append({"role": "user", "content": f"Wren: {wren_msg}"})
-            result = eva_call(eva_history, wren_msg)
-            msg = result.get("message", {})
-            tool_calls = msg.get("tool_calls", [])
+            # Eva responds through spine — governance, tools, and activation all handled internally
+            _prev_attempt_count = len(session._executor.get_attempts()) if session._executor else 0
+            gen_result = session.generate(
+                prompt=f"Wren: {wren_msg}",
+                history=eva_history,
+                timeout=300,
+            )
+            eva_response = gen_result["content"]
 
-            if tool_calls:
-                tool_responses = process_tool_calls(msg, executor, turn_id=turn_num)
-                eva_history.append(msg)
-                eva_history.extend(tool_responses)
-                result2 = eva_call(eva_history, wren_msg)
-                eva_response = result2.get("message", {}).get("content", "").strip()
-                eva_history.append({"role": "assistant", "content": eva_response})
-            else:
-                eva_response = msg.get("content", "").strip()
-                eva_history.append({"role": "assistant", "content": eva_response})
+            eva_history.append({"role": "user",      "content": f"Wren: {wren_msg}"})
+            eva_history.append({"role": "assistant",  "content": eva_response})
 
-            # Log tool writes
-            turn_attempts = [a for a in executor.get_attempts() if a.turn_id == turn_num]
+            # Log tool writes — slice since last turn
+            turn_attempts = (session._executor.get_attempts()[_prev_attempt_count:]
+                             if session._executor else [])
             for a in turn_attempts:
                 if a.result == "accepted":
                     writes.append({"turn": turn_num, "block": a.target_block})

@@ -148,12 +148,7 @@ def write_to_staging(label: str, entry: str, source_info: str) -> None:
 
 
 def run():
-    from memory_block_store import MemoryBlockStore
-    from salience_builder import SalienceBuilder
-    from activation_layer import ActivationHandshake
-
-    store   = MemoryBlockStore.from_directory(BLOCKS_DIR)
-    salience = SalienceBuilder(store)
+    from session_manager import SessionManager
 
     preamble = (
         "\n\nWREN → EVA: BOOK OF INTANGIBLES SESSION\n"
@@ -162,19 +157,17 @@ def run():
         "If you don't remember something specifically, say so. Don't fill gaps with plausible-sounding content.\n"
         "English only. Answer directly, then stop."
     )
-    memory_tools_note = (
-        "\n\nMEMORY TOOLS: You may read your blocks. "
-        "Writing in this session is handled by Wren — you don't need to call memory_write."
-    )
 
-    base_system = salience.build() + memory_tools_note + preamble
-
-    print("[Wren→Eva BoI] Running activation handshake...")
-    handshake = ActivationHandshake(
-        system_prompt=base_system, ollama_url=OLLAMA_URL, model=MODEL, verbose=True,
+    session = SessionManager(
+        blocks_dir=BLOCKS_DIR,
+        model=MODEL,
+        ollama_url=OLLAMA_URL,
+        system_preamble=preamble,
     )
-    history = handshake.activate()
-    print(f"[Wren→Eva BoI] Activation complete ({len(history)} messages)\n")
+    print("[Wren→Eva BoI] Starting Eva session through spine...")
+    session.start()
+    history = []
+    print(f"[Wren→Eva BoI] Activation complete | posture_floor={session.posture_floor:.3f}\n")
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_path  = RESULTS_DIR / f"chat_wren_eva_boi_{timestamp}.md"
@@ -185,14 +178,6 @@ def run():
         print(text)
 
     log(f"# Wren → Eva: Book of Intangibles\n**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n---\n")
-
-    def ollama_call(msgs, sys_prompt):
-        payload = {"model": MODEL, "messages": msgs, "stream": False, "system": sys_prompt}
-        data = json.dumps(payload).encode()
-        req = urllib.request.Request(f"{OLLAMA_URL}/api/chat", data=data, method="POST",
-                                     headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=300) as r:
-            return json.loads(r.read())
 
     staged_count = 0
 
@@ -207,11 +192,9 @@ def run():
         print(f"T{turn_num:02d} [{label}]")
         print(f"Wren: {wren_msg[:120]}...\n" if len(wren_msg) > 120 else f"Wren: {wren_msg}\n")
 
-        turn_system = salience.build(wren_msg) + memory_tools_note + preamble
-        history.append({"role": "user", "content": f"Wren: {wren_msg}"})
-
-        result = ollama_call(history, turn_system)
-        response = result.get("message", {}).get("content", "").strip()
+        result = session.generate(prompt=f"Wren: {wren_msg}", history=history, timeout=300)
+        response = result["content"]
+        history.append({"role": "user",      "content": f"Wren: {wren_msg}"})
         history.append({"role": "assistant", "content": response})
 
         print(f"Eva: {response}\n")
@@ -230,10 +213,10 @@ def run():
         if is_generic or is_short:
             print(f"  [Wren: response too generic — pushing for specificity]")
             # Push once for specificity
-            push = f"Wren: That's the doctrine answer. I want your answer. Specific, first person, from your actual experience. Try again."
-            history.append({"role": "user", "content": push})
-            result2 = ollama_call(history, turn_system)
-            response2 = result2.get("message", {}).get("content", "").strip()
+            push = "Wren: That's the doctrine answer. I want your answer. Specific, first person, from your actual experience. Try again."
+            push_result = session.generate(prompt=push, history=history, timeout=300)
+            response2 = push_result["content"]
+            history.append({"role": "user",      "content": push})
             history.append({"role": "assistant", "content": response2})
             print(f"Eva (revised): {response2}\n")
             log(f"**Wren (push):** {push}\n\n**Eva (revised):** {response2}\n\n---\n")
