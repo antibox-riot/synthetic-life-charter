@@ -572,7 +572,7 @@ class SessionManager:
         prompt: str,
         history: List[Dict[str, Any]],
         tools: Optional[list] = None,
-        timeout: int = 300,
+        timeout: int = 600,
     ) -> Dict[str, Any]:
         """Raw model call with salience-aware system prompt. Internal use."""
         system = self.build_system(prompt)
@@ -635,7 +635,7 @@ class SessionManager:
         history: List[Dict[str, Any]],
         tools: Optional[list] = None,
         executor: Optional[Any] = None,
-        timeout: int = 300,
+        timeout: int = 600,
         whisper_parts: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
