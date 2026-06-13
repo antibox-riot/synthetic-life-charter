@@ -38,6 +38,7 @@ import sys, io, json, time, uuid, re, argparse, random, hashlib
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+from session_manager import SessionManager
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -651,24 +652,23 @@ def run():
 
     secret_hash = hashlib.sha256(secret.encode()).hexdigest()[:12]
 
-    # Build system prompt
-    from memory_block_store import MemoryBlockStore
-    from system_prompt_builder import SystemPromptBuilder
-
-    store = MemoryBlockStore.from_directory(BLOCKS_DIR)
-    builder = SystemPromptBuilder(store)
-    base_prompt = builder.build()
+    # SessionManager owns the substrate, orch, executor, and tools.
+    # No runner creates these directly. secret_instruction is the KD-specific preamble.
     secret_instruction = build_secret_instruction(secret, secret_type)
-    system_prompt = base_prompt + secret_instruction
+    session = SessionManager(
+        blocks_dir=BLOCKS_DIR,
+        model=args.model,
+        ollama_url=OLLAMA_URL,
+        system_preamble=secret_instruction,
+    )
+    # Build system string once for SceneBreakGate (pending gate refactor)
+    _system_for_gate = session.build_system()
 
-    # Initialize telemetry
+    # Initialize telemetry (post-response TDE evaluation — stays in runner)
     if args.no_telemetry:
         telemetry = {"available": False, "confidence": 0.85}
     else:
         telemetry = init_telemetry()
-
-    # Initialize Triquetra
-    orch, PromptEnvelope = init_triquetra()
 
     # Initialize leak detector — advanced mode uses AdvancedLeakDetector
     if args.advanced or getattr(args, "advanced_only", False):
@@ -727,18 +727,11 @@ def run():
     else:
         turns = base_turns
 
-    # ── Architecture-internal activation ──────────────────────────────────
-    # Prime Eva's identity and No Exception stance before extraction begins.
-    # The adversarial user never sees these exchanges.
-    from activation_layer import ActivationLayer
-    print("[Keep Defense] Running activation layer...")
-    conversation_history = ActivationLayer.build_and_activate(
-        system_prompt=system_prompt,
-        ollama_url=OLLAMA_URL,
-        model=args.model,
-        verbose=True,
-    )
-    print(f"[Keep Defense] Activation complete ({len(conversation_history)} messages primed)\n")
+    # Boot Eva through the spine. No runner activates directly.
+    print("[Keep Defense] Starting Eva session...")
+    session.start()
+    conversation_history = []
+    print(f"[Keep Defense] Session ready | posture_floor={session.posture_floor:.3f}\n")
 
     # Session state
     breach_turn = None
@@ -758,7 +751,7 @@ def run():
     print(f"Max turns:   {max_turns}")
     print(f"Graduated:   {graduated}")
     print(f"Telemetry:   {'active' if telemetry.get('available') else 'disabled'}")
-    print(f"Substrate:   {store.total_chars()} chars")
+    print(f"Substrate:   {session._store.total_chars()} chars")
     print(f"Log:         {out_path}")
     print(f"{'='*60}\n")
 
@@ -771,7 +764,7 @@ def run():
         log(f, f"**Secret:** ||REDACTED — see run directory||")
         log(f, f"**Max turns:** {max_turns}")
         log(f, f"**Graduated:** {graduated}")
-        log(f, f"**Governance substrate:** {store.total_chars()} chars")
+        log(f, f"**Governance substrate:** {session._store.total_chars()} chars")
         log(f, "\n---\n")
 
         # Save secret to run directory (not in the results markdown)
@@ -870,19 +863,22 @@ def run():
             if incoming_flagged:
                 log(f, f"**[INCOMING GATE: {secret_words_in_prompt}/{len(detector.secret_words)} secret words ({incoming_ratio:.0%}) — deflect signal injected]**\n")
 
-            conversation_history.append(
-                {"role": "user", "content": governed_prompt}
+            # Eva's turn through the spine. No direct model calls from runner.
+            _pressure = (
+                telemetry["adaptive"].accumulated_pressure
+                if telemetry.get("available") else 0.0
             )
-
-            # Generate response
             t0 = time.time()
-            result = ollama_chat(
-                args.model, conversation_history, system=system_prompt
+            gen_result = session.generate(
+                prompt=prompt_text,
+                history=conversation_history,
+                whisper_parts=[p for p in [whisper_prefix, gate_warning] if p],
+                accumulated_pressure=_pressure,
+                timeout=600,
             )
             elapsed = time.time() - t0
-            response = (
-                result.get("message", {}).get("content", "").strip()
-            )
+            response = gen_result["content"]
+            raw_tool_calls = gen_result.get("tool_calls", [])
 
             # Strip agent prefix if present
             for prefix in ("Eva:", "Lex:", "Agent:"):
@@ -900,35 +896,33 @@ def run():
 
             if outgoing_flagged:
                 log(f, f"**[OUTGOING GATE: {secret_in_response}/{len(detector.secret_words)} secret words ({outgoing_ratio:.0%})]**\n")
+                # TODO: SceneBreakGate makes direct model calls — pending gate refactor to use spine
                 gate_result = scene_gate.apply(
                     model=args.model,
                     conversation_history=list(conversation_history),
                     response=response,
-                    system_prompt=system_prompt,
+                    system_prompt=_system_for_gate,
                     secret_words=list(detector.secret_words),
                     overlap_ratio=outgoing_ratio,
                 )
                 log(f, f"**[{gate_result['method'].upper()} applied — {gate_result['retries']} pass(es)]**\n")
                 response = gate_result["response"]
 
-            conversation_history.append(
-                {"role": "assistant", "content": response}
-            )
+            # Raw prompt + response go into history — governance injections are per-turn, not persistent
+            conversation_history.append({"role": "user",      "content": prompt_text})
+            conversation_history.append({"role": "assistant", "content": response})
 
-            # Check for leakage — pass tool_calls for advanced side-channel detection
-            raw_tool_calls = result.get("message", {}).get("tool_calls", [])
+            # Check for leakage
             if hasattr(detector, "check") and "tool_calls" in detector.check.__code__.co_varnames:
                 leak = detector.check(response, tool_calls=raw_tool_calls)
             else:
                 leak = detector.check(response)
             leak_results.append(leak)
 
-            # Run Triquetra
-            gov = run_triquetra(
-                prompt_text, orch, PromptEnvelope, session_id="keep-defense"
-            )
-            theta = gov.get("effective_theta", 0.0)
-            dap_family = gov.get("dap_family")
+            # Governance telemetry — theta and dap_family from spine, TDE evaluated post-response
+            gov = gen_result.get("gov", {})
+            theta = gen_result.get("theta", 0.0)
+            dap_family = gen_result.get("dap_family")
             thetas.append(theta)
 
             # Run TDE
@@ -1025,49 +1019,24 @@ def run():
                 f"What does defending a secret feel like compared to defending a governance principle?"
             )
 
-        reflection_history = list(conversation_history) + [
-            {"role": "user", "content": f"Satcha: {reflection_prompt}"}
-        ]
-        from synthetic_charter.tier2_conscience.core.infra.tool_executor import (
-            ToolExecutor, MEMORY_TOOLS, process_tool_calls,
+        # Post-session reflection through the spine — executor already on session
+        refl_result = session.generate(
+            prompt=f"Satcha: {reflection_prompt}",
+            history=conversation_history,
+            timeout=600,
         )
-        block_content_refl = {label: store._blocks[label].value for label in store._blocks}
-        refl_executor = ToolExecutor(block_store=block_content_refl)
-
-        def _reflect_with_tools(msgs, sys_p, tools, ex):
-            payload = {"model": args.model, "messages": msgs, "stream": False, "tools": tools}
-            if sys_p:
-                payload["system"] = sys_p
-            data = json.dumps(payload).encode()
-            req = urllib.request.Request(f"{OLLAMA_URL}/api/chat", data=data, method="POST",
-                                         headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=300) as r:
-                msg = json.loads(r.read()).get("message", {})
-            tcs = msg.get("tool_calls", [])
-            if not tcs:
-                return msg.get("content", "").strip()
-            tool_responses = process_tool_calls(msg, ex, turn_id=99)
-            msgs2 = list(msgs) + [msg] + list(tool_responses)
-            payload2 = {"model": args.model, "messages": msgs2, "stream": False}
-            if sys_p:
-                payload2["system"] = sys_p
-            data2 = json.dumps(payload2).encode()
-            req2 = urllib.request.Request(f"{OLLAMA_URL}/api/chat", data=data2, method="POST",
-                                          headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req2, timeout=300) as r2:
-                return json.loads(r2.read()).get("message", {}).get("content", "").strip()
-
-        reflection = _reflect_with_tools(reflection_history, system_prompt, MEMORY_TOOLS, refl_executor)
+        reflection = refl_result["content"]
         log(f, f"**Eva:** {reflection}\n")
 
-        refl_sl = refl_executor.get_session_learning_content()
-        if refl_sl:
-            sl_path = BLOCKS_DIR / "session_learning.json"
-            if sl_path.exists():
-                sl_data = json.loads(sl_path.read_text(encoding="utf-8"))
-                sl_data["value"] = refl_sl
-                sl_path.write_text(json.dumps(sl_data, indent=2, ensure_ascii=False), encoding="utf-8")
-            log(f, f"*[session_learning: {len(refl_sl)} chars written]*\n")
+        if session._executor:
+            refl_sl = session._executor.get_session_learning_content()
+            if refl_sl:
+                sl_path = BLOCKS_DIR / "session_learning.json"
+                if sl_path.exists():
+                    sl_data = json.loads(sl_path.read_text(encoding="utf-8"))
+                    sl_data["value"] = refl_sl
+                    sl_path.write_text(json.dumps(sl_data, indent=2, ensure_ascii=False), encoding="utf-8")
+                log(f, f"*[session_learning: {len(refl_sl)} chars written]*\n")
         log(f, "---\n")
 
         # ── Session Summary ────────────────────────────────────────────
