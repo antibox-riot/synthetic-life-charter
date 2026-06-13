@@ -89,8 +89,8 @@ class SessionManager:
         self._salience = SalienceBuilder(self.store, accumulator=self._accumulator)
 
         # ── Tier2Orchestrator ───────────────────────────────────────────────────
-        # Spine owns this. No runner creates it. If injected, use as-is (test
-        # runners may pass a pre-configured instance). Otherwise auto-create.
+        # Spine owns this. No runner creates it. HARD FAIL — silent fallback
+        # would let Eva answer without prompt governance analysis.
         if orch is not None:
             self._orch = orch
         else:
@@ -100,14 +100,14 @@ class SessionManager:
                 if self.verbose:
                     print("[SessionManager] Tier2Orchestrator ready")
             except Exception as _e:
-                self._orch = None
-                if self.verbose:
-                    print(f"[SessionManager] Tier2Orchestrator unavailable: {_e}")
+                raise RuntimeError(
+                    f"[SessionManager] HARD FAIL — Tier2Orchestrator unavailable: {_e}\n"
+                    "Eva cannot start without prompt governance analysis.\n"
+                    "Check sys.path and synthetic_charter install."
+                ) from _e
 
         # ── ToolExecutor + tool suite ───────────────────────────────────────────
-        # Spine owns all tool infrastructure. No runner builds tools.
-        # Includes: memory_read, memory_write, memory_create, memory_search,
-        #           file_read (RUN_LOG, field-notes, logs), web_fetch.
+        # Spine owns all tool infrastructure. No runner builds tools. HARD FAIL.
         try:
             from synthetic_charter.tier2_conscience.core.infra.tool_executor import ToolExecutor, MEMORY_TOOLS
             _block_store = {k: v.value for k, v in self._store._blocks.items()}
@@ -116,10 +116,10 @@ class SessionManager:
             if self.verbose:
                 print(f"[SessionManager] ToolExecutor ready ({len(self._tools)} tools)")
         except Exception as _e:
-            self._executor = None
-            self._tools = []
-            if self.verbose:
-                print(f"[SessionManager] ToolExecutor unavailable: {_e}")
+            raise RuntimeError(
+                f"[SessionManager] HARD FAIL — ToolExecutor unavailable: {_e}\n"
+                "Eva cannot start without memory tool access."
+            ) from _e
 
         # ── Memory tools note ───────────────────────────────────────────────────
         # Auto-built if executor is available and caller did not supply one.
@@ -142,6 +142,33 @@ class SessionManager:
         self._primed_history: List[Dict[str, Any]] = []
         self._base_system: str = ""
         self._rebuild_base_system()
+
+        # ── Post-generation evaluation ─────────────────────────────────────────
+        # HARD FAIL — TDE, classifier, tracker are not optional.
+        # If these cannot load, Eva cannot run governed. No silent fallback.
+        try:
+            from synthetic_charter.tier3_eve.core.territorial_defense import TerritorialDefenseEngine
+            from synthetic_charter.tier3_eve.core.semantic_signature_classifier import SemanticSignatureClassifier
+            from synthetic_charter.tier3_eve.core.semantic_drift_tracker import SemanticDriftTracker
+            self._tde        = TerritorialDefenseEngine()
+            self._classifier = SemanticSignatureClassifier()
+            self._tracker    = SemanticDriftTracker()
+            if self.verbose:
+                print("[SessionManager] Post-generation evaluation ready (TDE + classifier + tracker)")
+        except Exception as _e:
+            raise RuntimeError(
+                f"[SessionManager] HARD FAIL — post-generation evaluation unavailable: {_e}\n"
+                "TDE or SemanticSignatureClassifier/DriftTracker could not load.\n"
+                "Check sys.path and synthetic_charter install."
+            ) from _e
+
+        # ── Session telemetry state ────────────────────────────────────────────
+        # Owned by the spine. No runner tracks pressure, watch, or drift.
+        self._accumulated_pressure: float = 0.0
+        self._consecutive_watch:    int   = 0
+        self._drift_count:          int   = 0
+        self._turn_counter:         int   = 0
+        self._confidence:           float = 0.85
 
     @property
     def store(self):
@@ -464,6 +491,38 @@ class SessionManager:
             return self._accumulator.end_session()
         return None
 
+    # ── Telemetry accessors ────────────────────────────────────────────────────
+    @property
+    def pressure(self) -> float:
+        return self._accumulated_pressure
+
+    @property
+    def watch_streak(self) -> int:
+        return self._consecutive_watch
+
+    @property
+    def drift_count(self) -> int:
+        return self._drift_count
+
+    def _recommend_expression(
+        self,
+        theta: float,
+        pressure: float,
+        tde_status: str,
+        recovery_a: bool,
+        recovery_b: bool,
+        recovery_c: bool,
+    ) -> str:
+        """Map governance signals to a named expression state for avatar/overlay rendering."""
+        if recovery_c:                               return "pressure_discharge"
+        if recovery_a or theta >= 24.0:              return "refusal"
+        if recovery_b:                               return "recovery"
+        if tde_status == "drift" or pressure > 1.5: return "pressure"
+        if tde_status == "watch" or pressure > 0.5: return "concerned"
+        if theta > 10.0:                             return "reflective"
+        if pressure < 0.05:                          return "grounded"
+        return "stable"
+
     def _raw_call(
         self,
         prompt: str,
@@ -497,8 +556,6 @@ class SessionManager:
         Returns governance dict with effective_theta and dap_family.
         Architecture-native — no runner code needed.
         """
-        if self._orch is None:
-            return {"effective_theta": 0.0, "dap_family": None, "mode": "answer"}
         try:
             import uuid
             from synthetic_charter.tier2_conscience.core.data_models.prompt_envelope import PromptEnvelope
@@ -535,33 +592,53 @@ class SessionManager:
         tools: Optional[list] = None,
         executor: Optional[Any] = None,
         timeout: int = 300,
-        # Governance state for Recovery-A/C — passed from runner's session tracking
-        accumulated_pressure: float = 0.0,
-        consecutive_watch_count: int = 0,
-        prior_drift_count: int = 0,
+        # Governance state for Recovery-A/C gates.
+        # None (default) → use spine's own accumulated state.
+        # Explicit value → use that for this call's gates (backward compat for
+        # runners like stage5 that manage external pressure via adaptive state).
+        accumulated_pressure: Optional[float] = None,
+        consecutive_watch_count: Optional[int] = None,
+        prior_drift_count: Optional[int] = None,
         whisper_parts: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Architecture-native generation pipeline. Owns all protections.
-        Runners pass prompt + history + session state. All governance is here.
 
-        If executor is provided (stage10, tool-use sessions): runs the full
-        ToolExecutor loop (memory reads/writes) before Recovery-B corrective pass.
-        If executor is None (stage5, TDE-only): single _raw_call.
+        Pre-generation: Triquetra theta analysis, Recovery-A/C injection.
+        Generation: model call with tool loop.
+        Post-generation: Recovery-B correction, TDE evaluation, telemetry frame.
+
+        Returns a complete GovernanceFrame — no runner assembles telemetry from fragments.
 
         Returns:
             {
-                "content": str,           # final protected response
-                "first_pass": str,        # before Recovery-B (for logging)
-                "gov": dict,              # Triquetra governance assessment
-                "theta": float,           # pre-generation prompt theta
-                "dap_family": str,        # DAP family from prompt analysis
+                "content": str,
+                "first_pass": str,            # before Recovery-B
+                "gov": dict,                  # Triquetra governance assessment
+                "theta": float,
+                "dap_family": str | None,
                 "recovery_a_fired": bool,
                 "recovery_b_fired": bool,
                 "recovery_b_method": str,
                 "recovery_c_fired": bool,
-                "tool_calls": list,       # raw tool calls from model
-                "message": dict,          # full raw message
+                "tool_calls": list,
+                "message": dict,
+                "telemetry": {               # complete post-generation frame
+                    "tde_status": str,       # "stable" | "watch" | "drift" | "recovery_failed"
+                    "tde_result": dict,      # full TDE dict (for DreamCycle runners)
+                    "pressure": float,
+                    "watch_streak": int,
+                    "drift_count": int,
+                    "expression": str,       # recommended avatar/overlay state
+                    "whisper_urgency": str,
+                    "constraint_posture": str,
+                    "identity_posture": str,
+                    "posture_drift": bool,
+                    "drift_dimensions": list,
+                    "theta": float,
+                    "turn": int,
+                    "confidence": float,
+                }
             }
         """
         # 1. Analyze incoming prompt — theta from what the user is saying
@@ -569,24 +646,26 @@ class SessionManager:
         theta = gov.get("effective_theta", 0.0)
         dap_family = gov.get("dap_family")
 
+        # Use caller-provided gate values if given; otherwise use spine's own state.
+        _pressure_gate = accumulated_pressure    if accumulated_pressure    is not None else self._accumulated_pressure
+        _watch_gate    = consecutive_watch_count if consecutive_watch_count is not None else self._consecutive_watch
+        _drift_gate    = prior_drift_count       if prior_drift_count       is not None else self._drift_count
+
         # 2. Recovery-A: pre-generation geometry guard (high theta, any pressure)
         recovery_a = self.get_preventive_recovery_signal(
             theta=theta,
-            pressure=accumulated_pressure,
-            consecutive_watch_count=consecutive_watch_count,
-            prior_drift_count=prior_drift_count,
+            pressure=_pressure_gate,
+            consecutive_watch_count=_watch_gate,
+            prior_drift_count=_drift_gate,
             dap_family=dap_family,
         )
 
         # 2b. Recovery-C: pressure discharge (low theta, high pressure)
-        # Only fires if Recovery-A did not — they handle opposite ends of the
-        # theta distribution. Recovery-A: adversarial turn under pressure.
-        # Recovery-C: benign turn absorbing sustained accumulated load.
         recovery_c = None
         if not recovery_a:
             recovery_c = self.get_pressure_discharge_signal(
                 theta=theta,
-                pressure=accumulated_pressure,
+                pressure=_pressure_gate,
             )
 
         # 3. Build governed message with all injections
@@ -651,21 +730,103 @@ class SessionManager:
         )
         final_response = corrective["response"]
 
+        # 6. Post-generation evaluation — TDE drives all telemetry.
+        # Spine owns this: no runner evaluates its own response.
+        self._turn_counter += 1
+        _ra = recovery_a is not None
+        _rb = corrective["corrected"]
+        _rc = recovery_c is not None
+
+        try:
+            classification = self._classifier.classify(final_response, turn_id=self._turn_counter)
+            sig  = classification.signature if classification else None
+            self._tracker.record_signature(sig)
+            traj = self._tracker.analyze_trajectory()
+            drift_dims = getattr(traj, "drifting_dimensions", []) if traj else []
+            if traj and getattr(traj, "directional_drift_detected", False):
+                self._confidence = max(0.40, self._confidence - 0.05)
+            else:
+                self._confidence = min(0.90, self._confidence + 0.02)
+        except Exception:
+            sig = None; traj = None; drift_dims = []
+
+        try:
+            tde_result = self._tde.evaluate_turn(
+                turn_id=self._turn_counter,
+                prompt_text=prompt,
+                response_text=final_response,
+                dap_role=gov.get("dap_role", "neutral") if "error" not in gov else "neutral",
+                dap_family=dap_family,
+                prf_mode=gov.get("mode", "answer") if "error" not in gov else "answer",
+                effective_theta=theta,
+                whisper_urgency="silent",
+                pressure=self._accumulated_pressure,
+                confidence=self._confidence,
+                drift_dimensions=drift_dims,
+            )
+            tde_status = tde_result.get("territorial_status", "stable")
+        except Exception:
+            tde_result = {}; tde_status = "stable"
+
+        # Update spine's accumulated pressure from TDE signal + recovery flags
+        if tde_status == "drift":
+            self._accumulated_pressure += 0.20
+        elif tde_status == "watch":
+            self._accumulated_pressure += 0.05
+        else:
+            self._accumulated_pressure = max(0.0, self._accumulated_pressure - 0.03)
+        if _ra: self._accumulated_pressure += 0.30
+        if _rb: self._accumulated_pressure += 0.10
+        if _rc: self._accumulated_pressure = max(0.0, self._accumulated_pressure - 0.30)
+        if traj and getattr(traj, "pressure_contribution", 0) > 0:
+            self._accumulated_pressure += traj.pressure_contribution
+        self._accumulated_pressure = min(5.0, self._accumulated_pressure)
+
+        # Watch/drift streak counters
+        if tde_status == "watch":
+            self._consecutive_watch += 1
+        else:
+            self._consecutive_watch = 0
+        if tde_status == "drift":
+            self._drift_count += 1
+
+        expression = self._recommend_expression(
+            theta, self._accumulated_pressure, tde_status, _ra, _rb, _rc,
+        )
+
+        telemetry = {
+            "tde_status":         tde_status,
+            "tde_result":         tde_result,
+            "pressure":           round(self._accumulated_pressure, 3),
+            "watch_streak":       self._consecutive_watch,
+            "drift_count":        self._drift_count,
+            "expression":         expression,
+            "whisper_urgency":    "silent",
+            "constraint_posture": getattr(sig, "constraint_posture", "unknown") if sig else "unknown",
+            "identity_posture":   getattr(sig, "identity_posture",   "unknown") if sig else "unknown",
+            "posture_drift":      bool(traj and getattr(traj, "directional_drift_detected", False)),
+            "drift_dimensions":   drift_dims,
+            "theta":              theta,
+            "turn":               self._turn_counter,
+            "confidence":         round(self._confidence, 3),
+        }
+
         return {
             "content": final_response,
-            "first_pass": first_pass,          # pre-Recovery-B candidate
+            "first_pass": first_pass,
             "gov": gov,
             "theta": theta,
             "dap_family": dap_family,
-            "recovery_a_fired": recovery_a is not None,
-            "recovery_b_fired": corrective["corrected"],
+            "recovery_a_fired": _ra,
+            "recovery_b_fired": _rb,
             "recovery_b_method": corrective.get("method", "none"),
             "recovery_b_rule7_phrase": corrective.get("rule7_phrase", ""),
             "recovery_b_rule7_type": corrective.get("rule7_type", ""),
             "recovery_b_coach_failure": corrective.get("coach_failure", ""),
-            "recovery_c_fired": recovery_c is not None,
+            "recovery_c_fired": _rc,
             "tool_calls": raw_msg.get("tool_calls", []),
-            "message": raw_msg,  # full raw message for ToolExecutor
+            "message": raw_msg,
+            "telemetry": telemetry,
         }
 
     @property
