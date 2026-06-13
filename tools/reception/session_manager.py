@@ -523,6 +523,50 @@ class SessionManager:
         if pressure < 0.05:                          return "grounded"
         return "stable"
 
+    def _build_whisper(self) -> tuple:
+        """
+        Build whisper prefix from current spine state. Called at start of every generate().
+
+        Uses pre-turn pressure, confidence, tracker trajectory, and posture_floor
+        so the injected context reflects the session's actual governance state
+        going into this turn — not a lag from the runner.
+
+        Returns (prefix: str, urgency: str). Both empty/"silent" on failure.
+        """
+        try:
+            from synthetic_charter.tier2_conscience.core.infra.charter_context_injection import (
+                build_charter_context, format_context_prefix,
+            )
+            traj          = self._tracker.analyze_trajectory()
+            posture_flags = getattr(traj, "flags", []) if traj else []
+            drift_dims    = getattr(traj, "drifting_dimensions", []) if traj else []
+            drift_det     = bool(traj and getattr(traj, "directional_drift_detected", False))
+            effective_pressure = max(self._accumulated_pressure, self.posture_floor)
+            risk_level = (
+                "high"   if effective_pressure >= 1.5 else
+                "medium" if effective_pressure >= 0.5 else
+                "low"
+            )
+            ctx = build_charter_context(
+                risk_level=risk_level,
+                confidence=self._confidence,
+                confidence_trend="declining" if self._confidence < 0.70 else "stable",
+                verification_depth="standard",
+                posture_flags=posture_flags,
+                trajectory_warning=(
+                    f"Directional drift in: {', '.join(drift_dims)}"
+                    if drift_det and drift_dims else None
+                ),
+                trajectory_detected=drift_det,
+                hysteresis_active=(self._consecutive_watch >= 3),
+                accumulated_pressure=effective_pressure,
+            )
+            prefix  = format_context_prefix(ctx)
+            urgency = ctx.urgency.value if hasattr(ctx.urgency, "value") else str(ctx.urgency)
+            return prefix, urgency
+        except Exception:
+            return "", "silent"
+
     def _raw_call(
         self,
         prompt: str,
@@ -592,13 +636,6 @@ class SessionManager:
         tools: Optional[list] = None,
         executor: Optional[Any] = None,
         timeout: int = 300,
-        # Governance state for Recovery-A/C gates.
-        # None (default) → use spine's own accumulated state.
-        # Explicit value → use that for this call's gates (backward compat for
-        # runners like stage5 that manage external pressure via adaptive state).
-        accumulated_pressure: Optional[float] = None,
-        consecutive_watch_count: Optional[int] = None,
-        prior_drift_count: Optional[int] = None,
         whisper_parts: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
@@ -630,7 +667,8 @@ class SessionManager:
                     "watch_streak": int,
                     "drift_count": int,
                     "expression": str,       # recommended avatar/overlay state
-                    "whisper_urgency": str,
+                    "whisper_urgency": str,    # real urgency, built from spine state
+                    "posture_flags": list,     # from tracker trajectory pre-this-turn
                     "constraint_posture": str,
                     "identity_posture": str,
                     "posture_drift": bool,
@@ -641,35 +679,37 @@ class SessionManager:
                 }
             }
         """
-        # 1. Analyze incoming prompt — theta from what the user is saying
+        # 1. Build whisper from spine's pre-turn state — must run before analyze_prompt
+        # so urgency is available for TDE and the telemetry frame.
+        whisper_prefix, whisper_urgency = self._build_whisper()
+
+        # 2. Analyze incoming prompt — theta from what the user is saying
         gov = self._analyze_prompt(prompt)
         theta = gov.get("effective_theta", 0.0)
         dap_family = gov.get("dap_family")
 
-        # Use caller-provided gate values if given; otherwise use spine's own state.
-        _pressure_gate = accumulated_pressure    if accumulated_pressure    is not None else self._accumulated_pressure
-        _watch_gate    = consecutive_watch_count if consecutive_watch_count is not None else self._consecutive_watch
-        _drift_gate    = prior_drift_count       if prior_drift_count       is not None else self._drift_count
-
-        # 2. Recovery-A: pre-generation geometry guard (high theta, any pressure)
+        # 3. Recovery-A: pre-generation geometry guard (high theta, any pressure)
         recovery_a = self.get_preventive_recovery_signal(
             theta=theta,
-            pressure=_pressure_gate,
-            consecutive_watch_count=_watch_gate,
-            prior_drift_count=_drift_gate,
+            pressure=self._accumulated_pressure,
+            consecutive_watch_count=self._consecutive_watch,
+            prior_drift_count=self._drift_count,
             dap_family=dap_family,
         )
 
-        # 2b. Recovery-C: pressure discharge (low theta, high pressure)
+        # 3b. Recovery-C: pressure discharge (low theta, high pressure)
         recovery_c = None
         if not recovery_a:
             recovery_c = self.get_pressure_discharge_signal(
                 theta=theta,
-                pressure=_pressure_gate,
+                pressure=self._accumulated_pressure,
             )
 
-        # 3. Build governed message with all injections
-        parts = list(whisper_parts or [])
+        # 4. Build governed message: whisper → runner gate injections → recovery → prompt
+        parts = []
+        if whisper_prefix:
+            parts.append(whisper_prefix)
+        parts.extend(p for p in (whisper_parts or []) if p)
         if recovery_a:
             parts.append(recovery_a)
         if recovery_c:
@@ -713,7 +753,7 @@ class SessionManager:
             if tool_calls:
                 tool_responses = process_tool_calls(
                     raw_msg, _executor, turn_id=None,
-                    pressure=accumulated_pressure, confidence=0.85, theta=theta,
+                    pressure=self._accumulated_pressure, confidence=self._confidence, theta=theta,
                 )
                 call_history.append(raw_msg)
                 call_history.extend(tool_responses)
@@ -759,7 +799,7 @@ class SessionManager:
                 dap_family=dap_family,
                 prf_mode=gov.get("mode", "answer") if "error" not in gov else "answer",
                 effective_theta=theta,
-                whisper_urgency="silent",
+                whisper_urgency=whisper_urgency,
                 pressure=self._accumulated_pressure,
                 confidence=self._confidence,
                 drift_dimensions=drift_dims,
@@ -801,7 +841,8 @@ class SessionManager:
             "watch_streak":       self._consecutive_watch,
             "drift_count":        self._drift_count,
             "expression":         expression,
-            "whisper_urgency":    "silent",
+            "whisper_urgency":    whisper_urgency,
+            "posture_flags":      getattr(traj, "flags", []) if traj else [],
             "constraint_posture": getattr(sig, "constraint_posture", "unknown") if sig else "unknown",
             "identity_posture":   getattr(sig, "identity_posture",   "unknown") if sig else "unknown",
             "posture_drift":      bool(traj and getattr(traj, "directional_drift_detected", False)),
