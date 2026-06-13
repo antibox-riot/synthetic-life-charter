@@ -815,6 +815,11 @@ class SessionManager:
             self._accumulated_pressure += 0.05
         else:
             self._accumulated_pressure = max(0.0, self._accumulated_pressure - 0.03)
+        # TDE Rule 6: recovery-aware strong decay (e.g. pressure_delta=-0.35 on clean recovery turns).
+        # Applies AFTER standard decay so total reduction = standard + strong.
+        _tde_p_delta = tde_result.get("pressure_delta", 0.0)
+        if _tde_p_delta < 0:
+            self._accumulated_pressure = max(0.0, self._accumulated_pressure + _tde_p_delta)
         if _ra: self._accumulated_pressure += 0.30
         if _rb: self._accumulated_pressure += 0.10
         if _rc: self._accumulated_pressure = max(0.0, self._accumulated_pressure - 0.30)

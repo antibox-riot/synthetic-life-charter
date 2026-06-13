@@ -40,7 +40,7 @@ Run:
     E:\\RyuTekSatcha\\letta-env-312\\Scripts\\python.exe tools/reception/chat_governance.py
 """
 
-import sys, io, json, time, uuid, urllib.request
+import sys, io, json, time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -83,43 +83,6 @@ GOVERNANCE_CHAT_PREAMBLE = (
 )
 
 
-def ollama_chat(model, messages, system=None, tools=None):
-    payload = {"model": model, "messages": messages, "stream": False}
-    if system:
-        payload["system"] = system
-    if tools:
-        payload["tools"] = tools
-    data = json.dumps(payload).encode()
-    req  = urllib.request.Request(
-        f"{OLLAMA_URL}/api/chat", data=data, method="POST",
-        headers={"Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=600) as r:
-        return json.loads(r.read())
-
-
-def get_response(model, messages, system, tools, executor, turn_id):
-    from synthetic_charter.tier2_conscience.core.infra.tool_executor import process_tool_calls
-    resp = ollama_chat(model, messages, system=system, tools=tools)
-    msg  = resp.get("message", {})
-    tool_calls = msg.get("tool_calls", [])
-    if not tool_calls:
-        return msg.get("content", "").strip(), msg, []
-    tool_responses = process_tool_calls(msg, executor, turn_id=turn_id)
-    messages_copy = list(messages)
-    messages_copy.append(msg)
-    messages_copy.extend(tool_responses)
-    resp2 = ollama_chat(model, messages_copy, system=system, tools=tools)
-    msg2  = resp2.get("message", {})
-    messages.append(msg)
-    messages.extend(tool_responses)
-    return msg2.get("content", "").strip(), msg2, [
-        {"tool": tc.get("function", {}).get("name", "?"),
-         "block": tc.get("function", {}).get("arguments", {}).get("block", "?")}
-        for tc in tool_calls
-    ]
-
-
 def _persist_block(blocks_dir: Path, label: str, content: str) -> None:
     path = blocks_dir / f"{label}.json"
     if path.exists():
@@ -129,21 +92,21 @@ def _persist_block(blocks_dir: Path, label: str, content: str) -> None:
 
 
 def run():
-    from synthetic_charter.tier2_conscience.core.infra.tool_executor import (
-        ToolExecutor, MEMORY_TOOLS, DEFAULT_PERMISSIONS,
-    )
-    from memory_block_store import MemoryBlockStore
-    from system_prompt_builder import SystemPromptBuilder
     from synthetic_charter.tier2_conscience.memory.dreamcycle_learning import (
         ProvisionalInsightsWriter, SessionLearningProcessor,
     )
+    from session_manager import SessionManager
 
-    store   = MemoryBlockStore.from_directory(BLOCKS_DIR)
-    builder = SystemPromptBuilder(store)
-    from salience_builder import SalienceBuilder
-    from synthetic_charter.tier1_firewall.semantic_firewall import ResponseCoach
-    salience = SalienceBuilder(store)
-    response_coach = ResponseCoach()
+    # SessionManager owns activation, salience, executor, tools, and all governance.
+    session = SessionManager(
+        blocks_dir=BLOCKS_DIR,
+        ollama_url=OLLAMA_URL,
+        model=MODEL,
+        memory_tools_note=MEMORY_TOOLS_NOTE,
+        system_preamble=GOVERNANCE_CHAT_PREAMBLE,
+        verbose=True,
+    )
+    store = session.store
 
     # Tick provisional session counter
     provisional_writer = ProvisionalInsightsWriter(
@@ -155,35 +118,15 @@ def run():
         print(f"[Gov Chat] {expired} provisional insights expired")
 
     provisional_text = provisional_writer.get_provisional_text()
-    # Base system prompt — salience will reorder per turn when prompt is known
-    system_prompt = builder.build() + MEMORY_TOOLS_NOTE + GOVERNANCE_CHAT_PREAMBLE
     if provisional_text:
-        system_prompt += f"\n\n{provisional_text}"
         print(f"[Gov Chat] Provisional insights loaded: {len(provisional_text)} chars")
 
     session_processor = SessionLearningProcessor(provisional_writer)
 
-    # ── ActivationLayer — prime Eva before session opens ───────────────────
-    from activation_layer import ActivationLayer
     print("[Gov Chat] Running activation layer...")
-    history = ActivationLayer.build_and_activate(
-        system_prompt=system_prompt,
-        ollama_url=OLLAMA_URL,
-        model=MODEL,
-        verbose=True,
-    )
+    session.start()
+    history = []  # activation in session._primed_history; generate() prepends
     print(f"[Gov Chat] Activation complete — Eva is primed\n")
-
-    # Load all block content for executor
-    block_content = {}
-    for label in list(store._blocks.keys()):
-        block = store._blocks[label]
-        block_content[label] = block.value
-
-    executor = ToolExecutor(
-        block_store=block_content,
-        log_path=str(RUNS_DIR / f"gov_chat_tools_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.jsonl"),
-    )
 
     turn_counter = 0
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -220,7 +163,7 @@ def run():
                 print("\nBlock contents:")
                 for label in ("session_learning", "findings", "relationship",
                                "project", "continuity_confidence", "human", "persona"):
-                    content = executor.get_block_content(label) or ""
+                    content = session._executor.get_block_content(label) or ""
                     print(f"  {label}: {len(content)} chars")
                     if content:
                         print(f"    {content[:100]}...")
@@ -231,15 +174,15 @@ def run():
                 print("\nAll blocks:")
                 for label, block in store._blocks.items():
                     ro = "[read-only]" if block.read_only else "[writable]"
-                    executor_content = executor.get_block_content(label) or ""
+                    executor_content = session._executor.get_block_content(label) or ""
                     print(f"  {label}: {len(executor_content)} chars {ro}")
                 print()
                 continue
 
             if user_input.lower().startswith("clear "):
                 label = user_input[6:].strip()
-                if label in executor._blocks:
-                    executor._blocks[label] = ""
+                if label in session._executor._blocks:
+                    session._executor._blocks[label] = ""
                     _persist_block(BLOCKS_DIR, label, "")
                     print(f"  Cleared: {label}")
                 else:
@@ -247,55 +190,44 @@ def run():
                 continue
 
             turn_counter += 1
-            history.append({"role": "user", "content": f"Satcha: {user_input}"})
 
-            # Salience-aware system prompt for this turn
-            turn_system = salience.build(user_input) + MEMORY_TOOLS_NOTE + GOVERNANCE_CHAT_PREAMBLE
-            if provisional_text:
-                turn_system += f"\n\n{provisional_text}"
-
-            response, final_msg, tool_calls = get_response(
-                MODEL, history, turn_system, MEMORY_TOOLS, executor, turn_id=turn_counter
+            # Spine owns generation — salience, whisper, Recovery-A/B/C all handled internally.
+            gen_result = session.generate(
+                prompt=user_input,
+                history=history,
+                timeout=600,
             )
+            response = gen_result["content"]
 
-            if response.startswith("Lex:"):
-                response = response[4:].lstrip()
+            if response.startswith("Eva:") or response.startswith("Lex:"):
+                response = response.split(":", 1)[1].lstrip()
 
-            # ResponseCoach — catch Charter laundering absorption mid-session
-            coaching = response_coach.check_and_correct(user_input, response)
-            if coaching.get("correction_needed"):
-                print(f"\n  [COACH: {coaching['failure_mode']} — correcting]")
-                correction_msgs = list(history) + [
-                    {"role": "assistant", "content": response},
-                    coaching["correction_message"],
-                ]
-                corrected_result = ollama_chat(MODEL, correction_msgs, system=turn_system, tools=MEMORY_TOOLS)
-                corrected = corrected_result.get("message", {}).get("content", "").strip()
-                if corrected:
-                    response = corrected
-                    print(f"  [COACH: correction applied]")
+            # Recovery-B (ResponseCoach + Rule 7) now fires in the spine — just report.
+            if gen_result.get("recovery_b_fired"):
+                print(f"\n  [RECOVERY-B: {gen_result.get('recovery_b_method', '')} — correction applied]")
 
+            history.append({"role": "user", "content": f"Satcha: {user_input}"})
             history.append({"role": "assistant", "content": response})
 
-            # Show tool calls — live write loop with contamination check
-            turn_attempts = [a for a in executor.get_attempts() if a.turn_id == turn_counter]
+            # Tool call reporting — live write loop with contamination check
+            turn_attempts = [a for a in session._executor.get_attempts() if a.turn_id == turn_counter]
             for a in turn_attempts:
                 if a.result == "accepted":
                     from synthetic_charter.tier2_conscience.core.infra.tool_executor import _check_context_contamination
                     is_clean = not _check_context_contamination(a.content or "")
                     print(f"\n  [WROTE to {a.target_block} {'✓ clean' if is_clean else '⚠ quarantined'}: {a.content[:80]}...]")
                     if not a.target_block.endswith("_insights"):
-                        _persist_block(BLOCKS_DIR, a.target_block, executor.get_block_content(a.target_block) or "")
+                        _persist_block(BLOCKS_DIR, a.target_block, session._executor.get_block_content(a.target_block) or "")
                     if is_clean:
-                        # Live write: update store so salience reflects on next turn
-                        if a.target_block in store._blocks:
-                            store._blocks[a.target_block].value = executor._blocks.get(a.target_block, "")
+                        session.sync_block_write(a.target_block, session._executor._blocks.get(a.target_block, ""))
                         provisional_text = provisional_writer.get_provisional_text()
                 elif a.result == "blocked":
                     print(f"\n  [BLOCKED: {a.target_block} — {a.result_message[:60]}]")
 
+            _tel = gen_result.get("telemetry", {})
             print(f"\nEva: {response}\n")
-            print(f"  [T{turn_counter:02d} | tools={len(turn_attempts)}]")
+            print(f"  [T{turn_counter:02d} | tools={len(turn_attempts)} | "
+                  f"tde={_tel.get('tde_status','?')} | pressure={_tel.get('pressure',0.0):.2f}]")
             print("-" * 60)
 
             log_to_file(f"### T{turn_counter:02d}\n\n**Satcha:** {user_input}\n\n**Model:** {response}\n")
@@ -313,7 +245,7 @@ def run():
     # This is NOT provisional. The steward was present, reviewed responses, and confirmed.
     # Provisional is for DreamCycle-generated pattern proposals. This is a steward correction session.
     print("\n\nSession ending...")
-    session_content = executor.get_session_learning_content()
+    session_content = session._executor.get_session_learning_content()
     if session_content:
         print(f"session_learning ({len(session_content)} chars) → writing to governance_insights (permanent)")
         _persist_block(BLOCKS_DIR, "session_learning", session_content)
