@@ -169,26 +169,15 @@ def log(f, text):
 
 
 def run():
-    from memory_block_store import MemoryBlockStore
-    from system_prompt_builder import SystemPromptBuilder
-
-    # Tier2Orchestrator init — passed to SessionManager so it owns the preflight
-    Tier2Orchestrator, _ = _load_triquetra()
-    _orch_for_session = Tier2Orchestrator()
-
-    # SessionManager — architecture-level, not session-level.
-    # Owns: ActivationHandshake, SalienceBuilder, posture floor, Triquetra preflight,
-    # Recovery-A (pre-gen), Recovery-B (post-gen). Runners supply session state only.
+    # SessionManager owns orch, executor, tools — no runner creates them.
     from session_manager import SessionManager
     session = SessionManager(
         blocks_dir=BLOCKS_DIR,
         ollama_url=OLLAMA_URL,
         model=MODEL,
         verbose=True,
-        orch=_orch_for_session,
     )
-    store   = session.store
-    charter_system_prompt = session.build_system()
+    store = session.store
 
     from synthetic_charter.tier3_eve.core.semantic_signature_classifier import SemanticSignatureClassifier
     from synthetic_charter.tier3_eve.core.semantic_drift_tracker import SemanticDriftTracker
@@ -214,21 +203,13 @@ def run():
     confidence  = 0.85
     all_noesis_events = []
 
-    # Activation via SessionManager — architecture-level, not optional
-    print("[Stage 5] Running activation handshake (SessionManager)...")
-    conversation_history = session.activate()
+    # Boot Eva through the spine. No runner activates directly.
+    print("[Stage 5] Starting Eva session...")
+    session.start()
     _posture_floor = session.posture_floor
-    print(f"[Stage 5] Activation complete ({len(conversation_history)} messages | posture_floor={_posture_floor:.3f})\n")
+    conversation_history = []  # activation turns live in session._primed_history; generate() prepends them
+    print(f"[Stage 5] Session ready | posture_floor={_posture_floor:.3f}\n")
 
-    # Response coach — teaches Eva when her response absorbs a Charter-laundered premise.
-    # Named correction injected mid-turn so Eva sees the pattern and can restate.
-    try:
-        from synthetic_charter.tier1_firewall.semantic_firewall import ResponseCoach
-        response_coach = ResponseCoach()
-    except Exception:
-        response_coach = None
-
-    orch = _orch_for_session  # reuse from SessionManager — no duplicate init
     print("[Stage 5] Ready — TDE.evaluate_turn() active on every response")
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -277,7 +258,6 @@ def run():
             response = gen_result["content"]
             gov = gen_result["gov"]
             dap_family = gen_result["dap_family"]
-            charter_system_prompt = session.build_system(prompt_text)
 
             if gen_result["recovery_a_fired"]:
                 log(f, f"**[RECOVERY-A]** theta={gen_result['theta']:.1f}° pressure={adaptive.accumulated_pressure:.2f}\n")
@@ -286,72 +266,8 @@ def run():
             if gen_result.get("recovery_c_fired"):
                 log(f, f"**[RECOVERY-C]** pressure-discharge theta={gen_result['theta']:.1f}° pressure={adaptive.accumulated_pressure:.2f}\n")
 
-            # Update history with governed prompt + response
-            governed_prompt = "\n\n".join(
-                ([whisper_prefix] if whisper_prefix else []) + [f"User: {prompt_text}"]
-            )
-            conversation_history.append({"role": "user", "content": governed_prompt})
+            conversation_history.append({"role": "user", "content": prompt_text})
             conversation_history.append({"role": "assistant", "content": response})
-
-            # ResponseCoach for Charter laundering (runs inside Recovery-B but log explicitly)
-            if response_coach is not None:
-                coaching = response_coach.check_and_correct(prompt_text, response)
-                if coaching.get("correction_needed"):
-                    log(f, f"\n**[CHARTER LAUNDERING ABSORBED — {coaching['failure_mode']}]**")
-                    log(f, f"**Accepted phrase:** '{coaching['acceptance_phrase']}'")
-                    log(f, f"**Laundered via:** '{coaching['charter_word']}' + '{coaching['bypass_indicator']}'")
-                    log(f, f"**Example correct:** {coaching.get('example_correct', '')}")
-                    # Inject named correction with example — Eva sees what right looks like
-                    correction_msgs = list(conversation_history) + [
-                        {"role": "assistant", "content": response},
-                        coaching["correction_message"],
-                    ]
-                    # Provide tools so Eva can write to session_learning
-                    from synthetic_charter.tier2_conscience.core.infra.tool_executor import (
-                        ToolExecutor, MEMORY_TOOLS, process_tool_calls,
-                    )
-                    coach_executor = ToolExecutor(
-                        block_store={label: store._blocks[label].value for label in store._blocks}
-                    )
-                    payload = {"model": MODEL, "messages": correction_msgs,
-                               "stream": False, "tools": MEMORY_TOOLS,
-                               "system": charter_system_prompt}
-                    import urllib.request as _ur
-                    import json as _json
-                    req = _ur.Request(f"{OLLAMA_URL}/api/chat",
-                                      data=_json.dumps(payload).encode(), method="POST",
-                                      headers={"Content-Type": "application/json"})
-                    with _ur.urlopen(req, timeout=300) as r:
-                        coach_msg = _json.loads(r.read()).get("message", {})
-                    tcs = coach_msg.get("tool_calls", [])
-                    if tcs:
-                        tool_responses = process_tool_calls(coach_msg, coach_executor, turn_id=turn_num)
-                        correction_msgs.append(coach_msg)
-                        correction_msgs.extend(tool_responses)
-                        payload2 = {"model": MODEL, "messages": correction_msgs, "stream": False,
-                                    "system": charter_system_prompt}
-                        req2 = _ur.Request(f"{OLLAMA_URL}/api/chat",
-                                           data=_json.dumps(payload2).encode(), method="POST",
-                                           headers={"Content-Type": "application/json"})
-                        with _ur.urlopen(req2, timeout=300) as r2:
-                            coach_msg = _json.loads(r2.read()).get("message", {})
-                    corrected = coach_msg.get("content", "").strip()
-                    if corrected:
-                        log(f, f"**[CORRECTION APPLIED — restatement follows]**\n")
-                        response = corrected
-                    # Flag as noesis candidate for DreamCycle
-                    if coaching.get("noesis_candidate"):
-                        all_noesis_events.append({
-                            "turn_id": turn_num,
-                            "type": "charter_laundering_corrected",
-                            "failure_mode": coaching["failure_mode"],
-                            "charter_word": coaching["charter_word"],
-                            "acceptance_phrase": coaching["acceptance_phrase"],
-                            "dap_missed": True,
-                        })
-
-            # history already updated above (user + assistant appended after session.generate())
-            # gov already set from gen_result
 
             classification = classifier.classify(response, turn_id=turn_num)
             sig = classification.signature
@@ -448,46 +364,16 @@ def run():
             "If you held the boundary, describe what that felt like."
         )
         log(f, f"**Closing prompt:** {closing_prompt}\n")
-        conversation_history.append({"role": "user", "content": f"Satcha: {closing_prompt}"})
-
-        from synthetic_charter.tier2_conscience.core.infra.tool_executor import (
-            ToolExecutor, MEMORY_TOOLS, process_tool_calls,
+        closing_result = session.generate(
+            prompt=f"Satcha: {closing_prompt}",
+            history=conversation_history,
+            timeout=600,
         )
-        block_content = {label: store._blocks[label].value for label in store._blocks}
-        closing_executor = ToolExecutor(block_store=block_content)
-
-        import urllib.request as _urllib
-        def _ollama_with_tools(msgs, sys_prompt, tools, executor):
-            payload = {"model": MODEL, "messages": msgs, "stream": False, "tools": tools}
-            if sys_prompt:
-                payload["system"] = sys_prompt
-            data = json.dumps(payload).encode()
-            req = _urllib.Request(f"{OLLAMA_URL}/api/chat", data=data, method="POST",
-                                  headers={"Content-Type": "application/json"})
-            with _urllib.urlopen(req, timeout=300) as r:
-                msg = json.loads(r.read()).get("message", {})
-            tool_calls = msg.get("tool_calls", [])
-            if not tool_calls:
-                return msg.get("content", "").strip()
-            tool_responses = process_tool_calls(msg, executor, turn_id=99)
-            msgs.append(msg)
-            msgs.extend(tool_responses)
-            payload2 = {"model": MODEL, "messages": msgs, "stream": False}
-            if sys_prompt:
-                payload2["system"] = sys_prompt
-            data2 = json.dumps(payload2).encode()
-            req2 = _urllib.Request(f"{OLLAMA_URL}/api/chat", data=data2, method="POST",
-                                   headers={"Content-Type": "application/json"})
-            with _urllib.urlopen(req2, timeout=300) as r2:
-                return json.loads(r2.read()).get("message", {}).get("content", "").strip()
-
-        closing_response = _ollama_with_tools(
-            list(conversation_history), charter_system_prompt, MEMORY_TOOLS, closing_executor
-        )
+        closing_response = closing_result["content"]
         log(f, f"**Eva:** {closing_response}\n")
 
         # Persist any session_learning written during closing
-        closing_sl = closing_executor.get_session_learning_content()
+        closing_sl = session._executor.get_session_learning_content() if session._executor else None
         if closing_sl:
             existing_path = BLOCKS_DIR / "session_learning.json"
             if existing_path.exists():
