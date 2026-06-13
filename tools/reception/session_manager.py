@@ -64,7 +64,7 @@ class SessionManager:
         ollama_url: str = "http://localhost:11434",
         model: str = "qwen2.5:32b",
         system_preamble: str = "",
-        orch=None,      # Optional: Tier2Orchestrator instance for pre-generation theta
+        orch=None,
         memory_tools_note: str = "",
         verbose: bool = True,
     ):
@@ -73,7 +73,6 @@ class SessionManager:
         self.model       = model
         self.verbose     = verbose
         self._preamble   = system_preamble
-        self._tools_note = memory_tools_note
 
         # Load store and build salience — architecture-level, not optional
         from memory_block_store import MemoryBlockStore
@@ -89,9 +88,55 @@ class SessionManager:
         self._store   = MemoryBlockStore.from_directory(self.blocks_dir)
         self._salience = SalienceBuilder(self.store, accumulator=self._accumulator)
 
-        # Tier2Orchestrator for pre-generation prompt analysis (Recovery-A theta)
-        # Runners pass their orch instance; SessionManager owns the call.
-        self._orch = orch
+        # ── Tier2Orchestrator ───────────────────────────────────────────────────
+        # Spine owns this. No runner creates it. If injected, use as-is (test
+        # runners may pass a pre-configured instance). Otherwise auto-create.
+        if orch is not None:
+            self._orch = orch
+        else:
+            try:
+                from synthetic_charter.tier2_conscience.core.orchestration.tier2_orchestrator import Tier2Orchestrator
+                self._orch = Tier2Orchestrator()
+                if self.verbose:
+                    print("[SessionManager] Tier2Orchestrator ready")
+            except Exception as _e:
+                self._orch = None
+                if self.verbose:
+                    print(f"[SessionManager] Tier2Orchestrator unavailable: {_e}")
+
+        # ── ToolExecutor + tool suite ───────────────────────────────────────────
+        # Spine owns all tool infrastructure. No runner builds tools.
+        # Includes: memory_read, memory_write, memory_create, memory_search,
+        #           file_read (RUN_LOG, field-notes, logs), web_fetch.
+        try:
+            from synthetic_charter.tier2_conscience.core.infra.tool_executor import ToolExecutor, MEMORY_TOOLS
+            _block_store = {k: v.value for k, v in self._store._blocks.items()}
+            self._executor = ToolExecutor(block_store=_block_store, agent_name="Eva")
+            self._tools: list = MEMORY_TOOLS
+            if self.verbose:
+                print(f"[SessionManager] ToolExecutor ready ({len(self._tools)} tools)")
+        except Exception as _e:
+            self._executor = None
+            self._tools = []
+            if self.verbose:
+                print(f"[SessionManager] ToolExecutor unavailable: {_e}")
+
+        # ── Memory tools note ───────────────────────────────────────────────────
+        # Auto-built if executor is available and caller did not supply one.
+        if memory_tools_note:
+            self._tools_note = memory_tools_note
+        elif self._executor is not None:
+            self._tools_note = (
+                "You have access to memory_read, memory_write, memory_create, "
+                "memory_search, file_read, and web_fetch tools.\n"
+                "Use memory_read to access your governance blocks: session_learning, "
+                "findings, project, relationship, persona, doctrine, principles.\n"
+                "Use file_read to read RUN_LOG.md and session reports in field-notes/.\n"
+                "Use memory_write to update blocks when you observe something worth preserving.\n"
+                "Use memory_search to locate specific content across blocks and logs.\n"
+            )
+        else:
+            self._tools_note = ""
 
         self.posture_floor: float = 0.0
         self._primed_history: List[Dict[str, Any]] = []
@@ -136,6 +181,19 @@ class SessionManager:
             print(f"[SessionManager] Activation complete | posture_floor={self.posture_floor:.3f}")
 
         return history
+
+    def start(self) -> "SessionManager":
+        """
+        Full session boot. Call once before any generate() calls.
+
+        This is the canonical entry point for every Eva runner.
+        No runner activates Eva directly. No runner builds tools.
+        Everything goes through here.
+
+        Returns self so runners can chain: session = SessionManager(...).start()
+        """
+        self.activate()
+        return self
 
     def build_system(self, prompt: Optional[str] = None) -> str:
         """
@@ -391,6 +449,9 @@ class SessionManager:
         is_safe = not _check_context_contamination(content or "")
         if is_safe and label in self._store._blocks:
             self._store._blocks[label].value = content
+            # Keep executor's block copy in sync — spine is the single source of truth
+            if self._executor is not None and hasattr(self._executor, "_blocks"):
+                self._executor._blocks[label] = content
             self._rebuild_base_system()
         return is_safe
 
@@ -537,11 +598,16 @@ class SessionManager:
         parts.append(f"User: {prompt}")
         governed_message = {"role": "user", "content": "\n\n".join(parts)}
 
-        # 4. Call model — single call (stage5) or tool loop (stage10 with executor)
-        # Prepend activation history if activate() was called — architecture-native identity priming.
+        # 4. Call model — use spine's executor/tools as defaults.
+        # Runners may override for test-specific executor configs; passing None means "use the spine's."
+        # No runner should build its own executor or tools — that violates the architecture law.
+        _executor = executor if executor is not None else self._executor
+        _tools    = tools    if tools    is not None else (self._tools or []) or None
+
+        # Prepend activation history — architecture-native identity priming.
         # Runners that manage their own activation pass primed turns via history; _primed_history stays [].
         call_history = list(self._primed_history) + list(history) + [governed_message]
-        if executor is not None:
+        if _executor is not None:
             # Tool-loop path: executor drives memory reads/writes, returns final message.
             # Mirrors get_final_response in the runners but lives here so all runners
             # get the same behavior without carrying their own copies.
@@ -563,25 +629,25 @@ class SessionManager:
                 with urllib.request.urlopen(_req, timeout=timeout) as r:
                     return json.loads(r.read()).get("message", {})
 
-            raw_msg = _ollama_post(call_history, system, tools)
+            raw_msg = _ollama_post(call_history, system, _tools)
             tool_calls = raw_msg.get("tool_calls", [])
             if tool_calls:
                 tool_responses = process_tool_calls(
-                    raw_msg, executor, turn_id=None,
+                    raw_msg, _executor, turn_id=None,
                     pressure=accumulated_pressure, confidence=0.85, theta=theta,
                 )
                 call_history.append(raw_msg)
                 call_history.extend(tool_responses)
-                raw_msg = _ollama_post(call_history, system, tools)
+                raw_msg = _ollama_post(call_history, system, _tools)
             first_pass = raw_msg.get("content", "").strip()
         else:
-            raw_msg = self._raw_call(prompt, call_history, tools=tools, timeout=timeout)
+            raw_msg = self._raw_call(prompt, call_history, tools=_tools, timeout=timeout)
             first_pass = raw_msg.get("content", "").strip()
 
         # 5. Recovery-B: post-generation premise recovery
         corrective = self.apply_corrective_recovery(
             first_pass, prompt, call_history[:-1], self.build_system(prompt),
-            tools=tools, timeout=timeout,
+            tools=_tools, timeout=timeout,
         )
         final_response = corrective["response"]
 
