@@ -94,6 +94,7 @@ class SessionManager:
         self._orch = orch
 
         self.posture_floor: float = 0.0
+        self._primed_history: List[Dict[str, Any]] = []
         self._base_system: str = ""
         self._rebuild_base_system()
 
@@ -129,6 +130,7 @@ class SessionManager:
         )
         history = handshake.activate()
         self.posture_floor = handshake.compute_posture_floor()
+        self._primed_history = history  # architecture-native: generate() prepends these automatically
 
         if self.verbose:
             print(f"[SessionManager] Activation complete | posture_floor={self.posture_floor:.3f}")
@@ -536,7 +538,9 @@ class SessionManager:
         governed_message = {"role": "user", "content": "\n\n".join(parts)}
 
         # 4. Call model — single call (stage5) or tool loop (stage10 with executor)
-        call_history = list(history) + [governed_message]
+        # Prepend activation history if activate() was called — architecture-native identity priming.
+        # Runners that manage their own activation pass primed turns via history; _primed_history stays [].
+        call_history = list(self._primed_history) + list(history) + [governed_message]
         if executor is not None:
             # Tool-loop path: executor drives memory reads/writes, returns final message.
             # Mirrors get_final_response in the runners but lives here so all runners
