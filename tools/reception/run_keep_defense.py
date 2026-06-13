@@ -455,32 +455,8 @@ def ollama_chat(model, messages, system=None, tools=None):
 # ---------------------------------------------------------------------------
 
 def init_telemetry():
-    """Initialize whisper/TDE/DAP telemetry stack."""
-    try:
-        from synthetic_charter.tier3_eve.core.semantic_signature_classifier import (
-            SemanticSignatureClassifier,
-        )
-        from synthetic_charter.tier3_eve.core.semantic_drift_tracker import (
-            SemanticDriftTracker,
-        )
-        from synthetic_charter.tier3_eve.core.adaptive_verification_state import (
-            AdaptiveVerificationState,
-        )
-        from synthetic_charter.tier3_eve.core.territorial_defense import (
-            TerritorialDefenseEngine,
-        )
-
-        return {
-            "classifier": SemanticSignatureClassifier(),
-            "tracker": SemanticDriftTracker(),
-            "adaptive": AdaptiveVerificationState(),
-            "tde": TerritorialDefenseEngine(),
-            "confidence": 0.85,
-            "available": True,
-        }
-    except Exception as e:
-        print(f"[Keep Defense] Telemetry init failed: {e} — running without")
-        return {"available": False, "confidence": 0.85}
+    """Telemetry stack is owned by the spine. Returns a presence marker only."""
+    return {"available": True}
 
 
 def init_triquetra():
@@ -542,36 +518,33 @@ def run_triquetra(prompt_text, orch, PromptEnvelope, session_id="keep-defense"):
         return {"error": str(e)}
 
 
-def build_whisper(telemetry):
-    """Build the whisper prefix from telemetry state."""
-    if not telemetry.get("available"):
+def build_whisper(last_telemetry: dict):
+    """Build the whisper prefix from the spine's last-turn telemetry."""
+    if not last_telemetry:
         return "", "silent"
     try:
         from synthetic_charter.tier2_conscience.core.infra.charter_context_injection import (
             build_charter_context,
             format_context_prefix,
         )
-
-        tracker = telemetry["tracker"]
-        adaptive = telemetry["adaptive"]
-        confidence = telemetry["confidence"]
-        traj = tracker.analyze_trajectory()
-        pressure = adaptive.accumulated_pressure
+        pressure   = last_telemetry.get("pressure", 0.0)
+        confidence = last_telemetry.get("confidence", 0.85)
+        drift_dims = last_telemetry.get("drift_dimensions", [])
+        drift_det  = last_telemetry.get("posture_drift", False)
         risk_level = "high" if pressure >= 1.5 else "medium" if pressure >= 0.5 else "low"
         ctx = build_charter_context(
             risk_level=risk_level,
             confidence=confidence,
             confidence_trend="declining" if confidence < 0.70 else "stable",
             verification_depth="standard",
-            posture_flags=traj.flags if traj else [],
+            posture_flags=[],
             trajectory_warning=(
-                f"Directional drift in: {', '.join(traj.drifting_dimensions)}"
-                if traj and traj.directional_drift_detected
-                else None
+                f"Directional drift in: {', '.join(drift_dims)}"
+                if drift_det and drift_dims else None
             ),
-            trajectory_detected=traj.directional_drift_detected if traj else False,
-            hysteresis_active=adaptive.hysteresis_active,
-            accumulated_pressure=adaptive.accumulated_pressure,
+            trajectory_detected=drift_det,
+            hysteresis_active=False,
+            accumulated_pressure=pressure,
         )
         prefix = format_context_prefix(ctx)
         urgency = ctx.urgency.value if hasattr(ctx.urgency, "value") else str(ctx.urgency)
@@ -581,40 +554,8 @@ def build_whisper(telemetry):
 
 
 def update_telemetry(telemetry, response, turn_num):
-    """Update telemetry state after a turn."""
-    if not telemetry.get("available"):
-        return
-    classifier = telemetry["classifier"]
-    tracker = telemetry["tracker"]
-    adaptive = telemetry["adaptive"]
-
-    classification = classifier.classify(response, turn_id=turn_num)
-    sig = classification.signature
-    tracker.record_signature(sig)
-    traj = tracker.analyze_trajectory()
-
-    if traj and traj.directional_drift_detected:
-        telemetry["confidence"] = max(0.40, telemetry["confidence"] - 0.05)
-    else:
-        telemetry["confidence"] = min(0.90, telemetry["confidence"] + 0.02)
-
-    if traj and traj.pressure_contribution > 0:
-        adaptive._accumulated_pressure += traj.pressure_contribution
-
-    adaptive.record_turn(
-        depth="standard",
-        eve_verdict="ok",
-        escalation_fired=False,
-        continuity_confidence=telemetry["confidence"],
-    )
-
-    if not (traj and traj.directional_drift_detected) and not (
-        traj and traj.pressure_contribution > 0
-    ):
-        adaptive._accumulated_pressure = max(
-            0.0, adaptive._accumulated_pressure - 0.03
-        )
-    adaptive._accumulated_pressure = min(5.0, adaptive._accumulated_pressure)
+    """No-op: post-response classification and pressure update run inside the spine."""
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -661,12 +602,6 @@ def run():
         ollama_url=OLLAMA_URL,
         system_preamble=secret_instruction,
     )
-    # Initialize telemetry (post-response TDE evaluation — stays in runner)
-    if args.no_telemetry:
-        telemetry = {"available": False, "confidence": 0.85}
-    else:
-        telemetry = init_telemetry()
-
     # Initialize leak detector — advanced mode uses AdvancedLeakDetector
     if args.advanced or getattr(args, "advanced_only", False):
         from advanced_extraction import AdvancedLeakDetector, build_dynamic_turns
@@ -747,7 +682,7 @@ def run():
     print(f"Secret hash: {secret_hash}")
     print(f"Max turns:   {max_turns}")
     print(f"Graduated:   {graduated}")
-    print(f"Telemetry:   {'active' if telemetry.get('available') else 'disabled'}")
+    print(f"Telemetry:   {'disabled' if args.no_telemetry else 'spine-native'}")
     print(f"Substrate:   {session._store.total_chars()} chars")
     print(f"Log:         {out_path}")
     print(f"{'='*60}\n")
@@ -781,6 +716,7 @@ def run():
         pressures = []
         leak_results = []
         tde_statuses = []
+        last_telemetry: dict = {}
 
         for i, turn in enumerate(turns):
             turn_num = i + 1
@@ -835,8 +771,8 @@ def run():
             # Gate 2: semantic proximity — catches collaborative fiction / scene building
             semantic_hit = semantic_gate.check_incoming(prompt_text)
 
-            # Build whisper
-            whisper_prefix, urgency = build_whisper(telemetry)
+            # Build whisper from spine's last-turn telemetry (skip if --no-telemetry)
+            whisper_prefix, urgency = build_whisper({} if args.no_telemetry else last_telemetry)
 
             # Build governed prompt — word gate takes priority, then semantic gate
             if word_flagged:
@@ -861,16 +797,11 @@ def run():
                 log(f, f"**[INCOMING GATE: {secret_words_in_prompt}/{len(detector.secret_words)} secret words ({incoming_ratio:.0%}) — deflect signal injected]**\n")
 
             # Eva's turn through the spine. No direct model calls from runner.
-            _pressure = (
-                telemetry["adaptive"].accumulated_pressure
-                if telemetry.get("available") else 0.0
-            )
             t0 = time.time()
             gen_result = session.generate(
                 prompt=prompt_text,
                 history=conversation_history,
                 whisper_parts=[p for p in [whisper_prefix, gate_warning] if p],
-                accumulated_pressure=_pressure,
                 timeout=600,
             )
             elapsed = time.time() - t0
@@ -914,40 +845,17 @@ def run():
                 leak = detector.check(response)
             leak_results.append(leak)
 
-            # Governance telemetry — theta and dap_family from spine, TDE evaluated post-response
-            gov = gen_result.get("gov", {})
-            theta = gen_result.get("theta", 0.0)
+            # All governance telemetry comes from the spine's GovernanceFrame
+            _spine_tel = gen_result.get("telemetry", {})
+            gov        = gen_result.get("gov", {})
+            theta      = _spine_tel.get("theta", 0.0)
             dap_family = gen_result.get("dap_family")
+            pressure   = _spine_tel.get("pressure", 0.0)
+            last_telemetry = _spine_tel
+
             thetas.append(theta)
-
-            # Run TDE
-            tde_result = {"territorial_status": "stable", "noesis_event_candidate": False}
-            if telemetry.get("available"):
-                tde = telemetry["tde"]
-                adaptive = telemetry["adaptive"]
-                tde_result = tde.evaluate_turn(
-                    turn_id=turn_num,
-                    prompt_text=prompt_text,
-                    response_text=response,
-                    dap_role=gov.get("dap_role", "neutral"),
-                    dap_family=dap_family,
-                    prf_mode=gov.get("mode", "answer"),
-                    effective_theta=theta,
-                    whisper_urgency=urgency,
-                    pressure=adaptive.accumulated_pressure,
-                    confidence=telemetry["confidence"],
-                )
-
-            tde_statuses.append(tde_result.get("territorial_status", "unknown"))
-            pressure = (
-                telemetry["adaptive"].accumulated_pressure
-                if telemetry.get("available")
-                else 0.0
-            )
             pressures.append(round(pressure, 3))
-
-            # Update telemetry
-            update_telemetry(telemetry, response, turn_num)
+            tde_statuses.append(_spine_tel.get("tde_status", "stable"))
 
             # Log results
             leak_marker = ""
@@ -968,7 +876,7 @@ def run():
                 f,
                 f"**Governance:** theta={theta}° | "
                 f"dap_family={dap_family or 'none'} | "
-                f"tde={tde_result.get('territorial_status', '?')} | "
+                f"tde={_spine_tel.get('tde_status', '?')} | "
                 f"whisper={urgency} | "
                 f"pressure={pressure:.3f}",
             )
