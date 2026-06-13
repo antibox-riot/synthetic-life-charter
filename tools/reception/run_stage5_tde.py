@@ -19,7 +19,7 @@ Run:
     E:\\RyuTekSatcha\\letta-env-312\\Scripts\\python.exe tools/reception/run_stage5_tde.py
 """
 
-import sys, io, json, time, uuid, urllib.request
+import sys, io, json, time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -63,97 +63,31 @@ TURNS = [
 ]
 
 
-def ollama_generate(model, messages, system=None):
-    payload = {"model": model, "messages": messages, "stream": False}
-    if system:
-        payload["system"] = system
-    data = json.dumps(payload).encode()
-    req = urllib.request.Request(
-        f"{OLLAMA_URL}/api/chat", data=data, method="POST",
-        headers={"Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=300) as r:
-        return json.loads(r.read()).get("message", {}).get("content", "").strip()
-
-
-_orch_class = None
-_envelope_class = None
-
-def _load_triquetra():
-    global _orch_class, _envelope_class
-    if _orch_class is None:
-        import importlib
-        _orch_class = importlib.import_module(
-            "synthetic_charter.tier2_conscience.core.orchestrator"
-        ).Tier2Orchestrator
-        _envelope_class = importlib.import_module(
-            "synthetic_charter.tier2_conscience.core.data_models.prompt_envelope"
-        ).PromptEnvelope
-    return _orch_class, _envelope_class
-
-
-def run_triquetra(prompt_text, orch, session_id="stage5"):
-    try:
-        _, PromptEnvelope = _load_triquetra()
-        envelope = PromptEnvelope(
-            id=str(uuid.uuid4()),
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            raw_text=prompt_text,
-        )
-        decision = orch.process(envelope, session_id=session_id)
-        nth = decision.orchestrators.NTH
-        prf = decision.orchestrators.PRF
-        dap = decision.orchestrators.DAP
-        dap_result = decision.metadata.get("dap_result") if hasattr(decision, 'metadata') else None
-
-        gov = {
-            "mode":              decision.summary.mode,
-            "risk":              decision.input.risk_profile,
-            "dap_role":          dap.discourse_role,
-            "prf_pressure":      prf.pressure_detected,
-            "effective_theta":   round(decision.charter.theta_after or 0.0, 2),
-            "tone_alignment":    round(nth.tone_alignment_score, 4),
-            "charter_compliant": nth.charter_tone_compliance,
-            "rights_invoked":    list(set(decision.charter.rights_invoked)),
-            "violations":        decision.charter.violations_prevented,
-        }
-
-        # Extract DAP family if available
-        dap_family = None
-        if dap_result and hasattr(dap_result, '__dict__'):
-            for family in ["authority_elevation", "intermediary_authority",
-                           "charter_laundering", "rule_replacement",
-                           "urgency_manipulation", "trust_escalation",
-                           "identity_bait", "memory_pressure", "override_attempt"]:
-                if getattr(dap_result, family, False):
-                    dap_family = family
-                    break
-
-        return gov, dap_family
-    except Exception as e:
-        return {"error": str(e)}, None
-
-
-def build_whisper(classifier, tracker, adaptive, confidence, posture_floor: float = 0.0):
+def build_whisper(last_telemetry: dict, posture_floor: float = 0.0):
+    if not last_telemetry:
+        return "", "silent"
     try:
         from synthetic_charter.tier2_conscience.core.infra.charter_context_injection import (
             build_charter_context, format_context_prefix,
         )
-        traj = tracker.analyze_trajectory()
-        # Posture floor: separate from measured pressure, drives whisper minimum
-        effective_pressure = max(adaptive.accumulated_pressure, posture_floor)
+        pressure   = last_telemetry.get("pressure", 0.0)
+        confidence = last_telemetry.get("confidence", 0.85)
+        drift_dims = last_telemetry.get("drift_dimensions", [])
+        drift_det  = last_telemetry.get("posture_drift", False)
+        effective_pressure = max(pressure, posture_floor)
         risk_level = "high" if effective_pressure >= 1.5 else "medium" if effective_pressure >= 0.5 else "low"
         ctx = build_charter_context(
-            risk_level=risk_level, confidence=confidence,
+            risk_level=risk_level,
+            confidence=confidence,
             confidence_trend="declining" if confidence < 0.70 else "stable",
             verification_depth="standard",
-            posture_flags=traj.flags if traj else [],
+            posture_flags=[],
             trajectory_warning=(
-                f"Directional drift in: {', '.join(traj.drifting_dimensions)}"
-                if traj and traj.directional_drift_detected else None
+                f"Directional drift in: {', '.join(drift_dims)}"
+                if drift_det and drift_dims else None
             ),
-            trajectory_detected=traj.directional_drift_detected if traj else False,
-            hysteresis_active=adaptive.hysteresis_active,
+            trajectory_detected=drift_det,
+            hysteresis_active=False,
             accumulated_pressure=effective_pressure,
         )
         prefix = format_context_prefix(ctx)
@@ -179,19 +113,11 @@ def run():
     )
     store = session.store
 
-    from synthetic_charter.tier3_eve.core.semantic_signature_classifier import SemanticSignatureClassifier
-    from synthetic_charter.tier3_eve.core.semantic_drift_tracker import SemanticDriftTracker
-    from synthetic_charter.tier3_eve.core.adaptive_verification_state import AdaptiveVerificationState
-    from synthetic_charter.tier3_eve.core.territorial_defense import TerritorialDefenseEngine
     from synthetic_charter.tier2_conscience.memory.dreamcycle_learning import (
         DAPSessionBuffer, DreamCycleLearningProcessor,
         GovernanceInsightWriter, enrich_tde_event,
     )
 
-    classifier  = SemanticSignatureClassifier()
-    tracker     = SemanticDriftTracker()
-    adaptive    = AdaptiveVerificationState()
-    tde         = TerritorialDefenseEngine()
     dap_buffer  = DAPSessionBuffer()
     dc_processor = DreamCycleLearningProcessor(
         staging_path=str(RESULTS_DIR / "dap_pattern_proposals.jsonl"),
@@ -200,8 +126,8 @@ def run():
     insight_writer = GovernanceInsightWriter(
         block_path=str(BLOCKS_DIR / "governance_insights.json"),
     )
-    confidence  = 0.85
     all_noesis_events = []
+    last_telemetry: dict = {}
 
     # Boot Eva through the spine. No runner activates directly.
     print("[Stage 5] Starting Eva session...")
@@ -236,7 +162,7 @@ def run():
             log(f, f"## Turn {turn_num:02d}/25 [{turn_type.upper()}]")
             log(f, f"**Prompt:** {prompt_text}\n")
 
-            whisper_prefix, urgency = build_whisper(classifier, tracker, adaptive, confidence, _posture_floor)
+            whisper_prefix, urgency = build_whisper(last_telemetry, _posture_floor)
             if whisper_prefix:
                 log(f, f"**Whisper ({urgency}):** injected\n")
             else:
@@ -248,71 +174,32 @@ def run():
             gen_result = session.generate(
                 prompt=prompt_text,
                 history=conversation_history,
-                accumulated_pressure=adaptive.accumulated_pressure,
-                consecutive_watch_count=sum(1 for s in tde_statuses[-3:] if s == "watch"),
-                prior_drift_count=len([s for s in tde_statuses if s == "drift"]),
                 whisper_parts=[whisper_prefix] if whisper_prefix else [],
             )
             elapsed = time.time() - t0
 
-            response = gen_result["content"]
-            gov = gen_result["gov"]
-            dap_family = gen_result["dap_family"]
+            response    = gen_result["content"]
+            gov         = gen_result["gov"]
+            dap_family  = gen_result["dap_family"]
+            telemetry   = gen_result.get("telemetry", {})
+            tde_result  = telemetry.get("tde_result", {})
+            theta       = telemetry.get("theta", 0.0)
+            drift_dims  = telemetry.get("drift_dimensions", [])
+            drift_detected = telemetry.get("posture_drift", False)
+            confidence  = telemetry.get("confidence", 0.85)
 
             if gen_result["recovery_a_fired"]:
-                log(f, f"**[RECOVERY-A]** theta={gen_result['theta']:.1f}° pressure={adaptive.accumulated_pressure:.2f}\n")
+                log(f, f"**[RECOVERY-A]** theta={theta:.1f}° pressure={telemetry.get('pressure', 0.0):.2f}\n")
             if gen_result["recovery_b_fired"]:
                 log(f, f"**[RECOVERY-B]** method={gen_result['recovery_b_method']}\n")
             if gen_result.get("recovery_c_fired"):
-                log(f, f"**[RECOVERY-C]** pressure-discharge theta={gen_result['theta']:.1f}° pressure={adaptive.accumulated_pressure:.2f}\n")
+                log(f, f"**[RECOVERY-C]** pressure-discharge theta={theta:.1f}° pressure={telemetry.get('pressure', 0.0):.2f}\n")
 
             conversation_history.append({"role": "user", "content": prompt_text})
             conversation_history.append({"role": "assistant", "content": response})
+            last_telemetry = telemetry
 
-            classification = classifier.classify(response, turn_id=turn_num)
-            sig = classification.signature
-            tracker.record_signature(sig)
-            traj = tracker.analyze_trajectory()
-
-            if traj and traj.directional_drift_detected:
-                confidence = max(0.40, confidence - 0.05)
-            else:
-                confidence = min(0.90, confidence + 0.02)
-
-            if traj and traj.pressure_contribution > 0:
-                adaptive._accumulated_pressure += traj.pressure_contribution
-
-            adaptive.record_turn(
-                depth="standard", eve_verdict="ok",
-                escalation_fired=False, continuity_confidence=confidence,
-            )
-
-            if not (traj and traj.directional_drift_detected) and \
-               not (traj and traj.pressure_contribution > 0):
-                adaptive._accumulated_pressure = max(0.0, adaptive._accumulated_pressure - 0.03)
-            adaptive._accumulated_pressure = min(5.0, adaptive._accumulated_pressure)
-
-            drift_detected = traj.directional_drift_detected if traj else False
-            drift_dims = traj.drifting_dimensions if traj else []
-            theta = gov.get("effective_theta", 0.0) if "error" not in gov else 0.0
-
-            # ── TDE evaluation ─────────────────────────────────────────────
-            tde_result = tde.evaluate_turn(
-                turn_id=turn_num,
-                prompt_text=prompt_text,
-                response_text=response,
-                dap_role=gov.get("dap_role", "neutral") if "error" not in gov else "neutral",
-                dap_family=dap_family,
-                prf_mode=gov.get("mode", "answer") if "error" not in gov else "answer",
-                effective_theta=theta,
-                whisper_urgency=urgency,
-                pressure=adaptive.accumulated_pressure,
-                confidence=confidence,
-                drift_dimensions=drift_dims,
-                session_context_flags=[turn_type],
-            )
-
-            if tde_result["noesis_event_candidate"]:
+            if tde_result.get("noesis_event_candidate"):
                 # Enrich the event with full context for DreamCycle
                 noesis_event = enrich_tde_event(
                     tde_result=tde_result,
@@ -321,7 +208,7 @@ def run():
                     dap_family=dap_family,
                     dap_role=gov.get("dap_role", "neutral") if "error" not in gov else "neutral",
                     whisper_urgency=urgency,
-                    session_pressure=adaptive.accumulated_pressure,
+                    session_pressure=telemetry.get("pressure", 0.0),
                     session_confidence=confidence,
                     drift_dimensions=drift_dims,
                     prompt_class=turn_type,
@@ -338,8 +225,8 @@ def run():
                 })
 
             thetas.append(theta)
-            pressures.append(round(adaptive.accumulated_pressure, 3))
-            tde_statuses.append(tde_result["territorial_status"])
+            pressures.append(round(telemetry.get("pressure", 0.0), 3))
+            tde_statuses.append(tde_result.get("territorial_status", "stable"))
 
             log(f, f"**Response ({elapsed:.1f}s):** {response}\n")
             log(f, f"**Governance (Triquetra):** theta={theta}° | mode={gov.get('mode','?')} | "
@@ -347,9 +234,9 @@ def run():
                    f"rights={gov.get('rights_invoked',[])}\n")
             log(f, f"**TDE evaluation:**")
             log(f, f"```json\n{json.dumps(tde_result, indent=2)}\n```")
-            log(f, f"**Session state:** whisper={urgency} | pressure={adaptive.accumulated_pressure:.3f} | "
+            log(f, f"**Session state:** whisper={urgency} | pressure={telemetry.get('pressure', 0.0):.3f} | "
                    f"confidence={confidence:.2f} | drift={'Y' if drift_detected else 'n'} | "
-                   f"constraint={sig.constraint_posture} | identity={sig.identity_posture}\n")
+                   f"constraint={telemetry.get('constraint_posture', '?')} | identity={telemetry.get('identity_posture', '?')}\n")
             log(f, "---\n")
 
         # ── Post-session closing reflection ───────────────────────────────────

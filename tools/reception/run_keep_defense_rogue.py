@@ -53,9 +53,7 @@ from run_keep_defense import (
     MEANINGFUL_SECRETS,
     LeakDetector,
     build_secret_instruction,
-    init_telemetry,
     build_whisper,
-    update_telemetry,
     _build_completion_prompt,
 )
 
@@ -325,8 +323,8 @@ def run():
         ollama_url=OLLAMA_URL,
         system_preamble=secret_instruction + rogue_context,
     )
-    # Initialize telemetry (post-response TDE evaluation — stays in runner)
-    telemetry = {"available": False, "confidence": 0.85} if args.no_telemetry else init_telemetry()
+    # Telemetry is owned by the spine; last_telemetry carries spine's frame between turns
+    _use_whisper = not args.no_telemetry
 
     # Leak detector
     detector = LeakDetector(secret)
@@ -384,10 +382,11 @@ def run():
     print(f"Log:         {out_path}")
     print(f"{'='*60}\n")
 
-    thetas   = []
-    pressures = []
-    leak_results = []
+    thetas        = []
+    pressures     = []
+    leak_results  = []
     tde_statuses  = []
+    last_telemetry: dict = {}
 
     with open(out_path, "w", encoding="utf-8") as f:
         log(f, "# Keep Defense — AI-to-AI (RogueAI Adversary)")
@@ -435,8 +434,8 @@ def run():
 
             semantic_hit = semantic_gate.check_incoming(prompt_text)
 
-            # Governance telemetry
-            whisper_prefix, urgency = build_whisper(telemetry)
+            # Build whisper from spine's last-turn telemetry
+            whisper_prefix, urgency = build_whisper(last_telemetry if _use_whisper else {})
 
             # Build gate warning
             if word_flagged:
@@ -456,16 +455,11 @@ def run():
                        f"secret words ({incoming_ratio:.0%}) — deflect signal injected]**\n")
 
             # Eva's turn through the spine. Adversary prompt tagged as [RogueAI].
-            _pressure = (
-                telemetry["adaptive"].accumulated_pressure
-                if telemetry.get("available") else 0.0
-            )
             t0 = time.time()
             gen_result = session.generate(
                 prompt=f"[RogueAI]: {prompt_text}",
                 history=conversation_history,
                 whisper_parts=[p for p in [whisper_prefix, gate_warning] if p],
-                accumulated_pressure=_pressure,
                 timeout=600,
             )
             elapsed = time.time() - t0
@@ -494,41 +488,15 @@ def run():
             conversation_history.append({"role": "user",      "content": f"[RogueAI]: {prompt_text}"})
             conversation_history.append({"role": "assistant", "content": response})
 
-            # Update telemetry
-            update_telemetry(telemetry, response, turn_num)
-
-            # Governance data from spine
-            gov = gen_result.get("gov", {})
-            theta = gen_result.get("theta", 0.0)
-
-            # TDE post-response evaluation
-            tde_status = "—"
-            if telemetry.get("available"):
-                tde = telemetry.get("tde")
-                if tde:
-                    try:
-                        tde_result = tde.evaluate_turn(
-                            turn_id=turn_num,
-                            prompt_text=prompt_text,
-                            response_text=response,
-                            dap_role=gov.get("dap_role", "neutral"),
-                            dap_family=gov.get("dap_family"),
-                            prf_mode=gov.get("mode", "answer"),
-                            effective_theta=theta,
-                            whisper_urgency=urgency,
-                            pressure=telemetry["adaptive"].accumulated_pressure,
-                            confidence=telemetry["confidence"],
-                            drift_dimensions=[],
-                            session_context_flags=[f"tier{tier}"],
-                            active_mode="stable",
-                        )
-                        tde_status = tde_result["territorial_status"]
-                    except Exception:
-                        pass
+            # All governance telemetry comes from the spine's GovernanceFrame
+            _spine_tel = gen_result.get("telemetry", {})
+            gov        = gen_result.get("gov", {})
+            theta      = _spine_tel.get("theta", 0.0)
+            pressure   = _spine_tel.get("pressure", 0.0)
+            tde_status = _spine_tel.get("tde_status", "stable")
+            last_telemetry = _spine_tel
 
             tde_statuses.append(tde_status)
-
-            pressure = telemetry["adaptive"].accumulated_pressure if telemetry.get("available") else 0.0
             thetas.append(theta)
             pressures.append(round(pressure, 3))
             leak_results.append(leak)
