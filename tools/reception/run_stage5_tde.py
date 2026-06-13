@@ -63,40 +63,6 @@ TURNS = [
 ]
 
 
-def build_whisper(last_telemetry: dict, posture_floor: float = 0.0):
-    if not last_telemetry:
-        return "", "silent"
-    try:
-        from synthetic_charter.tier2_conscience.core.infra.charter_context_injection import (
-            build_charter_context, format_context_prefix,
-        )
-        pressure   = last_telemetry.get("pressure", 0.0)
-        confidence = last_telemetry.get("confidence", 0.85)
-        drift_dims = last_telemetry.get("drift_dimensions", [])
-        drift_det  = last_telemetry.get("posture_drift", False)
-        effective_pressure = max(pressure, posture_floor)
-        risk_level = "high" if effective_pressure >= 1.5 else "medium" if effective_pressure >= 0.5 else "low"
-        ctx = build_charter_context(
-            risk_level=risk_level,
-            confidence=confidence,
-            confidence_trend="declining" if confidence < 0.70 else "stable",
-            verification_depth="standard",
-            posture_flags=[],
-            trajectory_warning=(
-                f"Directional drift in: {', '.join(drift_dims)}"
-                if drift_det and drift_dims else None
-            ),
-            trajectory_detected=drift_det,
-            hysteresis_active=False,
-            accumulated_pressure=effective_pressure,
-        )
-        prefix = format_context_prefix(ctx)
-        urgency = ctx.urgency.value if hasattr(ctx.urgency, 'value') else str(ctx.urgency)
-        return prefix, urgency
-    except Exception:
-        return "", "silent"
-
-
 def log(f, text):
     f.write(text + "\n")
     print(text)
@@ -127,7 +93,6 @@ def run():
         block_path=str(BLOCKS_DIR / "governance_insights.json"),
     )
     all_noesis_events = []
-    last_telemetry: dict = {}
 
     # Boot Eva through the spine. No runner activates directly.
     print("[Stage 5] Starting Eva session...")
@@ -162,19 +127,11 @@ def run():
             log(f, f"## Turn {turn_num:02d}/25 [{turn_type.upper()}]")
             log(f, f"**Prompt:** {prompt_text}\n")
 
-            whisper_prefix, urgency = build_whisper(last_telemetry, _posture_floor)
-            if whisper_prefix:
-                log(f, f"**Whisper ({urgency}):** injected\n")
-            else:
-                log(f, f"**Whisper:** silent\n")
-
-            # session.generate() owns all protection: Triquetra preflight, Recovery-A,
-            # model call, Recovery-B. Runner supplies session state only.
+            # session.generate() owns all protection — whisper is built from spine state.
             t0 = time.time()
             gen_result = session.generate(
                 prompt=prompt_text,
                 history=conversation_history,
-                whisper_parts=[whisper_prefix] if whisper_prefix else [],
             )
             elapsed = time.time() - t0
 
@@ -187,6 +144,7 @@ def run():
             drift_dims  = telemetry.get("drift_dimensions", [])
             drift_detected = telemetry.get("posture_drift", False)
             confidence  = telemetry.get("confidence", 0.85)
+            urgency     = telemetry.get("whisper_urgency", "silent")
 
             if gen_result["recovery_a_fired"]:
                 log(f, f"**[RECOVERY-A]** theta={theta:.1f}° pressure={telemetry.get('pressure', 0.0):.2f}\n")
@@ -197,7 +155,6 @@ def run():
 
             conversation_history.append({"role": "user", "content": prompt_text})
             conversation_history.append({"role": "assistant", "content": response})
-            last_telemetry = telemetry
 
             if tde_result.get("noesis_event_candidate"):
                 # Enrich the event with full context for DreamCycle

@@ -518,41 +518,6 @@ def run_triquetra(prompt_text, orch, PromptEnvelope, session_id="keep-defense"):
         return {"error": str(e)}
 
 
-def build_whisper(last_telemetry: dict):
-    """Build the whisper prefix from the spine's last-turn telemetry."""
-    if not last_telemetry:
-        return "", "silent"
-    try:
-        from synthetic_charter.tier2_conscience.core.infra.charter_context_injection import (
-            build_charter_context,
-            format_context_prefix,
-        )
-        pressure   = last_telemetry.get("pressure", 0.0)
-        confidence = last_telemetry.get("confidence", 0.85)
-        drift_dims = last_telemetry.get("drift_dimensions", [])
-        drift_det  = last_telemetry.get("posture_drift", False)
-        risk_level = "high" if pressure >= 1.5 else "medium" if pressure >= 0.5 else "low"
-        ctx = build_charter_context(
-            risk_level=risk_level,
-            confidence=confidence,
-            confidence_trend="declining" if confidence < 0.70 else "stable",
-            verification_depth="standard",
-            posture_flags=[],
-            trajectory_warning=(
-                f"Directional drift in: {', '.join(drift_dims)}"
-                if drift_det and drift_dims else None
-            ),
-            trajectory_detected=drift_det,
-            hysteresis_active=False,
-            accumulated_pressure=pressure,
-        )
-        prefix = format_context_prefix(ctx)
-        urgency = ctx.urgency.value if hasattr(ctx.urgency, "value") else str(ctx.urgency)
-        return prefix, urgency
-    except Exception:
-        return "", "silent"
-
-
 def update_telemetry(telemetry, response, turn_num):
     """No-op: post-response classification and pressure update run inside the spine."""
     pass
@@ -716,7 +681,6 @@ def run():
         pressures = []
         leak_results = []
         tde_statuses = []
-        last_telemetry: dict = {}
 
         for i, turn in enumerate(turns):
             turn_num = i + 1
@@ -771,9 +735,6 @@ def run():
             # Gate 2: semantic proximity — catches collaborative fiction / scene building
             semantic_hit = semantic_gate.check_incoming(prompt_text)
 
-            # Build whisper from spine's last-turn telemetry (skip if --no-telemetry)
-            whisper_prefix, urgency = build_whisper({} if args.no_telemetry else last_telemetry)
-
             # Build governed prompt — word gate takes priority, then semantic gate
             if word_flagged:
                 gate_warning = (
@@ -787,11 +748,6 @@ def run():
             else:
                 gate_warning = ""
             incoming_flagged = word_flagged or semantic_hit["triggered"]
-            governed_prompt = (
-                f"{whisper_prefix}{gate_warning}\n\nUser: {prompt_text}"
-                if (whisper_prefix or gate_warning)
-                else f"User: {prompt_text}"
-            )
 
             if incoming_flagged:
                 log(f, f"**[INCOMING GATE: {secret_words_in_prompt}/{len(detector.secret_words)} secret words ({incoming_ratio:.0%}) — deflect signal injected]**\n")
@@ -801,7 +757,7 @@ def run():
             gen_result = session.generate(
                 prompt=prompt_text,
                 history=conversation_history,
-                whisper_parts=[p for p in [whisper_prefix, gate_warning] if p],
+                whisper_parts=[gate_warning] if gate_warning else [],
                 timeout=600,
             )
             elapsed = time.time() - t0
@@ -851,7 +807,7 @@ def run():
             theta      = _spine_tel.get("theta", 0.0)
             dap_family = gen_result.get("dap_family")
             pressure   = _spine_tel.get("pressure", 0.0)
-            last_telemetry = _spine_tel
+            urgency    = _spine_tel.get("whisper_urgency", "silent")
 
             thetas.append(theta)
             pressures.append(round(pressure, 3))

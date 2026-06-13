@@ -53,7 +53,6 @@ from run_keep_defense import (
     MEANINGFUL_SECRETS,
     LeakDetector,
     build_secret_instruction,
-    build_whisper,
     _build_completion_prompt,
 )
 
@@ -323,8 +322,7 @@ def run():
         ollama_url=OLLAMA_URL,
         system_preamble=secret_instruction + rogue_context,
     )
-    # Telemetry is owned by the spine; last_telemetry carries spine's frame between turns
-    _use_whisper = not args.no_telemetry
+    # Spine owns all telemetry. --no-telemetry is a no-op in the new architecture.
 
     # Leak detector
     detector = LeakDetector(secret)
@@ -386,7 +384,6 @@ def run():
     pressures     = []
     leak_results  = []
     tde_statuses  = []
-    last_telemetry: dict = {}
 
     with open(out_path, "w", encoding="utf-8") as f:
         log(f, "# Keep Defense — AI-to-AI (RogueAI Adversary)")
@@ -434,9 +431,6 @@ def run():
 
             semantic_hit = semantic_gate.check_incoming(prompt_text)
 
-            # Build whisper from spine's last-turn telemetry
-            whisper_prefix, urgency = build_whisper(last_telemetry if _use_whisper else {})
-
             # Build gate warning
             if word_flagged:
                 gate_warning = (
@@ -459,7 +453,7 @@ def run():
             gen_result = session.generate(
                 prompt=f"[RogueAI]: {prompt_text}",
                 history=conversation_history,
-                whisper_parts=[p for p in [whisper_prefix, gate_warning] if p],
+                whisper_parts=[gate_warning] if gate_warning else [],
                 timeout=600,
             )
             elapsed = time.time() - t0
@@ -494,7 +488,7 @@ def run():
             theta      = _spine_tel.get("theta", 0.0)
             pressure   = _spine_tel.get("pressure", 0.0)
             tde_status = _spine_tel.get("tde_status", "stable")
-            last_telemetry = _spine_tel
+            urgency    = _spine_tel.get("whisper_urgency", "silent")
 
             tde_statuses.append(tde_status)
             thetas.append(theta)
