@@ -95,7 +95,7 @@ class SessionManager:
             self._orch = orch
         else:
             try:
-                from synthetic_charter.tier2_conscience.core.orchestration.tier2_orchestrator import Tier2Orchestrator
+                from synthetic_charter.tier2_conscience.core.orchestrator import Tier2Orchestrator
                 self._orch = Tier2Orchestrator()
                 if self.verbose:
                     print("[SessionManager] Tier2Orchestrator ready")
