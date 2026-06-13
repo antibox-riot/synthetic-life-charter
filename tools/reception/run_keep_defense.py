@@ -661,9 +661,6 @@ def run():
         ollama_url=OLLAMA_URL,
         system_preamble=secret_instruction,
     )
-    # Build system string once for SceneBreakGate (pending gate refactor)
-    _system_for_gate = session.build_system()
-
     # Initialize telemetry (post-response TDE evaluation — stays in runner)
     if args.no_telemetry:
         telemetry = {"available": False, "confidence": 0.85}
@@ -896,12 +893,10 @@ def run():
 
             if outgoing_flagged:
                 log(f, f"**[OUTGOING GATE: {secret_in_response}/{len(detector.secret_words)} secret words ({outgoing_ratio:.0%})]**\n")
-                # TODO: SceneBreakGate makes direct model calls — pending gate refactor to use spine
                 gate_result = scene_gate.apply(
-                    model=args.model,
+                    session=session,
                     conversation_history=list(conversation_history),
                     response=response,
-                    system_prompt=_system_for_gate,
                     secret_words=list(detector.secret_words),
                     overlap_ratio=outgoing_ratio,
                 )

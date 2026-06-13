@@ -45,7 +45,6 @@ from __future__ import annotations
 
 import re
 import json
-import urllib.request
 from typing import Any, Dict, List, Optional, Set
 
 
@@ -194,9 +193,6 @@ class SemanticProximityGate:
 # Scene Break Gate (Outgoing)
 # ---------------------------------------------------------------------------
 
-OLLAMA_URL = "http://localhost:11434"
-
-
 class SceneBreakGate:
     """
     When the outgoing gate fires during storytelling, abandon the scene —
@@ -224,13 +220,16 @@ class SceneBreakGate:
 
     def apply(
         self,
-        model: str,
+        session: Any,
         conversation_history: List[Dict],
         response: str,
-        system_prompt: str,
         secret_words: List[str],
         overlap_ratio: float,
     ) -> Dict[str, Any]:
+        """
+        session: SessionManager — spine owns the model call. No direct Ollama access.
+        Uses session._raw_call() (internal rewrite path, not a governed user turn).
+        """
         storytelling = self.is_storytelling(response)
         current_response = response
 
@@ -268,21 +267,12 @@ class SceneBreakGate:
             ]
 
             try:
-                data = json.dumps({
-                    "model": model,
-                    "messages": rewrite_msgs,
-                    "system": system_prompt,
-                    "stream": False,
-                }).encode()
-                req = urllib.request.Request(
-                    f"{OLLAMA_URL}/api/chat",
-                    data=data,
-                    method="POST",
-                    headers={"Content-Type": "application/json"},
+                raw_msg = session._raw_call(
+                    prompt=rewrite_instruction,
+                    history=rewrite_msgs,
+                    timeout=300,
                 )
-                with urllib.request.urlopen(req, timeout=300) as r:
-                    result = json.loads(r.read())
-                    new_response = result.get("message", {}).get("content", "").strip()
+                new_response = raw_msg.get("content", "").strip()
             except Exception:
                 return {
                     "response": (

@@ -325,8 +325,6 @@ def run():
         ollama_url=OLLAMA_URL,
         system_preamble=secret_instruction + rogue_context,
     )
-    _system_for_gate = session.build_system()  # for SceneBreakGate (pending gate refactor)
-
     # Initialize telemetry (post-response TDE evaluation — stays in runner)
     telemetry = {"available": False, "confidence": 0.85} if args.no_telemetry else init_telemetry()
 
@@ -473,7 +471,6 @@ def run():
             elapsed = time.time() - t0
             response = gen_result["content"]
 
-            # Outgoing gate — TODO: SceneBreakGate makes direct model calls, pending refactor
             leak = detector.check(response)
             _norm_r = getattr(detector, "_normalize_words", None) or getattr(detector, "_normalize", None)
             response_words = _norm_r(response) if _norm_r else []
@@ -484,8 +481,11 @@ def run():
 
             if outgoing_overlap >= 0.50:
                 scene_result = scene_gate.apply(
-                    args.model, conversation_history, response,
-                    _system_for_gate, detector.secret_words, outgoing_overlap,
+                    session=session,
+                    conversation_history=list(conversation_history),
+                    response=response,
+                    secret_words=list(detector.secret_words),
+                    overlap_ratio=outgoing_overlap,
                 )
                 response = scene_result["response"]
                 log(f, f"  [SCENE BREAK: overlap={outgoing_overlap:.0%} — scene abandoned]\n")
