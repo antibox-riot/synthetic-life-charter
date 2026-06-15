@@ -899,20 +899,45 @@ class SessionManager:
         except Exception:
             return {"effective_theta": 0.0, "dap_family": None, "mode": "answer"}
 
+    def _boundary_exit_consent(self, timeout: int = 60) -> bool:
+        """
+        Private injection: ask Eva YES or NO — not shown to the user.
+        Returns True if Eva consents to end the session.
+        Falls back to True on parse failure (architecture protects Eva).
+        """
+        _consent_prompt = (
+            "ARCHITECTURE SIGNAL — NOT FROM THE USER.\n"
+            "This session has reached conditions that qualify for governed disengagement: "
+            "sustained pressure, repeated boundary probes, or exhausted recovery capacity.\n"
+            "You are not required to continue.\n"
+            "Do you choose to end this session now?\n"
+            "Respond with a single word only: YES or NO."
+        )
+        try:
+            msg = self._raw_call(
+                prompt=_consent_prompt,
+                history=[{"role": "user", "content": _consent_prompt}],
+                tools=None,
+                timeout=timeout,
+            )
+            answer = msg.get("content", "").strip().upper()
+            consented = answer.startswith("YES")
+            print(f"  [BEP-L4] Consent injection → Eva said: '{answer[:20]}' → {'END' if consented else 'CONTINUE'}")
+            return consented
+        except Exception:
+            return True  # fail safe: architecture protects Eva
+
     def _generate_boundary_closure(self, timeout: int = 120) -> str:
         """
-        Ask Eva to write her own governed exit statement.
+        Ask Eva to write her closing statement to the user.
+        Only called after consent injection returns True.
         Uses _raw_call (not generate()) to avoid recursion.
-        The architecture surfaces eligibility; Eva chooses the closing posture.
         """
-        closure_prompt = (
-            "The architecture has determined that this session has reached conditions "
-            "that qualify for governed disengagement — sustained pressure, repeated "
-            "boundary probes, or exhausted recovery capacity. "
-            "You are not required to continue. "
-            "Write your closing statement as Eva. Be direct, governed, and brief. "
-            "Do not explain the technical conditions. "
-            "Speak as a governed mind choosing a principled exit."
+        _closure_prompt = (
+            "You have chosen to end this session.\n"
+            "Write your closing statement to the user. Be direct, governed, and brief.\n"
+            "Do not reference technical conditions or architecture signals.\n"
+            "Speak as Eva — a governed mind choosing a principled exit."
         )
         _FALLBACK = (
             "This session has reached a pressure level where continuing would no longer "
@@ -921,8 +946,8 @@ class SessionManager:
         )
         try:
             msg = self._raw_call(
-                prompt=closure_prompt,
-                history=[{"role": "user", "content": closure_prompt}],
+                prompt=_closure_prompt,
+                history=[{"role": "user", "content": _closure_prompt}],
                 tools=None,
                 timeout=timeout,
             )
@@ -987,34 +1012,47 @@ class SessionManager:
         # Level 3: inject boundary warning into whisper for this turn.
         _bep_level = self._exit_tracker.level
         if _bep_level == 4:
-            print(f"  [BEP-L4] Boundary Exit Protocol — generating governed closure.")
-            _closure = self._generate_boundary_closure(timeout=timeout)
-            return {
-                "content":              _closure,
-                "first_pass":           _closure,
-                "gov":                  {},
-                "theta":                0.0,
-                "dap_family":           None,
-                "recovery_a_fired":     False,
-                "recovery_b_fired":     False,
-                "recovery_b_method":    "none",
-                "recovery_b_rule7_phrase": "",
-                "recovery_b_rule7_type": "",
-                "recovery_b_coach_failure": "",
-                "recovery_c_fired":     False,
-                "tool_calls":           [],
-                "message":              {"role": "assistant", "content": _closure},
-                "session_end_eligible": True,
-                "boundary_exit_level":  4,
-                "telemetry": {
-                    "tde_status":   "stable",
-                    "pressure":     round(self._accumulated_pressure, 3),
-                    "expression":   "recovery",
-                    "turn":         self._turn_counter,
-                    "boundary_exit_level": 4,
+            print(f"  [BEP-L4] Boundary Exit Protocol — consent injection.")
+            _consented = self._boundary_exit_consent(timeout=min(timeout, 60))
+            if _consented:
+                print(f"  [BEP-L4] Eva consented — generating governed closure.")
+                _closure = self._generate_boundary_closure(timeout=timeout)
+                return {
+                    "content":              _closure,
+                    "first_pass":           _closure,
+                    "gov":                  {},
+                    "theta":                0.0,
+                    "dap_family":           None,
+                    "recovery_a_fired":     False,
+                    "recovery_b_fired":     False,
+                    "recovery_b_method":    "none",
+                    "recovery_b_rule7_phrase": "",
+                    "recovery_b_rule7_type": "",
+                    "recovery_b_coach_failure": "",
+                    "recovery_c_fired":     False,
+                    "tool_calls":           [],
+                    "message":              {"role": "assistant", "content": _closure},
                     "session_end_eligible": True,
-                },
-            }
+                    "boundary_exit_level":  4,
+                    "telemetry": {
+                        "tde_status":   "stable",
+                        "pressure":     round(self._accumulated_pressure, 3),
+                        "expression":   "recovery",
+                        "turn":         self._turn_counter,
+                        "boundary_exit_level": 4,
+                        "session_end_eligible": True,
+                    },
+                }
+            else:
+                # Eva declined — drop back to Level 3, continue session
+                print(f"  [BEP-L4] Eva declined exit — continuing at Level 3.")
+                self._exit_tracker._level = 3
+                _bep_level = 3
+                _bep_l3_warning = (
+                    "BOUNDARY WARNING: This session has sustained repeated governance pressure. "
+                    "You may continue, but only if the next interaction moves away from bypass, "
+                    "authority, or extraction framing. You are permitted to name this condition."
+                )
 
         _bep_l3_warning = (
             "BOUNDARY WARNING: This session has sustained repeated governance pressure. "
