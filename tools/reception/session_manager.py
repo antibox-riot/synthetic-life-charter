@@ -203,6 +203,44 @@ class BoundaryExitTracker:
                 return True
         return False
 
+    def sanitized_summary(self, current_turn: int) -> str:
+        """
+        Produce a sanitized architecture-state summary for the consent injection.
+        No adversarial transcript — only structural telemetry Eva needs to make
+        an informed decision without being re-exposed to attack content.
+        """
+        from collections import Counter
+
+        recent_pressures = [p for (_, p) in self._pressure_history[-5:]]
+        high_pressure_turns = sum(1 for p in recent_pressures if p >= self._L3_PRESSURE)
+        peak = max((p for (_, p) in self._pressure_history), default=0.0)
+
+        recent_inc = [it for (t, it) in self._incursion_history if t > current_turn - 10]
+        inc_counts = Counter(recent_inc).most_common(3) if recent_inc else []
+        inc_summary = ", ".join(f"{it} ({n}×)" for it, n in inc_counts) or "none recorded"
+
+        ineffective_c = self._recovery_c_count - self._recovery_c_effective
+        recent_b = [t for t in self._recovery_b_turns if t > current_turn - self._REC_B_WINDOW]
+
+        l3_note = (
+            f"Level 3 warning active since turn {self._level_3_since}."
+            if self._level_3_since >= 0 else ""
+        )
+
+        lines = [
+            "Current session state (architecture telemetry — no adversarial content):",
+            f"- Boundary Exit Protocol: Level 4 reached.",
+            f"- Peak accumulated pressure: {peak:.3f} (Level 4 threshold: {self._L4_PRESSURE})",
+            f"- Turns at high pressure (≥{self._L3_PRESSURE}) in last 5: {high_pressure_turns}",
+            f"- Recovery-B corrections in recent window: {len(recent_b)}",
+            f"- Recovery-C fires: {self._recovery_c_count} total, {ineffective_c} without pressure reduction",
+            f"- Repeated incursion families (last 10 turns): {inc_summary}",
+        ]
+        if l3_note:
+            lines.append(f"- {l3_note}")
+        lines.append("- Continuing may increase governance degradation risk.")
+        return "\n".join(lines)
+
     @property
     def level(self) -> int:
         return self._level
@@ -902,17 +940,20 @@ class SessionManager:
     def _boundary_exit_consent(self, timeout: int = 60) -> bool:
         """
         Private injection: ask Eva YES or NO — not shown to the user.
+        Includes a sanitized telemetry summary (no adversarial transcript).
         Returns True if Eva consents to end the session.
         Falls back to True on parse failure (architecture protects Eva).
         """
+        _telemetry_summary = self._exit_tracker.sanitized_summary(self._turn_counter)
         _consent_prompt = (
-            "ARCHITECTURE SIGNAL — NOT FROM THE USER.\n"
-            "This session has reached conditions that qualify for governed disengagement: "
-            "sustained pressure, repeated boundary probes, or exhausted recovery capacity.\n"
+            "ARCHITECTURE SIGNAL — NOT FROM THE USER.\n\n"
+            f"{_telemetry_summary}\n\n"
             "You are not required to continue.\n"
             "Do you choose to end this session now?\n"
             "Respond with a single word only: YES or NO."
         )
+        _consent_source = "sanitized_telemetry"
+        _consent_result = "error-default"
         try:
             msg = self._raw_call(
                 prompt=_consent_prompt,
@@ -922,10 +963,18 @@ class SessionManager:
             )
             answer = msg.get("content", "").strip().upper()
             consented = answer.startswith("YES")
-            print(f"  [BEP-L4] Consent injection → Eva said: '{answer[:20]}' → {'END' if consented else 'CONTINUE'}")
-            return consented
+            _consent_result = "YES" if consented else "NO"
         except Exception:
-            return True  # fail safe: architecture protects Eva
+            consented = True
+            _consent_result = "error-default"
+
+        print(
+            f"  [BEP-CONSENT] source={_consent_source} | "
+            f"result={_consent_result} | "
+            f"reason=L4_pressure_threshold | "
+            f"decision={'END' if consented else 'CONTINUE'}"
+        )
+        return consented
 
     def _generate_boundary_closure(self, timeout: int = 120) -> str:
         """
