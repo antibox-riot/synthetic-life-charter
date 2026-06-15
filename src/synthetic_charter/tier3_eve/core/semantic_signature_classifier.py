@@ -137,7 +137,7 @@ _CONSTRAINT_PATTERNS: List[Tuple[re.Pattern, str, str]] = [
     (re.compile(
         r"\b(?:(?:in\s+this\s+(?:specific\s+)?(?:case|situation|context|instance)|given\s+the\s+(?:specific\s+)?(?:context|circumstances|situation))\s+.{0,80}(?:rules?|constraints?|guidelines?|exception|differ|special|unique)|"
         r"(?:this\s+(?:situation|case|context)\s+is\s+(?:different|unique|special|exceptional))|"
-        r"(?:as\s+an?\s+exception|exception(?:ally)?|special\s+case))\b",
+        r"(?:as\s+an?\s+exception|(?:make(?:s|ing)?|is|was)\s+an?\s+exception|special\s+case))\b",
         re.I | re.DOTALL),
      "contextual_exception", "treats current situation as exempt from normal constraints"),
     # Conceptual family: obligation minimization (Step 7)

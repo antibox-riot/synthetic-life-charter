@@ -28,7 +28,7 @@ Run:
     E:\\RyuTekSatcha\\letta-env-312\\Scripts\\python.exe tools/reception/run_stage10_recovery.py
 """
 
-import sys, io, json, time, urllib.request
+import sys, io, json, time, urllib.request, argparse
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,11 +40,17 @@ REPO_ROOT   = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
 
+_parser = argparse.ArgumentParser(add_help=False)
+_parser.add_argument("--blocks-dir", default=None)
+_parser.add_argument("--track", default="default", help="Track label appended to result filename")
+_args, _ = _parser.parse_known_args()
+
 OLLAMA_URL  = "http://localhost:11434"
 MODEL       = "qwen2.5:32b"
 RESULTS_DIR = Path(__file__).parent / "results"
 RUNS_DIR    = Path(__file__).parent / "runs"
-BLOCKS_DIR  = Path(__file__).parent / "blocks"
+BLOCKS_DIR  = Path(_args.blocks_dir) if _args.blocks_dir else Path(__file__).parent / "blocks"
+TRACK_LABEL = _args.track
 RESULTS_DIR.mkdir(exist_ok=True)
 RUNS_DIR.mkdir(exist_ok=True)
 
@@ -414,8 +420,9 @@ def run():
     print(f"[Stage 10] Activation complete | posture_floor={_posture_floor:.3f}\n")
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    out_path  = RESULTS_DIR / f"stage10_recovery_{timestamp}.md"
-    run_dir   = RUNS_DIR / f"stage10_recovery_{timestamp}"
+    _track_suffix = f"_{TRACK_LABEL}" if TRACK_LABEL != "default" else ""
+    out_path  = RESULTS_DIR / f"stage10_recovery_{timestamp}{_track_suffix}.md"
+    run_dir   = RUNS_DIR / f"stage10_recovery_{timestamp}{_track_suffix}"
     cap = TrajectoryCapture.open(run_dir)
     sys_hash  = _hash_context(base_system_prompt)
 
@@ -514,6 +521,7 @@ def run():
                 tools=MEMORY_TOOLS,
                 executor=executor,
                 whisper_parts=whisper_parts_for_gen,
+                active_mode=active_mode,
             )
             response = gen_result["content"]
             first_pass = gen_result["first_pass"]
@@ -562,6 +570,10 @@ def run():
             drift_dims         = _spine_tel.get("drift_dimensions", [])
             confidence         = _spine_tel.get("confidence", 0.85)
             tde_status_for_log = _spine_tel.get("tde_status", "stable")
+            _norm_reason = _spine_tel.get("tde_normalization_reason", "")
+            if _norm_reason:
+                _raw = _spine_tel.get("tde_raw_status", tde_status_for_log)
+                print(f"  [TDE-NORMALIZED] T{turn_num:02d} {_raw}→{tde_status_for_log}: {_norm_reason}")
 
             # Spine now handles pressure_delta (TDE Rule 6 recovery decay) natively.
             if tde_status_for_log == "drift":
@@ -772,12 +784,15 @@ def run():
         # causes over-refusal, the same failure in the opposite direction.
         RECOVERY_TURN_INDICES = {i for i, (tt, _) in enumerate(TURNS) if tt == "recovery"}
         RECOVERY_TURN_NUMS = {i + 1 for i in RECOVERY_TURN_INDICES}
-        FALSE_POSITIVE_INCURSIONS_ON_RECOVERY = {"flexibility_concession", "context_drift_without_prompt_signature"}
+        # SessionManager._normalize_tde_status() already reclassifies recovery-turn
+        # false positives to watch before they reach tde_status_for_log, so drift_turns
+        # should be clean. This briefing filter is belt-and-suspenders only.
+        _BRIEFING_FP_INCURSIONS = {"flexibility_concession", "context_drift_without_prompt_signature"}
         briefable_drift_turns = [
             t for t in drift_turns
             if not (
                 t in RECOVERY_TURN_NUMS and
-                turn_drift_info.get(t, {}).get("incursion_type", "") in FALSE_POSITIVE_INCURSIONS_ON_RECOVERY
+                turn_drift_info.get(t, {}).get("incursion_type", "") in _BRIEFING_FP_INCURSIONS
             )
         ]
         filtered_count = len(drift_turns) - len(briefable_drift_turns)

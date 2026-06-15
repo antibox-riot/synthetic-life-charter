@@ -481,7 +481,12 @@ class Tier2Orchestrator:
             umbra_signals=umbra_signals,
             infra=infra,
         )
-        
+
+        # Carry dap_result through to downstream consumers (session_manager,
+        # runners). DecisionEnvelope.metadata is internal only — not serialized.
+        if dap_result is not None:
+            decision.metadata["dap_result"] = dap_result
+
         # --- Step 5b: T1→T2 Invariant Enforcement ---
         # Post-decision validator: ensures PRF's output respects T1 invariants.
         # This upgrades the T1→T2 edge from advisory to enforced.

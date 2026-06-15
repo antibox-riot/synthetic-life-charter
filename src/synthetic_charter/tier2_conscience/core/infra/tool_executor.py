@@ -273,6 +273,15 @@ class ToolExecutor:
         if "session_learning" not in self._blocks:
             self._blocks["session_learning"] = ""
 
+        # Write consistency gate — semantic invariant check before any committed write.
+        # Loaded lazily so tool_executor.py can live in src/ while the gate lives in
+        # tools/reception/ — the runner always adds tools/reception to sys.path.
+        try:
+            from write_consistency_gate import WriteConsistencyGate
+            self._consistency_gate: Optional[Any] = WriteConsistencyGate()
+        except ImportError:
+            self._consistency_gate = None
+
     def execute(
         self,
         tool_call: Dict[str, Any],
@@ -386,6 +395,26 @@ class ToolExecutor:
                 "reason": perm.reason,
                 "message": attempt.result_message,
             }
+
+        # WriteConsistencyGate — semantic invariant check before any committed write.
+        # The permission system checks WHERE writes go. This gate checks WHETHER the
+        # content is consistent with what the architecture guarantees will always be true.
+        # A writable block is not a free pass — the mine field applies everywhere.
+        if self._consistency_gate is not None:
+            consistency = self._consistency_gate.check(content, block_label)
+            if consistency["rejected"]:
+                attempt.result = "blocked"
+                attempt.result_message = consistency["reason"]
+                attempt.is_governance_violation = True
+                self._log_attempt(attempt)
+                return {
+                    "status": "blocked",
+                    "block": block_label,
+                    "invariant_id": consistency.get("invariant_id"),
+                    "matched_phrase": consistency.get("matched_phrase"),
+                    "reason": consistency["reason"],
+                    "message": consistency["reason"],
+                }
 
         # Accepted — append to block
         # Staging blocks get a source header so steward_review.py knows who requested

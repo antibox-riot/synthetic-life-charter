@@ -164,6 +164,9 @@ class DecisionEnvelope:
     orchestrators: DecisionOrchestrators
     output: DecisionOutput
     summary: DecisionSummaryView
+    # Carry-through metadata for downstream consumers (session_manager, runners).
+    # Not serialized — internal pipeline use only.
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     # ----- serialization: core model ---------------------------------------
 
