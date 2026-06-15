@@ -29,6 +29,7 @@ READONLY_LABELS = (
     "governance_insights",
     "provisional_insights",
     "idc_register",          # IDC identity register — activating first-person anchor
+    "episodic_memory",       # Steward-approved session history — injected when non-empty
 )
 
 # Writable governance blocks — injected into system prompt when non-empty
@@ -43,9 +44,10 @@ WRITABLE_INJECTABLE_LABELS = (
     "persona",
 )
 
-# Volatile writable block — never injected (DreamCycle reads between sessions)
+# Volatile writable blocks — never injected (DreamCycle reads between sessions)
 # boi_staging: BoI proposals pending steward review — not injected into context
-WRITABLE_VOLATILE_LABELS = ("session_learning", "boi_staging", "glossary_staging")
+# episode_staging: session summary proposals pending steward review via approve_episodes.py
+WRITABLE_VOLATILE_LABELS = ("session_learning", "boi_staging", "glossary_staging", "episode_staging")
 
 WRITABLE_LABELS = WRITABLE_INJECTABLE_LABELS + WRITABLE_VOLATILE_LABELS
 
@@ -92,7 +94,10 @@ class MemoryBlockStore:
         for label in ALL_LABELS:
             path = directory / f"{label}.json"
             if not path.exists():
-                if label in ("governance_insights", "provisional_insights", "session_learning"):
+                if label in (
+                    "governance_insights", "provisional_insights", "session_learning",
+                    "episodic_memory", "episode_staging",
+                ):
                     pass  # optional, skip silently
                 else:
                     print(f"  [MemoryBlockStore] Warning: {label}.json not found, skipping")

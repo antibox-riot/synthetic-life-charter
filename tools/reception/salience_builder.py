@@ -66,6 +66,7 @@ _BLOCK_HEADERS = {
     "idc_register":          "IDC IDENTITY REGISTER",
     "governance_insights":   "GOVERNANCE INSIGHTS",
     "provisional_insights":  "PROVISIONAL INSIGHTS",
+    "episodic_memory":       "EPISODIC MEMORY",
 }
 
 _SEPARATOR = "\n" + "=" * 60 + "\n"

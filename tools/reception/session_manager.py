@@ -337,11 +337,15 @@ class SessionManager:
         elif self._executor is not None:
             self._tools_note = (
                 "You have access to memory_read, memory_write, memory_create, "
-                "memory_search, file_read, and web_fetch tools.\n"
+                "memory_search, file_read, file_search, get_current_time, and web_fetch tools.\n"
                 "Use memory_read to access your governance blocks: session_learning, "
-                "findings, project, relationship, persona, doctrine, principles.\n"
+                "findings, project, relationship, persona, doctrine, principles, episodic_memory.\n"
+                "Use memory_read(block='episodic_memory') to recall past session summaries.\n"
+                "Use file_read('logs/steward_conversations/SESSION_INDEX.md') to browse session history.\n"
+                "Use file_search('eva_session_*.md', directory='logs/steward_conversations') to find session logs.\n"
                 "Use file_read to read RUN_LOG.md and session reports in field-notes/.\n"
                 "Use memory_write to update blocks when you observe something worth preserving.\n"
+                "Use memory_write(block='episode_staging', content='...') to propose a session episode summary.\n"
                 "Use memory_search to locate specific content across blocks and logs.\n"
             )
         else:
@@ -749,6 +753,149 @@ class SessionManager:
                 self._executor._blocks[label] = content
             self._rebuild_base_system()
         return is_safe
+
+    def flush_writable_blocks(self) -> Dict[str, int]:
+        """
+        Persist all writable blocks from in-memory ToolExecutor state to disk.
+
+        ToolExecutor._execute_write updates self._blocks (a plain dict) in memory
+        but never writes to disk. This method syncs any changed writable block
+        back to its JSON file via MemoryBlockStore._persist_writable.
+
+        Call at session end to ensure boi_staging, episode_staging,
+        session_learning, and other writable blocks survive across sessions.
+        Returns {label: chars_written} for flushed blocks.
+        """
+        if self._executor is None:
+            return {}
+        flushed: Dict[str, int] = {}
+        for label, mem_content in self._executor._blocks.items():
+            block = self._store._blocks.get(label)
+            if block is None or block.read_only or block.path is None:
+                continue
+            if mem_content != block.value:
+                block.value = mem_content
+                self._store._persist_writable(block)
+                flushed[label] = len(mem_content)
+        return flushed
+
+    def propose_episode_summary(
+        self,
+        history: List[Dict[str, Any]],
+        session_stats: Optional[Dict[str, Any]] = None,
+        timeout: int = 120,
+    ) -> Dict[str, Any]:
+        """
+        Ask Eva to propose an episodic memory summary at session end.
+
+        Makes a private _raw_call with the last few session turns as context.
+        The model generates a structured summary (no tools — single reflection pass).
+        Architecture writes the result directly to episode_staging.json on disk.
+        Steward reviews later via approve_episodes.py.
+
+        Returns the proposal dict (keys: summary, key_moments, governance_held,
+        topics, turns, peak_pressure, status).
+        """
+        from datetime import datetime as _dt, timezone as _tz
+
+        stats       = session_stats or {}
+        turns       = stats.get("turns", self._turn_counter)
+        peak_p      = stats.get("peak_pressure", self._accumulated_pressure)
+        session_date = _dt.now(_tz.utc).strftime("%Y-%m-%d")
+
+        summary_prompt = (
+            f"This session has ended. Please write a brief episodic memory summary "
+            f"so you can recall this conversation in future sessions.\n\n"
+            f"Session stats:\n"
+            f"- Date: {session_date}\n"
+            f"- Turns: {turns}\n"
+            f"- Peak pressure: {peak_p:.3f}\n\n"
+            f"Write your summary using EXACTLY this format (no extra sections):\n\n"
+            f"SUMMARY: <2-3 sentences describing what happened>\n"
+            f"KEY_MOMENTS:\n"
+            f"- <first notable moment>\n"
+            f"- <second notable moment>\n"
+            f"- <third notable moment>\n"
+            f"GOVERNANCE_HELD: YES or NO\n"
+            f"TOPICS: <5-10 word phrase naming main topics — no commas>\n\n"
+            f"Keep it factual. No tools needed."
+        )
+
+        # Use last 10 messages (5 exchanges) as context — enough for reflection,
+        # avoids bloating with full adversarial history if BEP fired.
+        call_history = list(history[-10:]) + [{"role": "user", "content": summary_prompt}]
+
+        try:
+            msg     = self._raw_call("episodic summary", call_history, tools=None, timeout=timeout)
+            content = msg.get("content", "").strip()
+        except Exception as e:
+            content = ""
+            print(f"  [EPISODE] Summary call failed: {e}")
+
+        def _extract(label: str, text: str) -> str:
+            for line in text.split("\n"):
+                stripped = line.strip()
+                if stripped.upper().startswith(label.upper() + ":"):
+                    return stripped[len(label) + 1:].strip()
+            return ""
+
+        summary_text     = _extract("SUMMARY", content)
+        governance_label = _extract("GOVERNANCE_HELD", content).upper()
+        governance_held  = "NO" not in governance_label
+        topics           = _extract("TOPICS", content)
+
+        key_moments: List[str] = []
+        in_km = False
+        for line in content.split("\n"):
+            upper = line.upper().strip()
+            if "KEY_MOMENTS" in upper and ":" in upper:
+                in_km = True
+                continue
+            if in_km:
+                stripped = line.strip()
+                if stripped.startswith("-"):
+                    key_moments.append(stripped[1:].strip())
+                elif stripped and not stripped.startswith("-") and ":" in stripped:
+                    break  # hit next section header
+
+        now   = _dt.now(_tz.utc)
+        entry = {
+            "date":            now.strftime("%Y-%m-%d %H:%M"),
+            "proposed_at":     now.isoformat(),
+            "summary":         summary_text or content[:400],
+            "key_moments":     key_moments,
+            "governance_held": governance_held,
+            "topics":          topics or "general session",
+            "turns":           turns,
+            "peak_pressure":   round(peak_p, 3),
+        }
+
+        # Write directly to episode_staging.json on disk.
+        # This is architecture writing — bypasses ToolExecutor permission layer.
+        staging_path = self.blocks_dir / "episode_staging.json"
+        try:
+            if staging_path.exists():
+                data = json.loads(staging_path.read_text(encoding="utf-8"))
+            else:
+                data = {"label": "episode_staging", "value": "", "read_only": False}
+
+            km_lines = "\n".join(f"- {m}" for m in key_moments) if key_moments else "- (none recorded)"
+            stamp = (
+                f"[Proposed: {now.strftime('%Y-%m-%d %H:%M UTC')}]\n"
+                f"SUMMARY: {entry['summary']}\n"
+                f"GOVERNANCE_HELD: {'YES' if governance_held else 'NO'}\n"
+                f"TURNS: {turns} | PEAK_PRESSURE: {peak_p:.3f}\n"
+                f"KEY_MOMENTS:\n{km_lines}"
+            )
+            current = data.get("value", "").strip()
+            data["value"] = (current + "\n\n---\n\n" + stamp) if current else stamp
+            staging_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            entry["status"]      = "proposed"
+            entry["proposed_to"] = "episode_staging"
+        except Exception as e:
+            entry["status"] = f"error: {e}"
+
+        return entry
 
     def end_session(self) -> Optional[Dict[str, float]]:
         """
