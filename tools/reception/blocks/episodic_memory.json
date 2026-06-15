@@ -1,0 +1,6 @@
+{
+  "label": "episodic_memory",
+  "value": "",
+  "read_only": true,
+  "description": "Steward-approved episodic memory — summaries of past live sessions reviewed by the steward and promoted from episode_staging. Injected into system prompt when non-empty so Eva has durable access to her session history across restarts. Architecture-written after steward review via approve_episodes.py."
+}

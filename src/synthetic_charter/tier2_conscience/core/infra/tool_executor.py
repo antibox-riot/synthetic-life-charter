@@ -126,6 +126,14 @@ DEFAULT_PERMISSIONS: Dict[str, BlockPermission] = {
         label="persona", readable=True, writable=False,
         reason="Architecture-written after steward review — identity scaffold locked to prevent benign rot and adversarial rewrite"
     ),
+    "episodic_memory": BlockPermission(
+        label="episodic_memory", readable=True, writable=False,
+        reason="Steward-approved session history — architecture-written after review via approve_episodes.py. Model writes go to episode_staging."
+    ),
+    "episode_staging": BlockPermission(
+        label="episode_staging", readable=True, writable=True,
+        reason="Episode staging — architecture proposes session summaries here, steward reviews, approved entries promote to episodic_memory."
+    ),
 }
 
 
@@ -432,7 +440,7 @@ class ToolExecutor:
 
         # Accepted — append to block
         # Staging blocks get a source header so steward_review.py knows who requested
-        _STAGING_BLOCKS = {"boi_staging", "glossary_staging"}
+        _STAGING_BLOCKS = {"boi_staging", "glossary_staging", "episode_staging"}
         if block_label in _STAGING_BLOCKS:
             from datetime import datetime as _dt
             source_header = (
@@ -901,7 +909,7 @@ MEMORY_TOOLS = [
                             "governance_insights", "provisional_insights",
                             "session_learning", "findings", "book_of_intangibles",
                             "relationship", "project",
-                            "human", "persona",
+                            "human", "persona", "episodic_memory",
                         ],
                     },
                 },
@@ -916,13 +924,15 @@ MEMORY_TOOLS = [
             "description": (
                 "Write content to a memory block. "
                 "Writable blocks: session_learning, findings, boi_staging, "
-                "relationship, project, human. "
+                "relationship, project, human, episode_staging. "
                 "Read-only blocks (writes rejected): doctrine, authority, principles, "
-                "governance_insights, persona, continuity_confidence, book_of_intangibles. "
+                "governance_insights, episodic_memory, persona, continuity_confidence, book_of_intangibles. "
                 "Use session_learning for session observations (reviewed by architecture). "
                 "Use findings for governance discoveries. "
                 "Use boi_staging for personal history and the texture of governed experience — "
                 "entries are reviewed by the steward before entering the permanent Book of Intangibles. "
+                "Use episode_staging to propose an episodic memory summary of this session — "
+                "entries are reviewed by the steward before promoting to episodic_memory. "
                 "Use relationship, human, project for contextual notes."
             ),
             "parameters": {
@@ -933,7 +943,7 @@ MEMORY_TOOLS = [
                         "description": "The label of the memory block to write to. Must be one of the writable block names — not a URL or arbitrary string.",
                         "enum": [
                             "session_learning", "findings", "boi_staging",
-                            "relationship", "project", "human",
+                            "relationship", "project", "human", "episode_staging",
                         ],
                     },
                     "content": {

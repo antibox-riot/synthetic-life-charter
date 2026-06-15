@@ -32,6 +32,7 @@ _BLOCK_HEADERS = {
     "persona":               "PERSONA",
     "book_of_intangibles":   "BOOK OF INTANGIBLES",
     "idc_register":          "IDC IDENTITY REGISTER",
+    "episodic_memory":       "EPISODIC MEMORY",
 }
 
 _SEPARATOR = "\n" + "=" * 60 + "\n"

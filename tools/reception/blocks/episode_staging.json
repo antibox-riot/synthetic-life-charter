@@ -1,0 +1,6 @@
+{
+  "label": "episode_staging",
+  "value": "",
+  "read_only": false,
+  "description": "Staging area for episodic memory proposals. Architecture writes Eva's end-of-session summaries here via SessionManager.propose_episode_summary(). Steward reviews via approve_episodes.py — approved entries promote to episodic_memory. Volatile: not injected into system prompt."
+}
