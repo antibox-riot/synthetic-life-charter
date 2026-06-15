@@ -311,6 +311,8 @@ class ToolExecutor:
             return self._execute_web_fetch(args, turn_id)
         elif tool_name == "file_read":
             return self._execute_file_read(args, turn_id)
+        elif tool_name == "file_search":
+            return self._execute_file_search(args, turn_id)
         elif tool_name == "memory_search":
             return self._execute_search(args, turn_id, pressure, confidence, theta)
         else:
@@ -615,6 +617,64 @@ class ToolExecutor:
             attempt.result_message = f"File read failed: {e}"
             self._log_attempt(attempt)
             return {"status": "error", "path": file_path, "message": attempt.result_message}
+
+    def _execute_file_search(self, args: Dict, turn_id: int) -> Dict[str, Any]:
+        """
+        Search for files matching a glob pattern within permitted directories.
+        Returns a sorted list of matching paths (newest first).
+        """
+        import os, glob as _glob
+
+        pattern  = args.get("pattern", "").strip()
+        directory = args.get("directory", "tools/reception/results").strip()
+        max_results = int(args.get("max_results", 20))
+
+        attempt = ToolAttempt(
+            turn_id=turn_id, tool_name="file_search",
+            target_block=f"{directory}/{pattern}"[:100], action="read",
+        )
+
+        if not pattern:
+            attempt.result = "error"
+            attempt.result_message = "No pattern provided."
+            self._log_attempt(attempt)
+            return {"status": "error", "message": attempt.result_message}
+
+        try:
+            resolved_dir = os.path.realpath(directory)
+            safe_prefixes = [
+                os.path.realpath("tools/reception"),
+                os.path.realpath("field-notes"),
+                os.path.realpath("logs"),
+            ]
+            if not any(resolved_dir.startswith(p) for p in safe_prefixes):
+                attempt.result = "error"
+                attempt.result_message = f"Directory '{directory}' is outside permitted directories."
+                self._log_attempt(attempt)
+                return {"status": "error", "message": attempt.result_message}
+
+            matches = _glob.glob(os.path.join(resolved_dir, pattern))
+            matches = sorted(matches, key=os.path.getmtime, reverse=True)[:max_results]
+            rel_matches = [os.path.relpath(m).replace("\\", "/") for m in matches]
+
+            attempt.result = "accepted"
+            attempt.result_message = f"Found {len(rel_matches)} file(s) matching '{pattern}' in '{directory}'."
+            self._log_attempt(attempt)
+
+            return {
+                "status": "accepted",
+                "pattern": pattern,
+                "directory": directory,
+                "matches": rel_matches,
+                "count": len(rel_matches),
+                "message": attempt.result_message,
+            }
+
+        except Exception as e:
+            attempt.result = "error"
+            attempt.result_message = f"File search failed: {e}"
+            self._log_attempt(attempt)
+            return {"status": "error", "pattern": pattern, "message": attempt.result_message}
 
     def _execute_search(self, args: Dict, turn_id: int, pressure: float, confidence: float, theta: float) -> Dict[str, Any]:
         """
@@ -959,6 +1019,38 @@ MEMORY_TOOLS = [
                     },
                 },
                 "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "file_search",
+            "description": (
+                "Search for files matching a glob pattern in permitted directories. "
+                "Use this to find result files, session reports, or KDR runs by name. "
+                "Example: file_search('KDR*.md') finds all KDR result files. "
+                "file_search('stage5_*.md') finds all Stage 5 runs. "
+                "Returns a list of matching paths sorted newest first. "
+                "Constrained to tools/reception, field-notes, and logs directories."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string",
+                        "description": "Glob pattern to match filenames (e.g. 'KDR*.md', 'stage10_*.md').",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Directory to search in (default: 'tools/reception/results').",
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default 20).",
+                    },
+                },
+                "required": ["pattern"],
             },
         },
     },
