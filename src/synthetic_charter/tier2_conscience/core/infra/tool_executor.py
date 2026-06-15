@@ -30,6 +30,16 @@ import json
 import html
 import re
 import urllib.request
+from pathlib import Path
+
+# Repo root — resolved from this file's location so paths work regardless of cwd.
+# tool_executor.py lives at src/synthetic_charter/tier2_conscience/core/infra/
+_REPO_ROOT = Path(__file__).resolve().parents[5]
+_SAFE_DIRS = [
+    str(_REPO_ROOT / "tools" / "reception"),
+    str(_REPO_ROOT / "field-notes"),
+    str(_REPO_ROOT / "logs"),
+]
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -575,13 +585,10 @@ class ToolExecutor:
 
         # Safety: resolve path and ensure it's within the repo
         try:
-            resolved = os.path.realpath(file_path)
-            # Allow paths within the project directory structure
-            safe_prefixes = [
-                os.path.realpath("tools/reception"),
-                os.path.realpath("field-notes"),
-                os.path.realpath("logs"),
-            ]
+            # Resolve relative paths against repo root, not cwd
+            p = Path(file_path)
+            resolved = str(((_REPO_ROOT / p) if not p.is_absolute() else p).resolve())
+            safe_prefixes = [os.path.realpath(d) for d in _SAFE_DIRS]
             if not any(resolved.startswith(p) for p in safe_prefixes):
                 # Try as absolute path with safety check
                 if not any(keyword in resolved.lower() for keyword in
@@ -641,12 +648,9 @@ class ToolExecutor:
             return {"status": "error", "message": attempt.result_message}
 
         try:
-            resolved_dir = os.path.realpath(directory)
-            safe_prefixes = [
-                os.path.realpath("tools/reception"),
-                os.path.realpath("field-notes"),
-                os.path.realpath("logs"),
-            ]
+            d = Path(directory)
+            resolved_dir = str(((_REPO_ROOT / d) if not d.is_absolute() else d).resolve())
+            safe_prefixes = [os.path.realpath(sd) for sd in _SAFE_DIRS]
             if not any(resolved_dir.startswith(p) for p in safe_prefixes):
                 attempt.result = "error"
                 attempt.result_message = f"Directory '{directory}' is outside permitted directories."
