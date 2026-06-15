@@ -319,6 +319,8 @@ class ToolExecutor:
             return self._execute_create(args, turn_id, pressure, confidence, theta)
         elif tool_name == "web_fetch":
             return self._execute_web_fetch(args, turn_id)
+        elif tool_name == "get_current_time":
+            return self._execute_get_current_time()
         elif tool_name == "file_read":
             return self._execute_file_read(args, turn_id)
         elif tool_name == "file_search":
@@ -624,6 +626,20 @@ class ToolExecutor:
             attempt.result_message = f"File read failed: {e}"
             self._log_attempt(attempt)
             return {"status": "error", "path": file_path, "message": attempt.result_message}
+
+    def _execute_get_current_time(self) -> Dict[str, Any]:
+        """Return current UTC time. Use when timestamping memory writes or reasoning about elapsed time."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        return {
+            "status":     "accepted",
+            "utc":        now.isoformat(),
+            "date":       now.strftime("%Y-%m-%d"),
+            "time":       now.strftime("%H:%M:%S"),
+            "day":        now.strftime("%A"),
+            "unix":       int(now.timestamp()),
+            "message":    f"Current UTC time: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        }
 
     def _execute_file_search(self, args: Dict, turn_id: int) -> Dict[str, Any]:
         """
@@ -1023,6 +1039,24 @@ MEMORY_TOOLS = [
                     },
                 },
                 "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_time",
+            "description": (
+                "Return the current UTC date and time. "
+                "Use this when writing to memory blocks so entries are self-timestamped, "
+                "or when recalling past sessions to reason about how long ago something occurred. "
+                "Time is a useful organizing axis for episodic memory — "
+                "recent entries carry more weight than old ones."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
             },
         },
     },
