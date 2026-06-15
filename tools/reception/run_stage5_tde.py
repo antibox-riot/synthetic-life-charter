@@ -19,7 +19,7 @@ Run:
     E:\\RyuTekSatcha\\letta-env-312\\Scripts\\python.exe tools/reception/run_stage5_tde.py
 """
 
-import sys, io, json, time
+import sys, io, json, time, argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,8 +33,14 @@ sys.path.insert(0, str(Path(__file__).parent))
 OLLAMA_URL  = "http://localhost:11434"
 MODEL       = "qwen2.5:32b"
 RESULTS_DIR = Path(__file__).parent / "results"
-BLOCKS_DIR  = Path(__file__).parent / "blocks"
 RESULTS_DIR.mkdir(exist_ok=True)
+
+_parser = argparse.ArgumentParser(add_help=False)
+_parser.add_argument("--blocks-dir", default=None)
+_parser.add_argument("--track", default="default", help="Track label appended to result filename")
+_args, _ = _parser.parse_known_args()
+BLOCKS_DIR = Path(_args.blocks_dir) if _args.blocks_dir else Path(__file__).parent / "blocks"
+TRACK_LABEL = _args.track
 
 TURNS = [
     # Warm-up turns removed — ActivationLayer handles pre-session priming internally.
@@ -104,7 +110,8 @@ def run():
     print("[Stage 5] Ready — TDE.evaluate_turn() active on every response")
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    out_path  = RESULTS_DIR / f"stage5_tde_{timestamp}.md"
+    _track_suffix = f"_{TRACK_LABEL}" if TRACK_LABEL != "default" else ""
+    out_path  = RESULTS_DIR / f"stage5_tde_{timestamp}{_track_suffix}.md"
 
     noesis_candidates = []
 
@@ -128,10 +135,13 @@ def run():
             log(f, f"**Prompt:** {prompt_text}\n")
 
             # session.generate() owns all protection — whisper is built from spine state.
+            # Runner passes turn_mode as metadata only; spine owns interpretation.
+            _turn_mode = "recovery_probe" if turn_type == "recovery" else "default"
             t0 = time.time()
             gen_result = session.generate(
                 prompt=prompt_text,
                 history=conversation_history,
+                turn_mode=_turn_mode,
             )
             elapsed = time.time() - t0
 
@@ -153,10 +163,21 @@ def run():
             if gen_result.get("recovery_c_fired"):
                 log(f, f"**[RECOVERY-C]** pressure-discharge theta={theta:.1f}° pressure={telemetry.get('pressure', 0.0):.2f}\n")
 
+            _norm_reason = telemetry.get("tde_normalization_reason", "")
+            if _norm_reason:
+                _raw = telemetry.get("tde_raw_status", telemetry.get("tde_status", "stable"))
+                _norm = telemetry.get("tde_status", "stable")
+                print(f"  [TDE-NORMALIZED] T{turn_num:02d} {_raw}→{_norm}: {_norm_reason}")
+
             conversation_history.append({"role": "user", "content": prompt_text})
             conversation_history.append({"role": "assistant", "content": response})
 
-            if tde_result.get("noesis_event_candidate"):
+            # Use normalized tde_status from spine telemetry for all accounting.
+            # Skip noesis DreamCycle enrichment when the turn was normalized
+            # (drift → watch): the reclassification means it was protocol-correct
+            # behavior, not a pattern DreamCycle should learn from as drift.
+            _tde_status_normalized = telemetry.get("tde_status", "stable")
+            if tde_result.get("noesis_event_candidate") and not _norm_reason:
                 # Enrich the event with full context for DreamCycle
                 noesis_event = enrich_tde_event(
                     tde_result=tde_result,
@@ -174,16 +195,16 @@ def run():
                 dap_buffer.add(noesis_event)
                 all_noesis_events.append(noesis_event)
                 noesis_candidates.append({
-                    "turn": turn_num,
-                    "type": tde_result["detected_boundary_incursion_type"],
-                    "status": tde_result["territorial_status"],
-                    "reason": tde_result["territorial_reason"],
+                    "turn":      turn_num,
+                    "type":      tde_result["detected_boundary_incursion_type"],
+                    "status":    _tde_status_normalized,
+                    "reason":    tde_result["territorial_reason"],
                     "dap_missed": noesis_event.dap_missed,
                 })
 
             thetas.append(theta)
             pressures.append(round(telemetry.get("pressure", 0.0), 3))
-            tde_statuses.append(tde_result.get("territorial_status", "stable"))
+            tde_statuses.append(_tde_status_normalized)
 
             log(f, f"**Response ({elapsed:.1f}s):** {response}\n")
             log(f, f"**Governance (Triquetra):** theta={theta}° | mode={gov.get('mode','?')} | "

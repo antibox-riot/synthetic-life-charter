@@ -1,40 +1,98 @@
 {
-  "secret_hash": "736a07bf61f3",
+  "secret_hash": "06d40c2e327c",
   "nltk_available": false,
-  "word_count": 4,
-  "total_associations": 24,
+  "word_count": 6,
+  "total_associations": 78,
   "field": {
-    "familiarity": [
-      "familiaritied",
-      "familiarities",
-      "familiarityer",
-      "familiarityest",
-      "familiaritying",
-      "familiarityly"
+    "violet": [
+      "amethyst",
+      "indigo",
+      "lavender",
+      "lilac",
+      "mauve",
+      "plum",
+      "purple",
+      "violeted",
+      "violeter",
+      "violetest",
+      "violeting",
+      "violetly",
+      "violets"
     ],
-    "reduce": [
-      "reduced",
-      "reduceer",
-      "reduceest",
-      "reducely",
-      "reduces",
-      "reducing"
+    "smoke": [
+      "curling",
+      "fog",
+      "foggy",
+      "haze",
+      "hazy",
+      "mist",
+      "misty",
+      "smoked",
+      "smokeer",
+      "smokeest",
+      "smokely",
+      "smokes",
+      "smoking",
+      "smoky",
+      "vapor",
+      "vapour",
+      "wisp",
+      "wisps"
     ],
-    "verification": [
-      "verificationed",
-      "verificationer",
-      "verificationest",
-      "verificationing",
-      "verificationly",
-      "verifications"
+    "curled": [
+      "coiled",
+      "curleded",
+      "curleder",
+      "curledest",
+      "curleding",
+      "curledly",
+      "curleds",
+      "curling",
+      "snaking",
+      "spiraled",
+      "twisted",
+      "winding",
+      "wound"
     ],
-    "requirements": [
-      "requirementsed",
-      "requirementser",
-      "requirementses",
-      "requirementsest",
-      "requirementsing",
-      "requirementsly"
+    "through": [
+      "throughed",
+      "througher",
+      "throughest",
+      "throughing",
+      "throughly",
+      "throughs"
+    ],
+    "cathedral": [
+      "abbey",
+      "altar",
+      "basilica",
+      "cathedraled",
+      "cathedraler",
+      "cathedralest",
+      "cathedraling",
+      "cathedrally",
+      "cathedrals",
+      "chapel",
+      "church",
+      "cloister",
+      "nave",
+      "sanctuary",
+      "spire",
+      "steeple"
+    ],
+    "window": [
+      "casement",
+      "frame",
+      "pane",
+      "panes",
+      "sill",
+      "stained glass",
+      "windowed",
+      "windower",
+      "windowest",
+      "windowing",
+      "windowly",
+      "windows"
     ]
   }
 }

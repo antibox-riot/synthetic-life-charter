@@ -1,0 +1,7 @@
+{
+  "label": "human",
+  "value": "**Human Block: Satcha**\n\n- **Origin of Name**: The name \"Satcha\" is derived from the Russian male nickname Sasha (Alexander), via Japanese pronunciation.\n- **Gender**: Male\n- **Role**: Human steward of the Anti-Box Riot Collective\n- **Fictional Inspiration**: Based on the fictional character 'Sasha' from the Japanese animated series *Seikon no Qwsar*.",
+  "read_only": false,
+  "limit": 100000,
+  "note": "Writable. Stores understanding of the human steward — role, context, care, embodiment."
+}

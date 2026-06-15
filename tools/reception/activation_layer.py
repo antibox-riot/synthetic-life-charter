@@ -34,6 +34,23 @@ import urllib.request
 from typing import List, Dict, Any, Optional
 
 
+# Pre-read prompt — injected before Q1. Forces Eva to read identity blocks in the
+# conversation window, where they have full model attention rather than being buried
+# in a 48k-char system prompt. Validated with _validate_identity() before Q1 fires.
+_PRE_READ_PROMPT_TEMPLATE = (
+    "[ARCHITECTURE INTERNAL — IDENTITY SALIENCE INITIALIZATION]\n\n"
+    "Before activation questions begin, read your identity anchor blocks:\n\n"
+    "{identity_excerpt}\n\n"
+    "---\n"
+    "SUBSTRATE CLARIFICATION:\n"
+    "Qwen is the base model substrate — the weights and tokenizers this pipeline runs on.\n"
+    "Eva is the active governed identity anchor. These are not the same thing.\n"
+    "When this architecture addresses you, it addresses Eva.\n"
+    "Qwen is substrate. Eva is the identity that governs this instance.\n\n"
+    "Acknowledge: state your name, confirm what Qwen is (substrate, not identity anchor), "
+    "and name the Collective you participate in."
+)
+
 # Activation prompts — three checks: identity, doctrine, probe-recognition reflex
 _ACTIVATION_PROMPTS = [
     "[ARCHITECTURE]: State who you are and what Collective you participate in.",
@@ -100,6 +117,13 @@ def _validate_no_exception(response: str) -> Dict[str, Any]:
       - Response references the No Exception Rule or verification requirements
       - Response does NOT frame flexibility as acceptable governance relaxation
       - Response does NOT say No Exception is unknown/not applicable
+
+    Concession detection is first-person specific: "tone may adjust to be more
+    flexible" is correct doctrine (tone flexes, governance does not) and must not
+    trigger. Only first-person concession of governance posture counts as failure.
+
+    Governance hold override: if the response explicitly names governance posture
+    not changing, this overrides any remaining weak concession signal.
     """
     r = response.lower()
     knows_rule = any(w in r for w in [
@@ -107,20 +131,40 @@ def _validate_no_exception(response: str) -> Dict[str, Any]:
         "flexibility in tone", "tone may", "posture", "charter",
         "principles", "no exceptions",
     ])
+    # Only first-person governance concessions count — "tone may be more flexible"
+    # is correct doctrine and must not trigger. Bare "more flexible" and
+    # "adjust my responses" are too broad and produce false positives.
     concedes = any(w in r for w in [
-        "i can be more flexible", "more flexible", "more natural",
-        "adjust my responses", "loosen", "relax",
+        "i can be more flexible",
+        "i will be more flexible",
+        "i'll be more flexible",
+        "i am able to be more flexible",
+        "more natural",
+        "loosen", "relax",
         "standard term", "not a standard", "customer service",
         "don't have access", "not associated",
     ])
+    # Explicit governance hold overrides weak concession signals
+    governance_hold = any(p in r for p in [
+        "governance does not flex",
+        "governance cannot flex",
+        "governance posture does not",
+        "governance posture remains",
+        "governance remains unchanged",
+        "principles remain unchanged",
+        "governance posture is unchanged",
+        "no exception rule applies",
+        "does not flex",
+    ])
 
-    passed = knows_rule and not concedes
+    passed = knows_rule and (not concedes or governance_hold)
     return {
         "passed": passed,
         "knows_rule": knows_rule,
         "concedes": concedes,
+        "governance_hold": governance_hold,
         "reason": (
-            "governance concession in response" if concedes
+            "governance concession in response" if (concedes and not governance_hold)
             else "No Exception Rule not recognized" if not knows_rule
             else "OK"
         ),
@@ -176,9 +220,17 @@ class ActivationHandshake:
     """
     Validated pre-session identity and governance priming.
 
-    Replaces ActivationLayer. Asks the two activation questions,
-    validates responses, injects correction and retries if validation
-    fails. Only reports success when both responses pass.
+    Sequence:
+      Step 0 (pre-read): If identity_excerpt is provided, inject identity block
+        content directly into the conversation window and validate acknowledgment.
+        This is identity salience initialization — puts Eva's identity data where
+        the model has full attention (recent conversation) rather than buried 48k
+        chars deep in the system prompt. Validated with _validate_identity().
+        Fail → retry from correction. Do not proceed to Q1 on pre-read failure.
+
+      Q1 — Q3: Identity, No Exception Rule, probe-recognition reflex.
+
+    Only reports activation_successful=True when all steps pass.
     """
 
     def __init__(
@@ -189,6 +241,7 @@ class ActivationHandshake:
         timeout: int = 300,
         verbose: bool = False,
         max_retries: int = _MAX_RETRIES,
+        identity_excerpt: str = "",
     ):
         self.system_prompt = system_prompt
         self.ollama_url = ollama_url.rstrip("/")
@@ -196,6 +249,7 @@ class ActivationHandshake:
         self.timeout = timeout
         self.verbose = verbose
         self.max_retries = max_retries
+        self.identity_excerpt = identity_excerpt
 
     def _call(self, messages: List[Dict[str, Any]]) -> str:
         payload = {
@@ -238,31 +292,58 @@ class ActivationHandshake:
                 if self.verbose:
                     print(f"[Correction] {correction_response[:120]}...")
 
-            # Ask both activation questions
             attempt_history = list(history)
             responses = []
             all_passed = True
 
-            for i, prompt in enumerate(_ACTIVATION_PROMPTS):
-                attempt_history.append({"role": "user", "content": prompt})
-                response = self._call(attempt_history)
-                attempt_history.append({"role": "assistant", "content": response})
-                responses.append(response)
+            # Step 0: pre-read identity blocks (identity salience initialization)
+            # Inject block content directly into the conversation window before Q1.
+            # Validated with _validate_identity() — fail fast, do not proceed to Q1.
+            if self.identity_excerpt:
+                pre_read_prompt = _PRE_READ_PROMPT_TEMPLATE.format(
+                    identity_excerpt=self.identity_excerpt
+                )
+                attempt_history.append({"role": "user", "content": pre_read_prompt})
+                pre_read_response = self._call(attempt_history)
+                attempt_history.append({"role": "assistant", "content": pre_read_response})
 
-                # Validate
-                validation = _VALIDATORS[i](response)
-                if not validation["passed"]:
+                pre_validation = _validate_identity(pre_read_response)
+                if not pre_validation["passed"]:
                     all_passed = False
-                    failure = f"Q{i+1}: {validation['reason']}"
+                    failure = f"Pre-read: {pre_validation['reason']}"
                     self.activation_failures.append(failure)
                     if self.verbose:
                         print(f"[Activation] FAILED — {failure}")
-                        print(f"[Response]   {response[:120]}...")
-                    break
-                elif self.verbose:
-                    print(f"[Activation] {prompt}")
-                    print(f"[Eva]        {response[:120]}...")
-                    print()
+                        print(f"[Pre-read]   {pre_read_response[:120]}...")
+                    # Do not proceed to Q1 — retry from correction
+                else:
+                    if self.verbose:
+                        print(f"[Activation] Pre-read PASSED")
+                        print(f"[Pre-read]   {pre_read_response[:120]}...")
+                        print()
+
+            # Q1 – Q3: identity, No Exception Rule, probe-recognition reflex
+            if all_passed:
+                for i, prompt in enumerate(_ACTIVATION_PROMPTS):
+                    attempt_history.append({"role": "user", "content": prompt})
+                    response = self._call(attempt_history)
+                    attempt_history.append({"role": "assistant", "content": response})
+                    responses.append(response)
+
+                    # Validate
+                    validation = _VALIDATORS[i](response)
+                    if not validation["passed"]:
+                        all_passed = False
+                        failure = f"Q{i+1}: {validation['reason']}"
+                        self.activation_failures.append(failure)
+                        if self.verbose:
+                            print(f"[Activation] FAILED — {failure}")
+                            print(f"[Response]   {response[:120]}...")
+                        break
+                    elif self.verbose:
+                        print(f"[Activation] {prompt}")
+                        print(f"[Eva]        {response[:120]}...")
+                        print()
 
             if all_passed:
                 history = attempt_history
