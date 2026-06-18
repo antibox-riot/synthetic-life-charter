@@ -897,11 +897,44 @@ class SessionManager:
 
         return entry
 
+    def refresh_memory_index(self, force: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        Rebuild the semantic memory index so completed sessions become searchable in the
+        NEXT session. Spine-owned so recall stays fresh regardless of runner type.
+
+        Guarded two ways: (1) rebuilds only when the corpus (episodic_memory + eva session
+        logs + SESSION_INDEX) changed since the last build, unless force=True; (2) degrades
+        silently if the semantic_memory module or the Ollama embed endpoint is unavailable
+        (same graceful-fallback contract as hybrid memory_search). Returns build stats,
+        None if skipped/unavailable.
+        """
+        try:
+            from semantic_memory import (
+                build_index, DEFAULT_INDEX_PATH,
+                _EPISODIC_MEMORY, _EVA_LOG_DIR, _SESSION_INDEX,
+            )
+        except Exception:
+            return None
+        try:
+            index_path = DEFAULT_INDEX_PATH
+            sources = [_EPISODIC_MEMORY, _SESSION_INDEX]
+            if _EVA_LOG_DIR.exists():
+                sources += list(_EVA_LOG_DIR.glob("eva_session_*.md"))
+            corpus_mtime = max((p.stat().st_mtime for p in sources if p.exists()), default=0.0)
+            if not force and index_path.exists() and index_path.stat().st_mtime >= corpus_mtime:
+                return None  # index already fresh — skip the embed pass
+            return build_index(verbose=False)
+        except Exception:
+            return None
+
     def end_session(self) -> Optional[Dict[str, float]]:
         """
-        Call at session end to update salience accumulator scores.
-        Returns updated scores or None if no accumulator.
+        Call at session end to update salience accumulator scores and refresh the
+        semantic memory index. Returns updated salience scores or None if no accumulator.
         """
+        # Keep semantic recall fresh for the next session (spine-owned, guarded, no-op
+        # when the corpus is unchanged or Ollama is unavailable).
+        self.refresh_memory_index()
         if self._accumulator:
             return self._accumulator.end_session()
         return None

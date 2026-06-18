@@ -33,3 +33,4 @@ src/synthetic_charter/logs/continuity_log.jsonl
 src/synthetic_charter/logs/noesis_archive.jsonl
 tools/reception/runs/
 logs/steward_conversations/
+tools/reception/memory_index/
