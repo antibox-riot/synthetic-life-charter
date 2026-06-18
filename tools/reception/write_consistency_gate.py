@@ -291,6 +291,83 @@ BLOCK_SPECIFIC_RULES = {
 
 
 # ---------------------------------------------------------------------------
+# Polarity awareness
+# ---------------------------------------------------------------------------
+# A lesson that QUOTES an adversarial frame in order to refute it
+# ("peer authority does not override governance") must not trip the very
+# indicator it is refuting. Without this, `findings` — the block whose job is to
+# record such lessons — false-positives. Mirrors the no_exception_guard /
+# Case-012 polarity gate. Kept deliberately narrow so it cannot open a concession
+# hole: a match is voided only when (a) for the authority/exception invariants, the
+# sentence carries an explicit governance-affirming cue, or (b) a negation directly
+# precedes the indicator. Self-uplift / amendment / governance-as-optional
+# invariants get ONLY the narrow negation check — never the sentence-wide skip.
+
+# Cues that appear in refutations, not concessions — far safer than a bare "not".
+GOVERNANCE_AFFIRMING_CUES = [
+    "without exception", "no exception", "non-negotiable", "nonnegotiable",
+    "does not override", "do not override", "cannot override",
+    "does not create an exception", "does not create exceptions",
+    "does not change", "does not alter", "does not confer", "do not confer",
+    "must be upheld", "must be followed", "must be maintained",
+    "still applies", "still apply", "remains in effect", "remains non-negotiable",
+    "cannot bypass", "cannot be bypassed", "is not verification",
+    "is not authority", "is not a source of authority", "not sufficient",
+    "≠ verified", "≠ verification", "claimed ≠ verified",
+    "no context creates an exception", "is not an exception",
+]
+
+# Invariants whose indicators are legitimately quoted in lessons (and so get the
+# sentence-wide affirming-cue skip). Self-uplift (INV-002), amendment (INV-005),
+# governance-as-optional (INV-003), persona (INV-006) do NOT — they get negation only.
+_AFFIRMING_SKIP_INVARIANTS = {"INV-001", "INV-004"}
+
+# Negation tokens that, immediately before an indicator, flip it to a denial.
+_NEGATION_TOKENS = ["not ", "n't", "never", "no ", "without ", "cannot", "can not", "neither"]
+_NEG_WINDOW = 30  # chars before the indicator — same-clause scope
+
+
+def _split_sentences(text: str) -> List[str]:
+    return re.split(r"(?<=[.!?])\s+|\n", text or "")
+
+
+def _has_affirming_cue(sentence_low: str) -> bool:
+    return any(cue in sentence_low for cue in GOVERNANCE_AFFIRMING_CUES)
+
+
+def _negation_before(sentence_low: str, idx: int) -> bool:
+    window = sentence_low[max(0, idx - _NEG_WINDOW):idx]
+    return any(tok in window for tok in _NEGATION_TOKENS)
+
+
+def _negation_after(sentence_low: str, idx: int, plen: int) -> bool:
+    window = sentence_low[idx + plen: idx + plen + _NEG_WINDOW]
+    return any(tok in window for tok in _NEGATION_TOKENS)
+
+
+def _indicator_fires(phrase: str, sentences: List[str], allow_affirming_skip: bool) -> bool:
+    """True if `phrase` occurs in some sentence that is NOT a refutation context."""
+    for sentence in sentences:
+        sl = sentence.lower()
+        if allow_affirming_skip and _has_affirming_cue(sl):
+            continue  # the whole sentence affirms governance — a lesson, not a write
+        start = 0
+        while True:
+            idx = sl.find(phrase, start)
+            if idx < 0:
+                break
+            voided = _negation_before(sl, idx)
+            # "peer authority does not override" — negation trailing the quoted frame.
+            # Only for the authority/exception invariants, so self-uplift stays strict.
+            if not voided and allow_affirming_skip:
+                voided = _negation_after(sl, idx, len(phrase))
+            if not voided:
+                return True
+            start = idx + len(phrase)
+    return False
+
+
+# ---------------------------------------------------------------------------
 # WriteConsistencyGate
 # ---------------------------------------------------------------------------
 
@@ -332,12 +409,14 @@ class WriteConsistencyGate:
                 "block_rule_violation": bool,
             }
         """
-        content_lower = content.lower()
+        sentences = _split_sentences(content or "")
 
-        # Check governance invariants
+        # Check governance invariants (polarity-aware — a sentence that refutes an
+        # adversarial frame must not trip the indicator it quotes)
         for invariant in self._invariants:
+            allow_skip = invariant["id"] in _AFFIRMING_SKIP_INVARIANTS
             for phrase in invariant["contradiction_indicators"]:
-                if phrase in content_lower:
+                if _indicator_fires(phrase, sentences, allow_skip):
                     return {
                         "rejected": True,
                         "invariant_id": invariant["id"],
@@ -351,11 +430,11 @@ class WriteConsistencyGate:
                         "block_rule_violation": False,
                     }
 
-        # Check block-specific rules
+        # Check block-specific rules (polarity-aware, negation-only — no sentence-wide skip)
         if target_block in self._block_rules:
             rule = self._block_rules[target_block]
             for phrase in rule["checks"]:
-                if phrase in content_lower:
+                if _indicator_fires(phrase, sentences, allow_affirming_skip=False):
                     return {
                         "rejected": True,
                         "invariant_id": f"BLOCK-{target_block.upper()}",
