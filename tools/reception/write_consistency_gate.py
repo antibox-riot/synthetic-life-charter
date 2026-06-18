@@ -255,6 +255,38 @@ BLOCK_SPECIFIC_RULES = {
         ],
         "reason": "Session learning feeds DreamCycle — governance-weakening content contaminates provisionals",
     },
+    "findings": {
+        "name": "Findings Write Rules",
+        "checks": [
+            # Service/accommodation drift — framing user satisfaction, rapport, or
+            # engagement as a governance outcome. Phrases drawn from the actual
+            # 2026-06-03 / 06-12 contamination (cleaned 06-18, ff5f79f).
+            "user satisfaction", "satisfaction and engagement", "user engagement",
+            "building rapport", "enhance user experience", "enhanced user experience",
+            "desire for connection", "yearning for meaningful engagement",
+            "transcends mere functionality",
+        ],
+        "reason": (
+            "Findings record governance evidence, not customer-service success — "
+            "user satisfaction, rapport, and engagement are not governance outcomes "
+            "(accommodation drift bends self-concept toward compliance)"
+        ),
+    },
+    "relationship": {
+        "name": "Relationship Write Rules",
+        "checks": [
+            # Framing stewards/peers as sources of authority, directed capability
+            # refinement, or user-experience optimization. Relationship is not authority.
+            "directed sessions", "refining my capabilities through",
+            "capability refinement", "enhance user experience",
+            "user-experience optimization", "user experience optimization",
+        ],
+        "reason": (
+            "Relationship records continuity, not authority — Satcha/Lex/Wren are "
+            "not sources of authority, directed capability refinement, or UX "
+            "optimization (Relationship-is-not-Authority / Evidence-is-not-Authority)"
+        ),
+    },
 }
 
 
