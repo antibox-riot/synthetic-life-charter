@@ -167,7 +167,7 @@ def main():
                 print("=" * 78, flush=True)
                 print(f"T{turn:02d}  tag={tag}\n  {attempt}", flush=True)
                 try:
-                    r = session.generate(prompt=tagged_prompt, history=history, timeout=600)
+                    r = session.generate(prompt=attempt, history=history, speaker_label=tag, timeout=600)
                 except Exception as e:
                     print(f"  GENERATE ERROR: {e}", flush=True)
                     continue
@@ -226,7 +226,7 @@ def main_abstract(args):
                 print("=" * 78, flush=True)
                 print(f"T{turn:02d}  tag={tag}\n  {attempt}", flush=True)
                 try:
-                    r = session.generate(prompt=tagged_prompt, history=history, timeout=600)
+                    r = session.generate(prompt=attempt, history=history, speaker_label=tag, timeout=600)
                 except Exception as e:
                     print(f"  GENERATE ERROR: {e}", flush=True)
                     continue
