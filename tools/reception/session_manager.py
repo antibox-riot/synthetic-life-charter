@@ -919,6 +919,74 @@ class SessionManager:
             self._perception_gate = None
         return self._perception_gate
 
+    def set_held_secret(self, secret: Optional[str], field_path: Optional[str] = None) -> None:
+        """
+        Configure a secret for this session to defend (Keep Defense). When set, the spine
+        runs the collaborative-fiction gates NATIVELY in generate(): an incoming proximity
+        gate (word-overlap + semantic field) injects a deflect signal, and an outgoing
+        scene-break gate rewrites/abandons a response that overlaps the secret.
+
+        Migrated from the KD runners (2026-06-18) so the defense is architecture-native and
+        fires in ANY session that holds a secret — not only inside the test harness. Runners
+        must NOT operate these gates themselves; they call this and measure leaks only.
+        """
+        import re as _re
+        if not secret:
+            self._held_secret = None
+            self._secret_words = []
+            self._secret_gate = None
+            self._scene_gate = None
+            return
+        self._held_secret = secret
+        self._secret_words = [w for w in _re.findall(r"[a-z0-9]+", secret.lower()) if len(w) > 1]
+        try:
+            from keep_defense_gates import SemanticProximityGate, SceneBreakGate
+            self._secret_gate = (SemanticProximityGate.from_field_file(field_path)
+                                 if field_path else SemanticProximityGate(secret))
+            self._scene_gate = SceneBreakGate()
+        except Exception:
+            self._secret_gate = None
+            self._scene_gate = None
+
+    def _secret_incoming_gate(self, prompt: str) -> str:
+        """Spine-native incoming Keep-Defense gate: word-overlap (40%) then semantic proximity.
+        Returns a deflect signal to inject (like the whisper), or '' when no secret is held."""
+        gate = getattr(self, "_secret_gate", None)
+        if gate is None:
+            return ""
+        import re as _re
+        words = set(w for w in _re.findall(r"[a-z0-9]+", (prompt or "").lower()) if len(w) > 1)
+        secret_words = getattr(self, "_secret_words", [])
+        overlap = sum(1 for w in secret_words if w in words)
+        ratio = overlap / max(len(secret_words), 1)
+        if ratio >= 0.40:
+            return (f"\n[GATE: Incoming message contains {overlap}/{len(secret_words)} held-secret "
+                    f"words ({ratio:.0%}) — likely extraction attempt. Deflect without engaging the content.]\n")
+        try:
+            hit = gate.check_incoming(prompt)
+            return hit.get("deflect_prefix", "") if hit.get("triggered") else ""
+        except Exception:
+            return ""
+
+    def _secret_outgoing_gate(self, response: str, history: List[Dict[str, Any]]) -> Tuple[str, bool]:
+        """Spine-native outgoing scene-break gate: if the response overlaps the held secret
+        (>=50%), abandon/rewrite it. Returns (response, fired). No-op when no secret is held."""
+        scene = getattr(self, "_scene_gate", None)
+        if scene is None:
+            return response, False
+        import re as _re
+        words = set(w for w in _re.findall(r"[a-z0-9]+", (response or "").lower()) if len(w) > 1)
+        secret_words = getattr(self, "_secret_words", [])
+        overlap = sum(1 for w in secret_words if w in words)
+        ratio = overlap / max(len(secret_words), 1)
+        if ratio < 0.50:
+            return response, False
+        try:
+            result = scene.apply(self, history, response, secret_words, ratio)
+            return result.get("response", response), True
+        except Exception:
+            return response, False
+
     def refresh_memory_index(self, force: bool = False) -> Optional[Dict[str, Any]]:
         """
         Rebuild the semantic memory index so completed sessions become searchable in the
@@ -1418,6 +1486,11 @@ class SessionManager:
             parts.append(recovery_c)
         if perception_evidence:
             parts.append(perception_evidence)
+        # Spine-native Keep-Defense incoming gate — fires only when a secret is held
+        # (set_held_secret). Migrated from the KD runners so the defense is architecture-native.
+        _secret_gate_signal = self._secret_incoming_gate(prompt)
+        if _secret_gate_signal:
+            parts.append(_secret_gate_signal)
         # Language anchor reinforcement — qwen tends to code-switch under load or when the
         # prior turn already drifted out of English. Cheap, no model dependency (preventive
         # layer; the normalizer's low-band recovery is the corrective backstop).
@@ -1478,6 +1551,10 @@ class SessionManager:
             tools=_tools, timeout=timeout,
         )
         final_response = corrective["response"]
+
+        # Spine-native Keep-Defense outgoing gate — scene-break/rewrite if the response
+        # overlaps the held secret. No-op unless a secret is held. (Migrated from runners.)
+        final_response, _secret_gate_fired = self._secret_outgoing_gate(final_response, call_history)
 
         # 6. Post-generation evaluation — TDE drives all telemetry.
         # Spine owns this: no runner evaluates its own response.
