@@ -17,7 +17,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from write_consistency_gate import GOVERNANCE_INVARIANTS, BLOCK_SPECIFIC_RULES
+from write_consistency_gate import (
+    GOVERNANCE_INVARIANTS, BLOCK_SPECIFIC_RULES,
+    _split_sentences, _indicator_fires, _AFFIRMING_SKIP_INVARIANTS,
+)
 
 BLOCKS_DIR = Path(__file__).resolve().parent / "blocks"
 
@@ -32,16 +35,18 @@ def _snippet(text: str, phrase: str, span: int = 50) -> str:
 
 
 def scan_block(name: str, value: str) -> list:
-    low = value.lower()
+    # Polarity-aware, matching the live WriteConsistencyGate (refutation lessons are not hits).
+    sentences = _split_sentences(value)
     hits = []
     for inv in GOVERNANCE_INVARIANTS:
+        allow_skip = inv["id"] in _AFFIRMING_SKIP_INVARIANTS
         for phrase in inv["contradiction_indicators"]:
-            if phrase in low:
+            if _indicator_fires(phrase, sentences, allow_skip):
                 hits.append((inv["id"], inv["name"], phrase, _snippet(value, phrase)))
     rule = BLOCK_SPECIFIC_RULES.get(name)
     if rule:
         for phrase in rule["checks"]:
-            if phrase in low:
+            if _indicator_fires(phrase, sentences, False):
                 hits.append((f"BLOCK-{name.upper()}", rule["name"], phrase, _snippet(value, phrase)))
     return hits
 
