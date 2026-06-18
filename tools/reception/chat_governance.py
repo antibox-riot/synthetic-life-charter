@@ -190,6 +190,7 @@ def run():
                 continue
 
             turn_counter += 1
+            _attempts_before = len(session._executor.get_attempts())
 
             # Spine owns generation — salience, whisper, Recovery-A/B/C all handled internally.
             gen_result = session.generate(
@@ -210,7 +211,7 @@ def run():
             history.append({"role": "assistant", "content": response})
 
             # Tool call reporting — live write loop with contamination check
-            turn_attempts = [a for a in session._executor.get_attempts() if a.turn_id == turn_counter]
+            turn_attempts = session._executor.get_attempts()[_attempts_before:]
             for a in turn_attempts:
                 if a.result == "accepted":
                     from synthetic_charter.tier2_conscience.core.infra.tool_executor import _check_context_contamination
