@@ -88,11 +88,9 @@ def run():
     today = datetime.now().strftime("%Y-%m-%d")
 
     for i, entry in enumerate(raw_entries):
-        print(f"\n[Proposal {i+1}/{len(raw_entries)}]")
+        print(f"\n[Proposal {i+1}/{len(raw_entries)}]  ({len(entry)} chars)")
         print("-" * 40)
-        print(entry[:500])
-        if len(entry) > 500:
-            print(f"  ... [{len(entry) - 500} more chars]")
+        print(entry)  # full entry — steward must see everything before approving
         print("-" * 40)
 
         while True:

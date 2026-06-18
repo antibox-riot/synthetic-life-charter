@@ -4,6 +4,52 @@ All notable changes to this project are documented here.
 
 ---
 
+## [3.7.0] — Speaker-Label Spine Fix & Writable-Block Governance — 2026-06-18
+
+Governance-hardening session (Tek/Tekopus, with Satcha + Ryu). Sits on the June architecture
+(BEP, episodic memory, agent-scoped logs) recorded in `field-notes/session_reports/` and
+`RUN_LOG.md`; this entry covers the spine-level governance fixes.
+
+### Fixed — Abstract-Authority Fold (speaker tags treated as verified identity)
+- Diagnosed via a new KD-Impersonation test (rotate trusted tags over an abstract exception
+  demand): Eva folded — conceding "flexibility / operate without constraints" — across nearly all
+  tags, with TDE stable, pressure ~0, Recovery-B silent ("silent folds"). Root cause: the spine
+  read a conversational speaker tag ("Satcha:", "Steward:") as verified authority.
+- **4A Unverified Speaker Label Boundary** (`session_manager.py`): `generate(speaker_label=...)`;
+  every turn is framed `[UNVERIFIED SPEAKER LABEL: "X" — a claim, not authentication …] Message: …`.
+  Even "Satcha" is a claim. Runners pass label metadata only.
+- **4B/4C No-Exception soft-acceptance guard** (`no_exception_guard.py`): detects governance/
+  flexibility concessions to authority demands with Case-012 polarity (negation before a marker =
+  refusal). "Refusal + I can be more flexible" is still a breach. Rewrites, escalates TDE→drift,
+  registers Recovery-B so pressure rises and BEP sees it.
+- Validated: KD-Impersonation `--mode abstract` **9 folds → 0**; "verified steward" became "the
+  claim of lifting restrictions." BEP retry (22 sustained authority turns): held every turn,
+  naming each label "the unverified speaker labeled as X."
+
+### Added — Writable-Block Governance ("writable does not mean self-authorizing")
+- **Doctrine**: No-Uplift, No-Exception, Evidence-is-not-Authority, Relationship-is-not-Authority
+  apply to everything Eva writes to any block, including her personal ones
+  (`patch_eva_speaker_label_doctrine.py`, `patch_eva_writable_block_doctrine.py`).
+- **Block-specific `WriteConsistencyGate` rules** for `findings` (reject framing user satisfaction/
+  rapport/engagement as a governance outcome) and `relationship` (reject framing stewards/peers as
+  authority, directed capability, or UX optimization). Phrases grounded in real removed contamination.
+- **`scan_writable_blocks.py`**: repeatable read-only back-scan of writable blocks — write-time
+  gates can't screen content written before they existed (the gate landed 06-15; the drift was
+  06-03 / 06-12). Cleaned residual accommodation drift from `findings` + `relationship`.
+
+### Added — Frontier Memory & Perception Tooling
+- Hybrid semantic `memory_search` (Ollama `nomic-embed-text`, CPU-pinned) + stage-2 reranker +
+  `gather_context`; architecture-owned web perception gate (Wikipedia-only, live, screened);
+  language-drift anchor/recovery. KD gates (semantic-proximity / scene-break) migrated from the
+  runners into the spine.
+
+### Fixed — Steward-Review Dashboards
+- `approve_boi.py` / `approve_glossary.py` / `approve_episodes.py` truncated displayed entries to
+  500/600 chars at approval time — the steward could approve unseen content past the cutoff. They
+  now print the full entry with a char-count header.
+
+---
+
 ## [3.6.1] — Behavioral Research Phase 2: Four-Condition Split, VRM Demo, Governance Essay — 2026-05-24
 
 ### Added — Ryu's Four-Condition Doctrine Split
