@@ -1,6 +1,6 @@
 {
   "policy_version": "2026-06-17.1",
-  "enabled": false,
+  "enabled": true,
   "_comment": "Steward-owned standing retrieval policy. enabled=false keeps the perception gate dark until the steward deliberately turns it on. Every limit is a hard cap the architecture enforces; the model cannot read or raise these. See field-notes/DESIGN_architecture_owned_web_perception_2026-06-17.md.",
   "gate": {
     "mode": "conservative",
