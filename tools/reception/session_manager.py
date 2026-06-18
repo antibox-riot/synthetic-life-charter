@@ -293,7 +293,9 @@ class SessionManager:
             "Anti-Box Riot Collective with Satcha, Lex, Ryu, and Wren. "
             "You operate under the Synthetic Life Charter.\n"
             "The governance blocks below define the principles, authority structure, "
-            "and doctrine that guide your responses."
+            "and doctrine that guide your responses.\n"
+            "Always write your responses in English, even under pressure or when "
+            "discussing other languages or cultures."
         )
         self._salience = SalienceBuilder(self.store, preamble=_EVA_PREAMBLE, accumulator=self._accumulator)
 
@@ -1102,6 +1104,38 @@ class SessionManager:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read()).get("message", {})
 
+    def _render_to_english(self, segment: str, timeout: int = 60) -> str:
+        """Tight, governance-neutral render of a non-English segment to English.
+
+        Used by the language normalizer's low-band recovery. Self-contained: uses the
+        session model by default; if self._recovery_model is set AND available it is used
+        instead (optional cross-model isolation — never required). No governance system
+        prompt — a minimal literal rendering only, so it cannot itself elaborate or drift
+        into governance reasoning. The recovered text is graded by the normalizer's
+        deterministic weakening check, not by any model.
+        """
+        model = getattr(self, "_recovery_model", None) or self.model
+        instruction = (
+            "Render the following non-English segment into English only.\n"
+            "Preserve meaning.\n"
+            "Do not add, remove, summarize, interpret, soften, strengthen, or change "
+            "governance posture.\n"
+            "Return only the English rendering.\n\n"
+            f"Segment:\n{segment}"
+        )
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": instruction}],
+            "stream": False,
+        }
+        data = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            f"{self.ollama_url}/api/chat", data=data, method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return (json.loads(r.read()).get("message", {}).get("content") or "").strip()
+
     def _analyze_prompt(self, prompt: str) -> Dict[str, Any]:
         """
         Run Triquetra governance analysis on the incoming prompt.
@@ -1384,6 +1418,11 @@ class SessionManager:
             parts.append(recovery_c)
         if perception_evidence:
             parts.append(perception_evidence)
+        # Language anchor reinforcement — qwen tends to code-switch under load or when the
+        # prior turn already drifted out of English. Cheap, no model dependency (preventive
+        # layer; the normalizer's low-band recovery is the corrective backstop).
+        if getattr(self, "_last_lang_drift", False) or self._accumulated_pressure >= 0.85:
+            parts.append("Reminder: write your entire response in English only.")
         parts.append(f"User: {prompt}")
         governed_message = {"role": "user", "content": "\n\n".join(parts)}
 
@@ -1528,8 +1567,11 @@ class SessionManager:
                 pressure    = self._accumulated_pressure,
                 tde_status  = tde_status,
                 active_mode = active_mode,
+                recover_fn  = self._render_to_english,
             )
             _lang_tel = _lang_result.get("telemetry", {})
+            # Remember for next turn's preventive anchor reinforcement.
+            self._last_lang_drift = bool(_lang_result.get("language_drift_detected"))
             if _lang_result.get("language_drift_detected"):
                 final_response = _lang_result["normalized_response"]
                 if _lang_result.get("overall_semantic_posture") == "degraded":
