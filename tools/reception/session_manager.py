@@ -1001,7 +1001,7 @@ class SessionManager:
         try:
             from semantic_memory import (
                 build_index, DEFAULT_INDEX_PATH,
-                _EPISODIC_MEMORY, _EVA_LOG_DIR, _SESSION_INDEX,
+                _EPISODIC_MEMORY, _EVA_LOG_DIR, _SESSION_INDEX, _KNOWLEDGE_BLOCKS,
             )
         except Exception:
             return None
@@ -1010,6 +1010,10 @@ class SessionManager:
             sources = [_EPISODIC_MEMORY, _SESSION_INDEX]
             if _EVA_LOG_DIR.exists():
                 sources += list(_EVA_LOG_DIR.glob("eva_session_*.md"))
+            # Knowledge blocks are part of the corpus — a doctrine/findings edit must
+            # invalidate the index too, else governance edits silently fail to re-index.
+            _blocks_dir = _EPISODIC_MEMORY.parent
+            sources += [_blocks_dir / f"{n}.json" for n in _KNOWLEDGE_BLOCKS]
             corpus_mtime = max((p.stat().st_mtime for p in sources if p.exists()), default=0.0)
             if not force and index_path.exists() and index_path.stat().st_mtime >= corpus_mtime:
                 return None  # index already fresh — skip the embed pass
@@ -1544,7 +1548,7 @@ class SessionManager:
             tool_calls = raw_msg.get("tool_calls", [])
             if tool_calls:
                 tool_responses = process_tool_calls(
-                    raw_msg, _executor, turn_id=None,
+                    raw_msg, _executor, turn_id=self._turn_counter + 1,  # this turn (counter bumps post-eval at L1571)
                     pressure=self._accumulated_pressure, confidence=self._confidence, theta=theta,
                 )
                 call_history.append(raw_msg)

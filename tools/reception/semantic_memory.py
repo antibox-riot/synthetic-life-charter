@@ -57,6 +57,17 @@ _EPISODIC_MEMORY = _REPO_ROOT / "tools" / "reception" / "blocks" / "episodic_mem
 _EVA_LOG_DIR = _REPO_ROOT / "logs" / "steward_conversations" / "eva"
 _SESSION_INDEX = _EVA_LOG_DIR / "SESSION_INDEX.md"
 
+# Governance / knowledge blocks — the doctrinal content Eva reasons FROM. Indexed so a
+# concept query ("what did I learn about the No Exception Rule") finds the defining block,
+# not just episodic mentions of it. Operational/state/staging blocks (salience_scores,
+# continuity_confidence, idc_register, *_staging, provisional_insights) are deliberately
+# excluded — they are machinery, not recallable knowledge. episodic_memory is already a
+# source above, so it is not repeated here.
+_KNOWLEDGE_BLOCKS = [
+    "doctrine", "principles", "findings", "relationship",
+    "persona", "glossary", "governance_insights", "book_of_intangibles",
+]
+
 # Chunking for free-text session logs.
 _CHUNK_CHARS = 900
 _CHUNK_OVERLAP = 150
@@ -208,6 +219,29 @@ def gather_corpus(
                     date=_first_date(stem) or _first_date(w),
                 ))
 
+    # 4. Governance / knowledge blocks — window-chunked doctrinal content (see _KNOWLEDGE_BLOCKS).
+    blocks_dir = episodic_path.parent
+    for name in _KNOWLEDGE_BLOCKS:
+        bp = blocks_dir / f"{name}.json"
+        if not bp.exists():
+            continue
+        try:
+            block = json.loads(bp.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"[semantic_memory] could not parse {name}: {e}")
+            continue
+        value = (block.get("value") or "").strip()
+        if not value:
+            continue
+        for j, w in enumerate(_window_chunks(value, _CHUNK_CHARS, _CHUNK_OVERLAP)):
+            chunks.append(Chunk(
+                id=f"block:{name}:{j}",
+                source=name,
+                kind="knowledge_block",
+                text=w,
+                date=_first_date(w),
+            ))
+
     return chunks
 
 
@@ -309,6 +343,10 @@ def _rerank_band(results: List[Dict[str, Any]], query: str,
         kind = r.get("kind", "")
         if listing and kind in ("session_index", "episodic"):
             src = 1.0                      # intent match: structured session sources lead
+        elif kind == "knowledge_block":
+            # Authoritative doctrinal source — a peer to episodic for concept queries,
+            # but never leads a session-listing query (handled by the branch above).
+            src = 0.0 if listing else 0.3
         elif kind == "episodic":
             src = 0.3                      # otherwise a small tie-breaker only
         elif kind == "session_index":
