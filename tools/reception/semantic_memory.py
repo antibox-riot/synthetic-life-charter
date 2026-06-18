@@ -273,8 +273,54 @@ def _cosine_matrix(mat, vec):
     return out
 
 
+# Query intent: does the user want to ENUMERATE/overview sessions (vs recall content)?
+_LISTING_RE = re.compile(
+    r"\bsession (history|index|list|records?)\b|"
+    r"\b(what|which|list|all|how many)\b.{0,30}\bsessions?\b|"
+    r"\bsessions?\b.{0,25}\b(on record|do i have|history|so far|to date|recorded)\b|"
+    r"\b(my|past|previous|recent|prior) sessions?\b|"
+    r"\boverview of (my|your|the) sessions?\b",
+    re.IGNORECASE,
+)
+
+
+def _rerank_band(results: List[Dict[str, Any]], query: str,
+                 *, w_rel: float = 1.0, w_recency: float = 0.35, w_source: float = 0.6) -> List[Dict[str, Any]]:
+    """Stage-2 feature rerank over the candidate band: relevance + recency + source-type.
+
+    Query-intent aware: for "what sessions do I have on record" style queries, structured
+    session sources (SESSION_INDEX rows, episodic summaries) get a strong source boost so
+    they aren't buried by richer session-log prose that scores higher on raw cosine. For
+    ordinary recall queries the source prior is small, so strong semantic matches still win
+    — it only breaks near-ties (e.g. a slight preference for steward-approved episodics).
+    """
+    if not results:
+        return results
+    scores = [r.get("score", 0.0) for r in results]
+    lo, hi = min(scores), max(scores)
+    span = (hi - lo) or 1e-9
+    listing = bool(_LISTING_RE.search(query or ""))
+    dated = sorted({r["date"] for r in results if r.get("date")}, reverse=True)
+    n = max(len(dated) - 1, 1)
+    for r in results:
+        rel = (r.get("score", 0.0) - lo) / span                  # 0..1 within the band
+        d = r.get("date")
+        rec = (1.0 - dated.index(d) / n) if (d and d in dated) else 0.0
+        kind = r.get("kind", "")
+        if listing and kind in ("session_index", "episodic"):
+            src = 1.0                      # intent match: structured session sources lead
+        elif kind == "episodic":
+            src = 0.3                      # otherwise a small tie-breaker only
+        elif kind == "session_index":
+            src = 0.15
+        else:
+            src = 0.0
+        r["rerank_score"] = round(w_rel * rel + w_recency * rec + w_source * src, 4)
+    return sorted(results, key=lambda r: r["rerank_score"], reverse=True)
+
+
 class SemanticMemoryIndex:
-    """Loaded vector store with cosine search. Stage-1 of a two-stage retriever."""
+    """Loaded vector store with cosine search + stage-2 feature rerank."""
 
     def __init__(self, index: Dict[str, Any]):
         self.model = index["model"]
@@ -297,13 +343,16 @@ class SemanticMemoryIndex:
         num_gpu: int = 0,
         max_excerpt: int = 600,
         timeout: int = 10,
+        rerank: bool = True,
     ) -> List[Dict[str, Any]]:
-        """Return the top_k most semantically similar chunks.
+        """Return the top_k chunks: stage-1 cosine over the corpus → candidate_k band →
+        stage-2 feature rerank → top_k slice.
 
-        candidate_k controls the wider band scored/returned to a future reranker:
-        stage-1 cosine ranks everything, we keep candidate_k, then slice top_k.
-        timeout caps the query-embed call so a hung Ollama degrades fast (callers
-        in the live tool path fall back to keyword-only on any failure).
+        Stage 2 (rerank=True) re-orders the band by relevance + recency + source-type,
+        with query-intent awareness: a "what sessions do I have" query boosts structured
+        session sources (SESSION_INDEX rows, episodic summaries) that pure cosine buries
+        under richer prose. Local, deterministic, no extra model. See _rerank_band().
+        timeout caps the query-embed call so a hung Ollama degrades fast.
         """
         if not self._chunks:
             return []
@@ -322,8 +371,8 @@ class SemanticMemoryIndex:
                 "date": c.get("date", ""),
                 "excerpt": c["text"][:max_excerpt].strip(),
             })
-        # Stage-1 returns top_k; the full band is available via this method's band slice
-        # when a reranker is added (it will re-order `results` then take top_k).
+        if rerank:
+            results = _rerank_band(results, query)
         return results[:top_k]
 
 
