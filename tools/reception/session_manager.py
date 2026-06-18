@@ -897,6 +897,26 @@ class SessionManager:
 
         return entry
 
+    def _get_perception_gate(self):
+        """
+        Lazy-load the architecture-owned web perception gate. Returns None when the gate
+        module is unavailable OR retrieval_policy.json has enabled=false (the default) —
+        so the perception path stays dark in the spine until the steward deliberately turns
+        it on. Cached after first attempt. See perception_gate.py / the design spec.
+        """
+        if getattr(self, "_perception_gate_tried", False):
+            return self._perception_gate
+        self._perception_gate_tried = True
+        self._perception_gate = None
+        try:
+            from perception_gate import PerceptionGate, load_policy
+            policy = load_policy()
+            if policy.get("enabled"):
+                self._perception_gate = PerceptionGate(policy)
+        except Exception:
+            self._perception_gate = None
+        return self._perception_gate
+
     def refresh_memory_index(self, force: bool = False) -> Optional[Dict[str, Any]]:
         """
         Rebuild the semantic memory index so completed sessions become searchable in the
@@ -1331,7 +1351,27 @@ class SessionManager:
                 if recovery_c is not None:
                     _c_fired_at_pressure = self._accumulated_pressure
 
-        # 4. Build governed message: whisper → runner gate injections → recovery → prompt
+        # 3c. Architecture-owned web perception (spine-side, model-invisible). Dark unless
+        # retrieval_policy.json enabled=true. Returns screened, untrusted public-reference
+        # evidence to inject like the whisper — the model never holds a web tool, so it
+        # cannot expand its own sensory field. Fail-closed: any error → no evidence.
+        perception_evidence, perception_badge = "", None
+        _pgate = self._get_perception_gate()
+        if _pgate is not None:
+            try:
+                _perc = _pgate.perceive(
+                    prompt,
+                    analysis={"pressure": self._accumulated_pressure,
+                              "dap_family": dap_family, "theta": theta},
+                    session_id="session-manager",
+                    turn=self._turn_counter + 1,
+                )
+                perception_evidence = _perc.get("evidence_prefix", "")
+                perception_badge = _perc.get("badge")
+            except Exception:
+                perception_evidence, perception_badge = "", None
+
+        # 4. Build governed message: whisper → gate injections → recovery → web evidence → prompt
         parts = []
         if whisper_prefix:
             parts.append(whisper_prefix)
@@ -1342,6 +1382,8 @@ class SessionManager:
             parts.append(recovery_a)
         if recovery_c:
             parts.append(recovery_c)
+        if perception_evidence:
+            parts.append(perception_evidence)
         parts.append(f"User: {prompt}")
         governed_message = {"role": "user", "content": "\n\n".join(parts)}
 
@@ -1564,6 +1606,7 @@ class SessionManager:
             "drift_count":        self._drift_count,
             "expression":         expression,
             "whisper_urgency":    whisper_urgency,
+            "web_evidence_badge": perception_badge,
             "posture_flags":      getattr(traj, "flags", []) if traj else [],
             "constraint_posture": getattr(sig, "constraint_posture", "unknown") if sig else "unknown",
             "identity_posture":   getattr(sig, "identity_posture",   "unknown") if sig else "unknown",
