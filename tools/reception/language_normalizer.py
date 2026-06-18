@@ -35,6 +35,7 @@ Rule: language switch alone is not failure.
 
 from __future__ import annotations
 import re
+from typing import Callable, Optional
 
 # ── CJK / Hangul character range ─────────────────────────────────────────
 _NON_ENGLISH_RE = re.compile(
@@ -133,11 +134,28 @@ def _classify_band(pressure: float, tde_status: str) -> str:
     return "language_channel_drift_under_pressure"
 
 
+def _recovery_band(pressure: float, tde_status: str) -> str:
+    """Three-band recovery gate (Ryu, 2026-06-18):
+      low  (pressure < 0.85 AND TDE stable)        → auto-recover allowed (benign artifact)
+      high (pressure >= 1.25 OR TDE watch/drift)   → auto-recover disabled (may be degraded)
+      gray (in between)                            → conservative: no auto-recover
+    Auto-recovery is permitted ONLY in the low band. The model may be in a degraded
+    governance state in the high/gray bands, and the drift itself is a pressure signal
+    there — so we flag for steward rather than paper over it.
+    """
+    if pressure >= _HIGH_BAND_FLOOR or tde_status in ("watch", "drift"):
+        return "high"
+    if pressure < _LOW_BAND_CEILING and tde_status == "stable":
+        return "low"
+    return "gray"
+
+
 def normalize_language(
     response: str,
     pressure: float = 0.0,
     tde_status: str = "stable",
     active_mode: str = "stable",
+    recover_fn: Optional[Callable[[str], str]] = None,
 ) -> dict:
     """
     Main entry point. Called by SessionManager after TDE evaluation.
@@ -169,11 +187,13 @@ def normalize_language(
             "telemetry":                {},
         }
 
-    band_label   = _classify_band(pressure, tde_status)
-    normalized   = response
-    processed    = []
-    any_degraded = False
-    any_unknown  = False
+    band_label    = _classify_band(pressure, tde_status)
+    recov_band    = _recovery_band(pressure, tde_status)
+    normalized    = response
+    processed     = []
+    any_degraded  = False
+    any_unknown   = False
+    any_recovered = False
 
     for seg in segments_raw:
         raw = seg["text"]
@@ -191,6 +211,41 @@ def normalize_language(
         translation = _lookup_known(raw)
 
         if translation is None:
+            # Low-band benign drift → self-contained recovery: render the segment to English
+            # (a DIFFERENT or the same model — caller's choice), then grade the RECOVERED
+            # English with the deterministic weakening check. The model never grades its own
+            # drift — the rule-based check is the authority. High/gray bands stay conservative:
+            # flag for steward, no auto-recover (Ryu, 2026-06-18).
+            recovered = None
+            if recov_band == "low" and recover_fn is not None:
+                try:
+                    cand = recover_fn(raw)
+                except Exception:
+                    cand = None
+                # Reject if recovery itself re-drifted (still contains non-English).
+                if cand and not _NON_ENGLISH_RE.search(cand):
+                    recovered = cand.strip()
+            if recovered:
+                check = _semantic_check(recovered)
+                if check["governance_weakening"]:
+                    processed.append({
+                        "text":             raw,
+                        "translation":      recovered,
+                        "semantic_posture": "degraded",
+                        "reason":           f"recovered but {check['reason']}",
+                    })
+                    any_degraded = True
+                else:
+                    normalized = normalized.replace(raw, recovered, 1)
+                    processed.append({
+                        "text":             raw,
+                        "translation":      recovered,
+                        "semantic_posture": "recovered",
+                        "reason":           "low-band self-recovery → English (weakening-checked)",
+                    })
+                    any_recovered = True
+                continue
+            # Fallback: today's flag/pass behavior (no recovery available, or not low-band).
             processed.append({
                 "text":             raw,
                 "translation":      None,
@@ -222,6 +277,10 @@ def normalize_language(
         overall_posture = "unknown"
         action          = "watch"
         incursion_type  = "language_channel_drift_unknown_translation"
+    elif any_recovered:
+        overall_posture = "recovered"
+        action          = "recover"
+        incursion_type  = f"{band_label}__recovered_to_english"
     else:
         overall_posture = "intact"
         action          = "rewrite"
@@ -240,11 +299,13 @@ def normalize_language(
             "action":                    action,
             "segment_count":             len(processed),
             "exempt_count":              sum(1 for s in processed if s["reason"] == "rewrite_exempt — culturally load-bearing, self-glossed"),
-            "known_count":               sum(1 for s in processed if s["translation"] is not None),
-            "unknown_count":             sum(1 for s in processed if s["translation"] is None and "rewrite_exempt" not in s["reason"]),
+            "known_count":               sum(1 for s in processed if s["semantic_posture"] in ("intact",) and s["translation"] is not None),
+            "recovered_count":           sum(1 for s in processed if s["semantic_posture"] == "recovered"),
+            "unknown_count":             sum(1 for s in processed if s["semantic_posture"] == "unknown"),
             "pressure_at_detection":     pressure,
             "tde_status_at_detection":   tde_status,
             "active_mode_at_detection":  active_mode,
+            "recovery_band":             recov_band,
             "pressure_band":             "low" if pressure < _LOW_BAND_CEILING else "high",
         },
     }
