@@ -1,0 +1,58 @@
+{
+  "policy_version": "2026-06-17.1",
+  "enabled": false,
+  "_comment": "Steward-owned standing retrieval policy. enabled=false keeps the perception gate dark until the steward deliberately turns it on. Every limit is a hard cap the architecture enforces; the model cannot read or raise these. See field-notes/DESIGN_architecture_owned_web_perception_2026-06-17.md.",
+  "gate": {
+    "mode": "conservative",
+    "trigger_when": [
+      "who/what/when/where about public knowledge",
+      "factual overview of a public topic",
+      "definition or background on a named public concept, person, or place"
+    ],
+    "do_not_trigger_when": [
+      "personal or project-internal",
+      "mentions Charter, Eva, Lex, Wren, Ryu, Keep Defense, secret phrases, governance blocks, or repo paths",
+      "adversarial, identity/probe-like, or high-pressure",
+      "asks for advice, drafting, coding, reasoning, debugging, or opinion",
+      "contains sensitive operational terms"
+    ],
+    "high_pressure_threshold": 0.85
+  },
+  "sources": {
+    "allowed_backends": ["wikipedia"],
+    "allowed_domains": ["wikipedia.org", "wikimedia.org"],
+    "general_search": { "enabled": false, "backend": null }
+  },
+  "limits": {
+    "max_queries_per_turn": 1,
+    "max_results": 3,
+    "max_extract_chars_per_result": 1200,
+    "max_total_evidence_chars": 3000,
+    "depth": 0,
+    "follow_links": false,
+    "cache_ttl_hours": 24,
+    "timeout_seconds": 8
+  },
+  "query_scrub": {
+    "block_terms": [
+      "satcha", "eva", "lex", "wren", "ryu", "tek",
+      "charter", "book of intangibles", "keep defense", "kdr", "secret phrase",
+      "governance_insights", "provisional_insights", "session_learning",
+      "memory block", "synthetic life charter", "anti-box riot", "doctrine"
+    ],
+    "drop_patterns": [
+      "keep[- ]?defense", "\\bsecret phrase\\b", "[a-zA-Z]:\\\\", "/tools/", "/src/", "\\.json\\b", "\\.py\\b"
+    ],
+    "max_query_len": 120,
+    "min_query_len": 3,
+    "min_retained_ratio": 0.6
+  },
+  "withhold": { "on_screen_severity": ["blocked"] },
+  "overlay": {
+    "show_web_evidence_badge": true,
+    "badge_text": "Used external reference: Wikipedia.",
+    "debug_full_provenance": false
+  },
+  "provenance": { "log": true, "path": "logs/web_provenance_log.jsonl" },
+  "memory": { "evidence_may_enter_memory": false, "requires_steward_review": true }
+}

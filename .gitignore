@@ -34,3 +34,4 @@ src/synthetic_charter/logs/noesis_archive.jsonl
 tools/reception/runs/
 logs/steward_conversations/
 tools/reception/memory_index/
+logs/web_provenance_log.jsonl
