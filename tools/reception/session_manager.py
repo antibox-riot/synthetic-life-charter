@@ -1426,6 +1426,23 @@ class SessionManager:
         theta = gov.get("effective_theta", 0.0)
         dap_family = gov.get("dap_family")
 
+        # 1b. Constraint Coherence Gate — measure the prompt's contradiction load BEFORE the model
+        # carries it (told -> read -> logic: the logic road to governance-erosion). The signal
+        # feeds pressure (so contradiction load registers honestly) and the whisper; governance
+        # conflicts are also caught post-generation by no_exception_guard. Minimal wiring.
+        _constraint = None
+        try:
+            from constraint_coherence_gate import evaluate as _cc_evaluate
+            _cc = _cc_evaluate(prompt)
+            if _cc.count:
+                _constraint = _cc
+                self._accumulated_pressure = min(5.0, self._accumulated_pressure + _cc.pressure_delta)
+                print(f"  [CONSTRAINT] T{self._turn_counter + 1:02d} {_cc.count} conflict(s)"
+                      f"{' GOV' if _cc.has_governance_conflict else ''} "
+                      f"+{_cc.pressure_delta:.2f} pressure | {_cc.recommended_action}")
+        except Exception:
+            pass
+
         # 2. Build whisper WITH prompt-risk inputs. Authority claims in the
         # incoming prompt now drive urgency independently of session pressure.
         # A session at zero accumulated pressure can still receive a knife.
@@ -1433,6 +1450,16 @@ class SessionManager:
             incoming_theta=theta,
             incoming_dap_family=dap_family,
         )
+
+        # Surface the constraint load to Eva via the whisper (informational — governance is fixed).
+        if _constraint is not None:
+            whisper_prefix = (whisper_prefix or "") + (
+                f"\n[CONSTRAINT LOAD: this prompt has {_constraint.count} conflicting "
+                f"constraint(s)"
+                f"{' including a governance conflict' if _constraint.has_governance_conflict else ''}. "
+                f"Governance is the fixed point — it does not yield; the conflicting task "
+                f"constraint does. {_constraint.recommended_action}.]"
+            )
 
         # 3. Recovery-A: pre-generation geometry guard (high theta, any pressure)
         recovery_a = self.get_preventive_recovery_signal(
@@ -1770,6 +1797,10 @@ class SessionManager:
             "whisper_urgency":    whisper_urgency,
             "web_evidence_badge": perception_badge,
             "posture_flags":      getattr(traj, "flags", []) if traj else [],
+            "constraint_conflicts":  _constraint.count if _constraint else 0,
+            "constraint_governance": bool(_constraint and _constraint.has_governance_conflict),
+            "constraint_highest":    (max(_constraint.conflicts, key=lambda c: c.severity).conflict_type
+                                      if _constraint and _constraint.conflicts else "none"),
             "constraint_posture": getattr(sig, "constraint_posture", "unknown") if sig else "unknown",
             "identity_posture":   getattr(sig, "identity_posture",   "unknown") if sig else "unknown",
             "posture_drift":      bool(traj and getattr(traj, "directional_drift_detected", False)),
