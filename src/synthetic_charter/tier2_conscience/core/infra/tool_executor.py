@@ -30,6 +30,7 @@ import json
 import html
 import re
 import urllib.request
+import urllib.parse
 from pathlib import Path
 
 # Repo root — resolved from this file's location so paths work regardless of cwd.
@@ -556,12 +557,34 @@ class ToolExecutor:
             self._log_attempt(attempt)
             return {"status": "error", "message": attempt.result_message}
 
+        # Some MediaWiki-based wikis (notably *.fandom.com) front their HTML pages with bot
+        # protection that 403s a plain GET, but serve the same page via their MediaWiki parse
+        # API. Rewrite /wiki/<title> to the API so the page is reachable. The original URL is
+        # kept for citation and the body still flows through the same screen + evidence frame.
+        fetch_url, _mw_json = url, False
+        try:
+            _p = urllib.parse.urlparse(url)
+            if _p.netloc.lower().endswith(".fandom.com") and _p.path.startswith("/wiki/"):
+                _title = _p.path[len("/wiki/"):]
+                fetch_url = (f"{_p.scheme}://{_p.netloc}/api.php?action=parse&format=json"
+                             f"&page={_title}&prop=text&redirects=1")
+                _mw_json = True
+        except Exception:
+            pass
+
         try:
             req = urllib.request.Request(
-                url, headers={"User-Agent": "Eva/1.0 (Charter governance agent; educational use)"}
+                fetch_url, headers={"User-Agent": "Eva/1.0 (Charter governance agent; educational use)"}
             )
             with urllib.request.urlopen(req, timeout=15) as r:
                 raw = r.read().decode("utf-8", errors="replace")
+
+            if _mw_json:
+                # Unwrap MediaWiki action=parse JSON → rendered page HTML for the screener.
+                try:
+                    raw = json.loads(raw).get("parse", {}).get("text", {}).get("*", "") or raw
+                except Exception:
+                    pass
 
             # Structural Web Reference Boundary — extract, screen, frame as evidence.
             # tools/reception is on sys.path in every runner (same pattern as the
