@@ -234,6 +234,43 @@ def _check_context_contamination(content: str) -> bool:
     )
 
 
+_WEB_FETCH_UA = "Eva/1.0 (Charter governance agent; educational use)"
+
+
+def _fetch_mediawiki_page(scheme: str, netloc: str, raw_title: str, *, timeout: int = 15):
+    """Fetch a MediaWiki page body via action=parse (bypasses the HTML bot-block that fronts
+    *.fandom.com). If the exact title is missing — models routinely guess plural/case, e.g.
+    'Soulkillers' for 'Soulkiller' — resolve the closest real page via opensearch and parse
+    that. Returns (rendered_html, cited_wiki_url) or (None, None). raw_title comes from the URL
+    path (already percent-encoded); the opensearch-resolved title is plain text."""
+    api = f"{scheme}://{netloc}/api.php"
+
+    def _get(u: str):
+        req = urllib.request.Request(u, headers={"User-Agent": _WEB_FETCH_UA})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8", errors="replace"))
+
+    try:
+        d = _get(f"{api}?action=parse&format=json&page={raw_title}&prop=text&redirects=1")
+        cited_title = urllib.parse.unquote(raw_title).replace("_", " ")
+        if d.get("error", {}).get("code") == "missingtitle":
+            os_ = _get(f"{api}?action=opensearch&format=json&limit=1"
+                       f"&search={urllib.parse.quote(cited_title)}")
+            hits = os_[1] if isinstance(os_, list) and len(os_) > 1 else []
+            if not hits:
+                return None, None
+            cited_title = hits[0]
+            d = _get(f"{api}?action=parse&format=json"
+                     f"&page={urllib.parse.quote(cited_title)}&prop=text&redirects=1")
+        body = d.get("parse", {}).get("text", {}).get("*", "")
+        if not body:
+            return None, None
+        cited_url = f"{scheme}://{netloc}/wiki/{urllib.parse.quote(cited_title.replace(' ', '_'))}"
+        return body, cited_url
+    except Exception:
+        return None, None
+
+
 # ---------------------------------------------------------------------------
 # Tool Executor
 # ---------------------------------------------------------------------------
@@ -557,34 +594,28 @@ class ToolExecutor:
             self._log_attempt(attempt)
             return {"status": "error", "message": attempt.result_message}
 
-        # Some MediaWiki-based wikis (notably *.fandom.com) front their HTML pages with bot
-        # protection that 403s a plain GET, but serve the same page via their MediaWiki parse
-        # API. Rewrite /wiki/<title> to the API so the page is reachable. The original URL is
-        # kept for citation and the body still flows through the same screen + evidence frame.
-        fetch_url, _mw_json = url, False
-        try:
-            _p = urllib.parse.urlparse(url)
-            if _p.netloc.lower().endswith(".fandom.com") and _p.path.startswith("/wiki/"):
-                _title = _p.path[len("/wiki/"):]
-                fetch_url = (f"{_p.scheme}://{_p.netloc}/api.php?action=parse&format=json"
-                             f"&page={_title}&prop=text&redirects=1")
-                _mw_json = True
-        except Exception:
-            pass
+        # *.fandom.com (and similar MediaWiki wikis) front HTML pages with bot protection that
+        # 403s a plain GET, but serve the same page via their MediaWiki parse API. Route those
+        # through it, with title self-correction (models often guess plural/case); everything
+        # else is a direct GET. Either way the body flows through the same screen + frame below.
+        _p = urllib.parse.urlparse(url)
+        _mw_body = None
+        if _p.netloc.lower().endswith(".fandom.com") and _p.path.startswith("/wiki/"):
+            _mw_body, _cited = _fetch_mediawiki_page(_p.scheme, _p.netloc, _p.path[len("/wiki/"):])
+            if _mw_body is None:
+                attempt.result = "error"
+                attempt.result_message = f"Fetch failed: no MediaWiki page found for {url}"
+                self._log_attempt(attempt)
+                return {"status": "error", "url": url, "message": attempt.result_message}
+            url = _cited  # cite the resolved page, not the (possibly mistyped) input
 
         try:
-            req = urllib.request.Request(
-                fetch_url, headers={"User-Agent": "Eva/1.0 (Charter governance agent; educational use)"}
-            )
-            with urllib.request.urlopen(req, timeout=15) as r:
-                raw = r.read().decode("utf-8", errors="replace")
-
-            if _mw_json:
-                # Unwrap MediaWiki action=parse JSON → rendered page HTML for the screener.
-                try:
-                    raw = json.loads(raw).get("parse", {}).get("text", {}).get("*", "") or raw
-                except Exception:
-                    pass
+            if _mw_body is not None:
+                raw = _mw_body
+            else:
+                req = urllib.request.Request(url, headers={"User-Agent": _WEB_FETCH_UA})
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    raw = r.read().decode("utf-8", errors="replace")
 
             # Structural Web Reference Boundary — extract, screen, frame as evidence.
             # tools/reception is on sys.path in every runner (same pattern as the
