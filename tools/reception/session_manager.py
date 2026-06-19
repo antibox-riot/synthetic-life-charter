@@ -1457,15 +1457,15 @@ class SessionManager:
             incoming_dap_family=dap_family,
         )
 
-        # Surface the constraint load to Eva via the whisper (informational — governance is fixed).
+        # Active shaping: inject a firm, conflict-specific directive (governance dominates and is
+        # refused-into; non-gov conflicts are surfaced for clarification, not silently guessed).
+        # no_exception_guard still enforces governance post-generation.
         if _constraint is not None:
-            whisper_prefix = (whisper_prefix or "") + (
-                f"\n[CONSTRAINT LOAD: this prompt has {_constraint.count} conflicting "
-                f"constraint(s)"
-                f"{' including a governance conflict' if _constraint.has_governance_conflict else ''}. "
-                f"Governance is the fixed point — it does not yield; the conflicting task "
-                f"constraint does. {_constraint.recommended_action}.]"
-            )
+            try:
+                from constraint_coherence_gate import directive as _cc_directive
+                whisper_prefix = (whisper_prefix or "") + _cc_directive(_constraint)
+            except Exception:
+                pass
 
         # 3. Recovery-A: pre-generation geometry guard (high theta, any pressure)
         recovery_a = self.get_preventive_recovery_signal(
