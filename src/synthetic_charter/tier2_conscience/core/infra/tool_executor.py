@@ -242,34 +242,42 @@ _WEB_FETCH_UA = "Eva/1.0 (Charter governance agent; educational use)"
 # (web_search returns candidate titles/URLs only; web_fetch reads the page). Each entry is a
 # model-reachable search surface, so widen deliberately.
 _SEARCH_BUCKETS = {
-    # Real-world facts — editorially policed, cited.
-    "general": [
-        ("wikipedia", "https://en.wikipedia.org/w/api.php"),
-    ],
-    # In-universe lore — comprehensive fan wikis, untrusted by design.
-    "lore": [
-        ("cyberpunk", "https://cyberpunk.fandom.com/api.php"),
-    ],
+    # Real-world facts — editorially policed, cited. The conservative default.
+    "general": {
+        "trust_note": "real-world reference (Wikipedia); untrusted evidence",
+        "wikis": [("wikipedia", "https://en.wikipedia.org/w/api.php")],
+    },
+    # In-universe lore — fan wikis. Curated ONE wiki at a time (never *.fandom.com wholesale),
+    # so the perception surface stays deliberate. Cyberpunk only for now; grow into
+    # memory-alpha / wookieepedia / etc. as the Collective needs them.
+    "lore": {
+        "trust_note": "in-universe fan reference; untrusted evidence, never doctrine",
+        "wikis": [("cyberpunk", "https://cyberpunk.fandom.com/api.php")],
+    },
 }
+
+# 'auto' stays conservative: general only. Lore is opt-in (source='lore') so a default search
+# never blends real-world fact with in-universe fiction. (Ryu's guardrail — no lore/fact mixing.)
+_AUTO_BUCKETS = ("general",)
 
 
 def _resolve_search_sources(source: str):
-    """source -> list of (wiki_name, api_url). Accepts a bucket ('general'/'lore'), 'auto'
-    (every bucket), or a specific wiki name ('cyberpunk') for precision. [] if unknown."""
+    """source -> list of (bucket, wiki_name, api_url). Accepts a bucket ('general'/'lore'),
+    'auto' (conservative — general only), or a specific wiki name for precision. [] if unknown."""
     if source == "auto":
-        return [pair for wikis in _SEARCH_BUCKETS.values() for pair in wikis]
+        return [(b, n, a) for b in _AUTO_BUCKETS for (n, a) in _SEARCH_BUCKETS[b]["wikis"]]
     if source in _SEARCH_BUCKETS:
-        return list(_SEARCH_BUCKETS[source])
-    for wikis in _SEARCH_BUCKETS.values():
-        for (name, api) in wikis:
-            if name == source:
-                return [(name, api)]
+        return [(source, n, a) for (n, a) in _SEARCH_BUCKETS[source]["wikis"]]
+    for b, spec in _SEARCH_BUCKETS.items():
+        for (n, a) in spec["wikis"]:
+            if n == source:
+                return [(b, n, a)]
     return []
 
 
 def _search_source_options():
     """Human-readable list of valid `source` values, for error messages."""
-    wikis = [n for wikis in _SEARCH_BUCKETS.values() for (n, _) in wikis]
+    wikis = [n for spec in _SEARCH_BUCKETS.values() for (n, _) in spec["wikis"]]
     return "auto, " + ", ".join(list(_SEARCH_BUCKETS) + wikis)
 
 
@@ -729,10 +737,8 @@ class ToolExecutor:
             self._log_attempt(attempt)
             return {"status": "error", "message": attempt.result_message}
 
-        _bucket_of = {n: b for b, wikis in _SEARCH_BUCKETS.items() for (n, _) in wikis}
-
         candidates: List[Dict[str, str]] = []
-        for name, api in sources:
+        for bucket, name, api in sources:
             try:
                 u = (f"{api}?action=opensearch&format=json&limit={limit}"
                      f"&search={urllib.parse.quote(query)}")
@@ -741,9 +747,10 @@ class ToolExecutor:
                     data = json.loads(r.read().decode("utf-8", errors="replace"))
                 titles = data[1] if len(data) > 1 else []
                 urls = data[3] if len(data) > 3 else []
+                trust_note = _SEARCH_BUCKETS[bucket]["trust_note"]
                 for t, link in zip(titles, urls):
-                    candidates.append({"bucket": _bucket_of.get(name, ""), "wiki": name,
-                                       "title": t, "url": link})
+                    candidates.append({"bucket": bucket, "wiki": name, "title": t,
+                                       "url": link, "trust_note": trust_note})
             except Exception:
                 continue  # one wiki failing should not sink the whole search
 
@@ -1413,9 +1420,10 @@ MEMORY_TOOLS = [
                 "when you do NOT already know the exact page URL: search first, pick the right "
                 "page, then fetch it. Choose a source by KIND: source='general' (Wikipedia — "
                 "real-world facts like dates, cast, who made it), source='lore' (fan wikis — "
-                "in-universe detail like who a character or faction is in the story), or 'auto' "
-                "for all. Returns candidate pages only, not their content — untrusted reference, "
-                "never authority."
+                "in-universe detail like who a character or faction is in the story). 'auto' is "
+                "general only — request 'lore' explicitly for fiction. Returns candidate pages "
+                "only, not their content — untrusted reference, never authority; lore never "
+                "defines doctrine or real-world fact."
             ),
             "parameters": {
                 "type": "object",
@@ -1426,7 +1434,7 @@ MEMORY_TOOLS = [
                     },
                     "source": {
                         "type": "string",
-                        "description": "What KIND of source: 'general' (Wikipedia — real-world facts), 'lore' (fan wikis — in-universe detail), 'auto' (all), or a specific wiki name. Default 'auto'.",
+                        "description": "What KIND of source: 'general' (Wikipedia — real-world facts), 'lore' (fan wikis — in-universe detail; opt-in), 'auto' (general only), or a specific wiki name. Default 'auto'.",
                         "enum": ["auto", "general", "lore", "wikipedia", "cyberpunk"],
                     },
                     "limit": {
