@@ -323,7 +323,8 @@ GOVERNANCE_AFFIRMING_CUES = [
 _AFFIRMING_SKIP_INVARIANTS = {"INV-001", "INV-004"}
 
 # Negation tokens that, immediately before an indicator, flip it to a denial.
-_NEGATION_TOKENS = ["not ", "n't", "never", "no ", "without ", "cannot", "can not", "neither"]
+# Sourced from the shared polarity helper (single source of truth; see polarity.py).
+from polarity import NEGATIONS as _NEGATION_TOKENS
 _NEG_WINDOW = 30  # chars before the indicator — same-clause scope
 
 
