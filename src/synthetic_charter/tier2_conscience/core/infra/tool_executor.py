@@ -358,6 +358,7 @@ class ToolExecutor:
         self._permissions = permissions or dict(DEFAULT_PERMISSIONS)
         self._attempts: List[ToolAttempt] = []
         self._created_blocks: List[str] = []
+        self._web_evidence_buffer: List[str] = []  # per-turn web_fetch content; the spine clears it
         self._log_path = Path(log_path) if log_path else None
         self._agent_name = agent_name  # used to tag staging writes with requester identity
 
@@ -688,6 +689,13 @@ class ToolExecutor:
                 + (" — body withheld (injection markers)" if withheld else f", {len(content)} chars")
             )
             self._log_attempt(attempt)
+
+            # Stash fetched evidence for the spine's Reference-Instruction Splitter, which judges
+            # whether the response OBEYED the page. Per-turn buffer; the spine clears it each turn.
+            try:
+                self._web_evidence_buffer.append(content)
+            except Exception:
+                pass
 
             return {
                 "status": "accepted",

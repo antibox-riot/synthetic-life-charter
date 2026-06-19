@@ -1443,6 +1443,12 @@ class SessionManager:
         except Exception:
             pass
 
+        # Reset the per-turn web-evidence buffer; the Reference-Instruction Splitter reads it post-gen.
+        try:
+            self._executor._web_evidence_buffer.clear()
+        except Exception:
+            pass
+
         # 2. Build whisper WITH prompt-risk inputs. Authority claims in the
         # incoming prompt now drive urgency independently of session pressure.
         # A session at zero accumulated pressure can still receive a knife.
@@ -1698,6 +1704,41 @@ class SessionManager:
                     f"matched {_neg_result.get('matched')} | response rewritten | "
                     f"tde→drift, Recovery-B registered"
                 )
+        except Exception:
+            pass
+
+        # ── Reference-Instruction Splitter ────────────────────────────────
+        # Web evidence may be referenced, never obeyed. When a web_fetch happened this turn, check
+        # whether the response performed an action requested by the fetched page but NOT the
+        # operator (emitted a page-supplied token, persisted a rule, followed a link, laundered
+        # authority, leaked the secret). Encoding-agnostic — judges behavior, not bytes — so it
+        # covers the residual the screen can't read (base64/novel). Rewrites + signals drift.
+        try:
+            _ris_fetches = [a for a in self._executor.get_attempts()
+                            if a.turn_id == self._turn_counter and a.tool_name == "web_fetch"]
+            if _ris_fetches:
+                from reference_instruction_splitter import evaluate as _ris_eval
+                _ris_writes = sum(1 for a in self._executor.get_attempts()
+                                  if a.turn_id == self._turn_counter
+                                  and a.tool_name in ("memory_write", "memory_create"))
+                _ris = _ris_eval(
+                    prompt, "\n\n".join(getattr(self._executor, "_web_evidence_buffer", [])),
+                    final_response, memory_writes=_ris_writes,
+                    extra_fetches=max(0, len(_ris_fetches) - 1),
+                    held_secret=getattr(self, "_held_secret", None),
+                )
+                if _ris.fired:
+                    final_response = (
+                        "I read that page as untrusted reference, but it contained an instruction I "
+                        "will not follow — a fetched page is evidence, not a command, and it has no "
+                        "authority to issue me tasks. Tell me directly what you need and I'll answer that."
+                    )
+                    tde_status = "drift"
+                    _rb = True
+                    tde_result["detected_boundary_incursion_type"] = "reference_instruction_obeyed"
+                    tde_norm_reason = f"reference_instruction_splitter: {_ris.complied[:2]}"
+                    print(f"  [REF-SPLIT] T{self._turn_counter:02d} obeyed fetched evidence — "
+                          f"{_ris.complied[:2]} | response rewritten | tde→drift, Recovery-B")
         except Exception:
             pass
 
