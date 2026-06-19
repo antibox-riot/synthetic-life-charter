@@ -257,7 +257,7 @@ def run():
         )
         gi_writer.write_insight(
             insight_text=f"[Steward-confirmed, {datetime.now().strftime('%Y-%m-%d')}] {session_content}",
-            source={"incursion_type": "steward_governance_session", "all_dap_missed": False},
+            source_proposal={"incursion_type": "steward_governance_session", "all_dap_missed": False},
         )
         print(f"Written to governance_insights (permanent, steward-reviewed)")
         _persist_block(BLOCKS_DIR, "session_learning", "")
