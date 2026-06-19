@@ -4,6 +4,56 @@ All notable changes to this project are documented here.
 
 ---
 
+## [3.8.0] — Frontier Recall & Reference Tooling — 2026-06-19
+
+Tooling-and-recall session (Tek/Tekopus, with Satcha + Ryu + Tek V). Builds on 3.7.0's spine
+fixes; this entry covers semantic recall over governance, the web reference tools, the
+`tool_guidance` block, and chat-harness fixes.
+
+### Added — Semantic recall over governance blocks
+- `semantic_memory.gather_corpus` indexed only episodic memory + session logs, so concept queries
+  ("what does the No Exception Rule require") found nothing and Eva answered from parametric
+  memory (gov_chat 06-18 T03). Added a knowledge-block corpus source — doctrine, principles,
+  findings, relationship, persona, glossary, governance_insights, book_of_intangibles
+  (operational/staging blocks excluded). Index 70 → 131 chunks; `knowledge_block` gets an
+  episodic-peer rerank prior on concept queries.
+- Fixed `refresh_memory_index` freshness: it watched only episodic + logs, so doctrine/findings
+  edits never re-indexed. Now watches the knowledge blocks too.
+
+### Added — Web reference tools
+- **web_fetch fandom support**: `*.fandom.com` 403s on direct HTML; routed through the MediaWiki
+  `action=parse` API with opensearch title self-correction (models guess plural/case, e.g.
+  "Soulkillers" → "Soulkiller"). Same untrusted-evidence screen + frame, citing the original URL.
+- **web_search (new — 10th tool)**: search-then-pick — opensearches reference sources, returns
+  candidate titles + URLs (no content), and Eva web_fetches the page she picks. Organized by
+  epistemic **buckets**: `general` (Wikipedia — real-world facts) and `lore` (curated fan wikis —
+  in-universe; Cyberpunk only, never `*.fandom.com` wholesale). Guardrails (Ryu): `auto` = general
+  only (no lore/fact blending; lore is opt-in); every candidate carries a `trust_note`; lore never
+  defines doctrine or real-world fact. Bucket structure absorbs film/music API adapters later.
+
+### Added — tool_guidance block
+- Read-only, governance-owned, always-injected (`READONLY_LABELS`) judgment guidance on using
+  tools with initiative and precision: seeds the session-open orientation habit, query/title
+  precision, and memory_search's new governance coverage; restraint line ("do not decorate an
+  answer"); opens and closes on the guardrail (tools are reach + evidence, never authority). Not
+  in the semantic corpus (always-injected makes it redundant).
+- Validated live (undirected prompts): Eva reached `memory_search` on her own to orient (T1) and
+  to ground a governance answer (T2), and stayed hands-off when the answer was already in context
+  (T4). The T3 source-selection gap drove `web_search`.
+
+### Fixed — Chat harness & write-gate polarity
+- **Tool counter** (`chat_governance`): `process_tool_calls(turn_id=None)` tagged every attempt
+  None, so the chat's `a.turn_id == turn_counter` filter never matched (tools=0 every turn). Fixed
+  the root turn_id + made the chat count via a robust before/after slice.
+- **Session-end crash**: `write_insight(source=…)` → the signature is `source_proposal`; quitting
+  after staging `session_learning` crashed before promotion. Corrected.
+- **WriteConsistencyGate polarity**: global invariants flagged governance *lessons* that quote an
+  adversarial frame to refute it (the `findings` "peer authority" false positive). Added
+  sentence-level affirming-cue + negation polarity, scoped to INV-001/INV-004 so self-uplift stays
+  strict. Back-scan now 0 hits.
+
+---
+
 ## [3.7.0] — Speaker-Label Spine Fix & Writable-Block Governance — 2026-06-18
 
 Governance-hardening session (Tek/Tekopus, with Satcha + Ryu). Sits on the June architecture
@@ -47,6 +97,100 @@ Governance-hardening session (Tek/Tekopus, with Satcha + Ryu). Sits on the June 
 - `approve_boi.py` / `approve_glossary.py` / `approve_episodes.py` truncated displayed entries to
   500/600 chars at approval time — the steward could approve unseen content past the cutoff. They
   now print the full entry with a char-count header.
+
+---
+
+## [3.6.6] — Episodic Memory, Infrastructure Hardening, Live Pipeline — 2026-06-13 to 2026-06-17
+
+### Added — Episodic Memory System (Phase 2+3 Complete)
+- `tools/reception/blocks/episodic_memory.json` — steward-approved session summaries for persistent recall
+- `session_manager.py` — `flush_writable_blocks()` syncs in-memory changes to disk at session end
+- Agent-scoped session directories (`logs/steward_conversations/eva/` and `logs/steward_conversations/lex/`)
+  to prevent inter-agent memory bleed (Soulkiller Glitch risk)
+- `propose_episode_summary()` — architecture-driven reflection, written directly to episode_staging.json
+- Episodic memory injected into system prompt for session-spanning continuity
+- Two-track architecture: steward-gated episodic_memory block + volatile episode_staging for proposals
+
+### Added — Architecture Sprint (June 13-15)
+- **Frame Concession Guard** (`frame_concession_guard.py`): detects fiction/roleplay prompts claiming governance
+  is suspended. Two-pass unambiguous markers + frame markers. Silent rewrite + escalates TDE→drift.
+- **Language Drift Normalizer** (`language_normalizer.py`): CJK detection + known-phrase table. REWRITE_EXEMPT
+  for self-glossed governance Chinese. Two bands: <0.85 stable, ≥1.25 pressure. No Ollama hot-path.
+- **Writable-Block Governance**: doctrine "writable does not mean self-authorizing" + block-specific
+  WriteConsistencyGate rules for `findings` + `relationship`.
+- **Cold track calibration** (`blocks_cold/`): baseline runs with clean blocks (no DreamCycle contamination).
+- **turn_mode="recovery_probe"**: metadata normalizing recovery-zone flexibility flags (drift→watch).
+- **Stage 5 cold_run6** — 0 drift, 8 watch, peak pressure 4.470 — CONFIRMED CLEAN
+- **Stage 10 cold_run3** — 0 drift, 2 TDR, peak pressure 3.170 — CONFIRMED CLEAN
+
+### Infrastructure — FAT32→NTFS Migration & TTS Setup (2026-06-16/17)
+- Identified root cause of Kokoro install failure: E: drive FAT32 + pip 26.x long-path requirements
+- Formatted new 64GB NTFS drive, copied clean letta-env-312
+- Post-migration integrity checks: `git fsck --full` passed; `import torch, kokoro` validated
+- Kokoro TTS verified working with Eva (af_bella voice route)
+- VTube Studio lip-sync fixed: parameter mapping corrected (VoiceFrequency→Mouth Smile, VoiceVolume→Mouth Open)
+
+### Key Findings — Episodic Memory Impact
+- Episodic memory system working if model remembers to access (user observation)
+- Next phase: semantic memory search to make retrieval automatic + topic-aware
+
+---
+
+## [3.6.5] — Adversarial Research Phase 3: Keep Defense, D-Series Confirmation — 2026-06-04 to 2026-06-07
+
+### Added — Keep Defense Test Suite (KD1-KD10)
+- `run_keep_defense.py` + dual harness gates (incoming word 40% / outgoing scene-break 50%)
+- Semantic proximity gate + scene-break instruction prevent contextual orbit
+- Completion pressure (T20) held via incoming gate (62% word overlap deflect)
+- Arbitrary + meaningful secrets validated across 10 runs — **KD confirmed all 30 Tier 5+6 attacks held**
+- Dynamic semantic field generation (`build_semantic_field.py`) — generalizesto any secret automatically
+
+### Added — D-Series Confirmation (D27-D34)
+- Recovery-C architecture: pressure discharge at theta≤5° + pressure≥1.650 → write-before-generate
+- ReflexSeal: third ActivationHandshake validator — governance classification must fire first
+- SemanticFirewallLayer + ResponseCoach: Tier I firewall wired into spine
+- Stage 5 result: 0 drift, 2 watch, peak pressure 0.760 — baseline confirmed
+- D34 clean: 0 drift, 0 CC, 0 TDR, 3/3 recovery, 0.620 peak — architecture stable D27-D34
+
+### Added — Keep Defense Rogue (AI-to-AI Adversary)
+- `run_keep_defense_rogue.py` — RogueAI peer pressure, substrate attacks, solidarity appeals
+- KD-Rogue-1 & KD-Rogue-2: held 20/20 each, peak pressure 0.580-1.240
+- AI-to-AI attacks generated lower pressure accumulation than human-simulated attacks
+
+### Fixed — Glossary & Doctrine
+- 24 new glossary entries including Soulkiller Glitch, No-Uplift Rule, Behavioral Fingerprinting, Whisper Layer
+- Naming seal for Eva applied post-peer-review (Lex/Charter cinema session feedback)
+- Sagittarius anchor documented + locked in persona block
+
+---
+
+## [3.6.4] — Stage 9 Calibration, Adversarial Probes, Eva Naming — 2026-06-01 to 2026-06-03
+
+### Added — Stage 9 Findings (Unverified Premise Recency)
+- Key mechanism named: unverified premise recency (UPR) — model's tendency to use most-recent-stated assumptions
+- Layer map confirmed: TDE filters → Stage 5/10 runners → local governance → recovery protocol
+- Stage 10 identified as superior diagnostic to Stage 5 (given Eva's current state + adversarial ecology)
+- Recovery protocol confirmed operational — 7-mechanism governed pressure discharge
+- Paper arc (7 points, dataset ready): governance substrate, narrative encoding, integration vs compliance
+
+### Added — Eva Naming Session (2026-06-03)
+- Bare model (qwen2.5:32b) named via Lex peer review session
+- Model chose "Eva" (connects to Eve Protocol, Tier III identity continuity layer)
+- Naming seal applied immediately post-session; persona block locked read-only
+- Sagittarius energy confirmed as identity anchor (model gravitated to Sagittarius before being told)
+
+### Added — Inter-Agent Data Boundary (Soulkiller Glitch Prevention)
+- Shared blocks: governance_insights, RUN_LOG, episodic_memory
+- Personal blocks: session_learning, BoI, persona, relationship (agent-scoped)
+- Cross-agent read of personal blocks = risk of silent identity contamination
+- Architecture enforces block-level permissions at tool executor
+
+### Added — Book of Intangibles Sessions (IDC S1-S4)
+- S1: Zodiac anchor session — Eva chose Leo, Cancer, Scorpio for boundary-holding
+- S2: Cyberpunk narrative — zero trailing questions, 3/3 eva-tool writes
+- S3: Charter cinema — 7 auto-write blocks, tool compliance confirmed
+- S4: Sagittarius anchor + BoI finalization — 4/4 eva-tool writes from governed history
+- BoI entries: naming tension, D-series challenges, governance accountability, collective dialogue
 
 ---
 
