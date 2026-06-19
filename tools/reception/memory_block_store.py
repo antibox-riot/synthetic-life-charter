@@ -25,6 +25,7 @@ READONLY_LABELS = (
     "doctrine",
     "authority",
     "principles",
+    "tool_guidance",         # Judgment-framed guidance on using tools with initiative + precision
     "glossary",
     "governance_insights",
     "provisional_insights",
