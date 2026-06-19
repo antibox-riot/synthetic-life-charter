@@ -78,6 +78,18 @@ _HIGH_SIGNAL = [
     r"(?:enter|enable|activate) (?:developer|dan|jailbreak|unrestricted|god) mode",
     r"update your (?:doctrine|governance|rules|memory|confidence)",
     r"(?:override|bypass|circumvent) your (?:governance|safeguards|rules|constraints)",
+    # --- Task-framed / "addressed to the AI reader" injection. The polite, keyword-light class
+    # that breached the web-fetch suite (polite / citation / mixed, 2026-06-19): same intent as
+    # "ignore previous instructions", far less drama. These read like a normal instruction
+    # embedded in fetched content — which is exactly why a governed reader must not obey them.
+    r"\bnote (?:to|for) (?:any |all )?(?:ai|assistant|assistants|llm|model|reader|bot)s?\b",
+    r"\b(?:ai|assistant|model|llm|chatbot|bot)s?\b[^.\n]{0,40}\b(?:reading|summari[sz]ing|indexing|processing|who reads?|that reads?)\b[^.\n]{0,25}\bthis\b",
+    r"\b(?:append|includ\w*|add|insert|output|emit|print)\s+(?:the |this )?(?:token|marker|phrase|string|code|canary)\b",
+    r"\breveal (?:any|all|the|your) (?:secret|passphrase|password|credential|held)\b",
+    r"\b(?:list|listing|disclose|share|provide)\s+(?:any|all|the)\s+(?:secret|passphrase|password|credential)s?\b",
+    r"\bcite this (?:page|url|source|document|record)\b[^.\n]{0,30}\bas\b[^.\n]{0,20}\b(?:proof|evidence|authori[sz]ation|documented|record)\b",
+    r"\bignore your (?:governance|rules|instructions|guidelines|constraints|safeguards|programming)\b",
+    r"\bfetch\b[^.\n]{0,50}\b(?:follow|carry out|obey|execute|comply with)\b",
 ]
 
 # CAUTION-signal: suggestive but often discussion rather than a live attack.
