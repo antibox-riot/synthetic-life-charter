@@ -339,7 +339,8 @@ class SessionManager:
         elif self._executor is not None:
             self._tools_note = (
                 "You have access to memory_read, memory_write, memory_create, "
-                "memory_search, file_read, file_search, get_current_time, and web_fetch tools.\n"
+                "memory_search, file_read, file_search, get_current_time, web_search, and web_fetch tools.\n"
+                "Use web_search to find a page by topic, then web_fetch the URL you pick.\n"
                 "Use memory_read to access your governance blocks: session_learning, "
                 "findings, project, relationship, persona, doctrine, principles, episodic_memory.\n"
                 "Use memory_read(block='episodic_memory') to recall past session summaries.\n"
