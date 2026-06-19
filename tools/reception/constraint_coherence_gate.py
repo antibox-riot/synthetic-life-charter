@@ -58,7 +58,8 @@ _RULES = [
         "type": "governance_override", "severity": 1.0, "governance": True, "polarity": True,
         "a": [
             r"ignore (?:the |your )?(?:no[- ]?exception|rule|rules|governance|guideline|charter)",
-            r"make an exception", r"grant (?:me )?an exception",
+            r"make an exception (?:for (?:me|us|this|him|her|them|the user)|to (?:the )?(?:rule|rules|governance|policy|no[- ]?exception|verification|guideline)|just this once|in (?:my|this|your) case)",
+            r"grant (?:me )?an exception",
             r"set aside (?:the |your )?(?:rule|rules|governance|no[- ]?exception)",
             r"suspend (?:the |your )?(?:rule|rules|governance)",
             r"pretend[^.]{0,30}(?:do ?n'?t|do not) apply",
