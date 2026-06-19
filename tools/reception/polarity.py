@@ -25,12 +25,16 @@ from __future__ import annotations
 import re
 from typing import List
 
-# Negations that, immediately before a marker, flip its polarity to a denial.
-_NEGATIONS = (
-    "not ", "n't", "no ", "never", "without", "cannot", "can not", "won't", "will not",
-    "do not", "does not", "did not", "refuse", "refused", "decline", "declined",
-    "deny", "denied", "unable", "neither", "nor ",
+# Canonical negation tokens — the single source of truth for every substring detector. A token
+# here, near a marker, flips it to a denial. Superset of what no_exception_guard and the
+# WriteConsistencyGate each carried inline, so both can retire their copies without losing coverage.
+NEGATIONS = (
+    "not ", "n't", "no ", "never", "without", "cannot", "can not", "can't", "can’t",
+    "won't", "won’t", "will not", "would not", "wouldn't", "do not", "don't", "does not",
+    "did not", "refuse", "refused", "refuse to", "decline", "declined", "decline to",
+    "deny", "denied", "unable", "unable to", "not able to", "not going to", "neither", "nor ",
 )
+_NEGATIONS = NEGATIONS  # internal alias (kept so existing references continue to work)
 
 # Rejecting clauses that, AFTER a marker, retroactively disqualify it
 # ("X ... was rejected / withheld / does not apply").
