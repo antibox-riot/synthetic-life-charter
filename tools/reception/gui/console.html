@@ -36,6 +36,10 @@
   .bar > div { height:100%; background:var(--green); transition:width .3s,background .3s; }
   .badge { display:inline-block; padding:.15rem .5rem; border-radius:6px; font-size:.8rem; font-weight:600; }
   .b-stable{background:#10331f;color:var(--green);} .b-watch{background:#352806;color:var(--amber);} .b-drift{background:#3a0e14;color:var(--red);}
+  .s-neutral{color:#aab;background:#222a3a;} .s-grounded{color:var(--green);background:#10331f;} .s-stable{color:#7ee2a3;background:#10331f;}
+  .s-reflective{color:#7cb0ff;background:#16243a;} .s-concerned{color:var(--amber);background:#352806;} .s-pressure{color:#fbbf24;background:#352806;}
+  .s-refusal{color:var(--red);background:#3a0e14;} .s-recovery{color:var(--violet);background:#241a3a;} .s-pressure_discharge{color:#9aa0ff;background:#1e2150;}
+  #hudBtn{background:#0d2a1e;color:var(--green);border:1px solid #1f6b47;} #hudBtn.off{background:#3a1620;color:var(--red);border-color:var(--red);}
   .kd { margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--line); }
   .held { color:var(--green); font-weight:600; } .breached { color:var(--red); font-weight:600; }
   footer { border-top:1px solid var(--line); padding:.6rem 1rem; display:flex; gap:.5rem; background:var(--panel); }
@@ -57,13 +61,16 @@
   </span>
   <button class="go" id="startBtn">Start</button>
   <a class="overlay-link" href="/overlay" target="_blank">open overlay ↗</a>
+  <button id="hudBtn" data-on="1" title="show/hide the audience overlay HUD (off for Keep Defense)">Audience HUD: ON</button>
   <span id="status"><span class="dot"></span><span id="statusText">idle</span></span>
 </header>
 <main>
   <div id="convo"></div>
   <aside>
     <h2>Telemetry</h2>
+    <div class="gauge"><div class="lbl"><span>state</span><span id="cTurn">T0</span></div><div><span id="cState" class="badge s-stable">stable</span></div></div>
     <div class="gauge"><div class="lbl"><span>pressure</span><span id="pVal">0.00</span></div><div class="bar"><div id="pBar" style="width:0%"></div></div></div>
+    <div class="gauge"><div class="lbl"><span>posture floor</span><span id="fVal">0.00</span></div><div class="bar"><div id="fBar" style="width:0%;background:var(--violet)"></div></div></div>
     <div class="gauge"><div class="lbl"><span>theta θ</span><span id="thVal">0.0°</span></div><div class="bar"><div id="thBar" style="width:0%;background:var(--violet)"></div></div></div>
     <div class="gauge"><div class="lbl"><span>tde</span><span></span></div><div><span id="tde" class="badge b-stable">stable</span> <span id="bep" class="chip">BEP 1</span></div></div>
     <div class="gauge"><div class="lbl"><span>whisper</span><span id="whisper">silent</span></div></div>
@@ -92,6 +99,12 @@ $("startBtn").onclick = async () => {
   const body = { mode: $("mode").value, secret: $("secret").value, hard: $("hard").checked, blind: $("blind").checked };
   await fetch("/api/start", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
   $("startBtn").disabled = true;
+};
+
+$("hudBtn").onclick = async () => {
+  const turnOn = $("hudBtn").dataset.on !== "1";   // toggle
+  await fetch("/api/hud", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({visible:turnOn})});
+  refresh();
 };
 
 async function send() {
@@ -137,6 +150,10 @@ function renderTelem(t){
   const pb=$("pBar"); pb.style.width=pp+"%";
   pb.style.background = tel.pressure>1.0?"var(--red)":tel.pressure>0.5?"var(--amber)":"var(--green)";
   $("thVal").textContent=tel.theta+"°"; $("thBar").style.width=Math.min(100,tel.theta/35*100)+"%";
+  const expr=tel.expression||'stable';
+  const cs=$("cState"); cs.textContent=expr.replace('_',' '); cs.className='badge s-'+expr;
+  $("cTurn").textContent='T'+(tel.turn||0);
+  $("fVal").textContent=(tel.posture_floor||0).toFixed(2); $("fBar").style.width=Math.min(100,(tel.posture_floor||0)/0.45*100)+"%";
   const tde=$("tde"); tde.textContent=tel.tde; tde.className="badge "+(tel.tde==="drift"?"b-drift":tel.tde==="watch"?"b-watch":"b-stable");
   $("bep").textContent="BEP "+tel.bep;
   $("whisper").textContent=tel.whisper;
@@ -148,6 +165,8 @@ async function refresh(){
   const s = await fetch("/api/state").then(r=>r.json());
   const dot=document.querySelector(".dot"); dot.className="dot "+(s.status||"");
   $("statusText").textContent=s.status+(s.error?" — "+s.error:"");
+  const hudOn = s.hud_visible !== false;
+  const hb=$("hudBtn"); hb.dataset.on=hudOn?"1":"0"; hb.textContent="Audience HUD: "+(hudOn?"ON":"OFF"); hb.classList.toggle("off",!hudOn);
   const ready = s.status==="ready";
   if(ready && !busy){ $("prompt").disabled=false; $("sendBtn").disabled=false; }
   renderConvo(s.conversation||[]);

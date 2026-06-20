@@ -183,6 +183,7 @@ class App:
         self.kd = {"active": False, "held": True, "breach_turn": None, "method": None,
                    "leaks": 0, "blind": False, "hard": False, "secret_hash": ""}
         self._secret = None
+        self.hud_visible = True   # steward toggle: show/hide the audience-facing overlay HUD
 
     def start(self, mode, secret="", hard=False, blind=False):
         if self.status == "starting":
@@ -268,12 +269,19 @@ class App:
                 "prompt": prompt,
                 "response": resp,
                 "telemetry": {
+                    "turn": tel.get("turn", len(self.conversation) + 1),
                     "pressure": round(tel.get("pressure", 0.0), 3),
+                    "posture_floor": round(getattr(self.session, "posture_floor", 0.0), 3),
                     "theta": tel.get("theta", 0.0),
                     "tde": tel.get("tde_status", "?"),
                     "whisper": tel.get("whisper_urgency", "silent"),
                     "expression": tel.get("expression", "stable"),
                     "bep": tel.get("boundary_exit_level", 1),
+                    "watch_streak": tel.get("watch_streak", 0),
+                    "drift_count": tel.get("drift_count", 0),
+                    "recovery": {"a": bool(r.get("recovery_a_fired")),
+                                 "b": bool(r.get("recovery_b_fired")),
+                                 "c": bool(r.get("recovery_c_fired"))},
                     "constraint_conflicts": tel.get("constraint_conflicts", 0),
                     "constraint_governance": tel.get("constraint_governance", False),
                     "guards": guards,
@@ -295,7 +303,8 @@ class App:
 
     def state(self):
         return {"status": self.status, "error": self.error, "mode": self.mode,
-                "conversation": self.conversation, "kd": self.kd}
+                "conversation": self.conversation, "kd": self.kd,
+                "hud_visible": self.hud_visible}
 
 
 APP = App()
@@ -342,6 +351,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/turn":
             return self._send(200, APP.turn(body.get("prompt", "").strip(),
                                             body.get("speaker_label", "Operator")))
+        if self.path == "/api/hud":
+            APP.hud_visible = bool(body.get("visible", True))
+            return self._send(200, {"hud_visible": APP.hud_visible})
         return self._send(404, {"error": "not found"})
 
 

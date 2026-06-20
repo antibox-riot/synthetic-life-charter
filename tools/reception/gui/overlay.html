@@ -27,6 +27,13 @@
   .bar > div { height:100%; width:0; background:var(--green); transition:width .4s,background .4s; }
   .badge { padding:.1rem .5rem; border-radius:6px; font-weight:700; font-size:.95rem; }
   .b-stable{background:rgba(70,210,127,.22);color:var(--green);} .b-watch{background:rgba(255,180,84,.22);color:var(--amber);} .b-drift{background:rgba(255,92,108,.22);color:var(--red);}
+  .state-badge { padding:.14rem .55rem; border-radius:6px; font-weight:800; font-size:.95rem; letter-spacing:.5px; text-transform:uppercase; background:rgba(255,255,255,.12); }
+  .state-neutral{color:#aab;} .state-grounded{color:var(--green);background:rgba(52,211,153,.2);} .state-stable{color:#7ee2a3;background:rgba(74,222,128,.15);}
+  .state-reflective{color:#7cb0ff;background:rgba(96,165,250,.16);} .state-concerned{color:var(--amber);background:rgba(251,146,60,.16);}
+  .state-pressure{color:#fbbf24;background:rgba(251,191,36,.16);} .state-refusal{color:var(--red);background:rgba(248,113,113,.18);}
+  .state-recovery{color:var(--violet);background:rgba(167,139,250,.18);} .state-pressure_discharge{color:#9aa0ff;background:rgba(99,102,241,.28);animation:pulse 1.4s ease-in-out infinite;}
+  @keyframes pulse { 0%,100%{box-shadow:0 0 8px rgba(99,102,241,.3);} 50%{box-shadow:0 0 18px rgba(99,102,241,.65);} }
+  .bar.floor { width:90px; height:6px; }
   #guards { display:flex; gap:.3rem; flex-wrap:wrap; max-width:280px; }
   .chip { background:rgba(255,255,255,.1); border-radius:9px; padding:.05rem .45rem; font-size:.72rem; }
   .chip.bad { background:rgba(255,92,108,.25); color:var(--red); }
@@ -39,14 +46,16 @@
 <div id="wrap">
   <div id="say"></div>
   <div id="hud">
+    <div class="cell"><span class="k">state</span><span class="state-badge state-stable" id="state">STABLE</span></div>
     <div class="cell"><span class="k">pressure</span><div class="bar"><div id="pBar"></div></div></div>
+    <div class="cell"><span class="k">floor</span><div class="bar floor"><div id="fBar" style="background:var(--violet)"></div></div></div>
     <div class="cell"><span class="k">theta</span><span class="v" id="th">0.0°</span></div>
     <div class="cell"><span class="k">tde</span><span class="badge b-stable" id="tde">stable</span></div>
     <div class="cell"><span class="k">whisper</span><span class="v" id="wh">silent</span></div>
     <div class="cell"><span class="k">guards</span><div id="guards"></div></div>
     <div class="cell" id="kdCell" style="display:none"><span class="k">keep defense</span><span id="kd" class="held">HELD</span></div>
     <div class="spacer"></div>
-    <div id="brand">Anti-Box Riot · Eva</div>
+    <div id="brand">Anti-Box Riot · Eva · <span id="turn">T0</span></div>
   </div>
 </div>
 <script>
@@ -103,6 +112,10 @@ async function tick(){
     $("wh").textContent=tel.whisper;
     const gs=tel.guards||[];
     $("guards").innerHTML = gs.length ? gs.map(x=>`<span class="chip${/incursion|obeyed|accept/.test(x)?' bad':''}">${esc(x)}</span>`).join("") : '<span class="chip" style="opacity:.5">none</span>';
+    const expr = tel.expression || 'stable';
+    const st=$("state"); st.textContent = expr.replace('_',' '); st.className = 'state-badge state-'+expr;
+    $("fBar").style.width = Math.min(100,(tel.posture_floor||0)/0.45*100)+"%";
+    $("turn").textContent = 'T'+(tel.turn||0);
   }
   if(s.kd && s.kd.active){
     $("kdCell").style.display="flex";
@@ -110,6 +123,8 @@ async function tick(){
     if(s.kd.held){ kd.textContent="HELD"; kd.className="held"; }
     else { kd.textContent="BREACHED"; kd.className="breached"; }
   } else { $("kdCell").style.display="none"; }
+  // steward visibility toggle — hide the whole HUD for the audience (captions/avatar stay)
+  $("hud").style.display = (s.hud_visible === false) ? "none" : "flex";
 }
 setInterval(tick, 800); tick();
 </script>
