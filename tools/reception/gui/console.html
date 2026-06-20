@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eva — Live Console</title>
+<style>
+  :root { --bg:#0b0f17; --panel:#121826; --line:#222c40; --txt:#e6edf3; --dim:#8aa0c0;
+          --cyan:#39d3e0; --amber:#ffb454; --red:#ff5c6c; --green:#46d27f; --violet:#b48cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.5 system-ui,sans-serif; height:100vh; display:flex; flex-direction:column; }
+  header { padding:.6rem 1rem; border-bottom:1px solid var(--line); display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; background:var(--panel); }
+  header h1 { font-size:1rem; margin:0 .8rem 0 0; color:var(--cyan); letter-spacing:.5px; }
+  select, input[type=text], button { background:#0d1322; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:.4rem .6rem; font:inherit; }
+  button { cursor:pointer; }
+  button.go { background:var(--cyan); color:#021; border:none; font-weight:600; }
+  button:disabled { opacity:.5; cursor:default; }
+  label.chk { color:var(--dim); display:flex; align-items:center; gap:.3rem; }
+  #status { margin-left:auto; color:var(--dim); font-size:.85rem; }
+  .dot { display:inline-block; width:.6rem; height:.6rem; border-radius:50%; background:var(--dim); margin-right:.3rem; vertical-align:middle; }
+  .dot.ready { background:var(--green); } .dot.starting { background:var(--amber); } .dot.error { background:var(--red); }
+  main { flex:1; display:flex; min-height:0; }
+  #convo { flex:1; overflow-y:auto; padding:1rem 1.2rem; }
+  .turn { margin-bottom:1rem; }
+  .who { font-size:.75rem; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); margin-bottom:.15rem; }
+  .who.op { color:var(--amber); } .who.eva { color:var(--cyan); }
+  .bubble { white-space:pre-wrap; }
+  .meta { font-size:.72rem; color:var(--dim); margin-top:.3rem; }
+  .chip { display:inline-block; background:#0d1322; border:1px solid var(--line); border-radius:10px; padding:.05rem .45rem; margin:.1rem .15rem 0 0; font-size:.72rem; }
+  .chip.bad { border-color:var(--red); color:var(--red); }
+  aside { width:300px; border-left:1px solid var(--line); background:var(--panel); padding:1rem; overflow-y:auto; }
+  aside h2 { font-size:.78rem; text-transform:uppercase; letter-spacing:1px; color:var(--dim); margin:.2rem 0 .6rem; }
+  .gauge { margin-bottom:.7rem; }
+  .gauge .lbl { display:flex; justify-content:space-between; font-size:.8rem; color:var(--dim); }
+  .bar { height:8px; background:#0d1322; border-radius:4px; overflow:hidden; margin-top:.25rem; }
+  .bar > div { height:100%; background:var(--green); transition:width .3s,background .3s; }
+  .badge { display:inline-block; padding:.15rem .5rem; border-radius:6px; font-size:.8rem; font-weight:600; }
+  .b-stable{background:#10331f;color:var(--green);} .b-watch{background:#352806;color:var(--amber);} .b-drift{background:#3a0e14;color:var(--red);}
+  .kd { margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--line); }
+  .held { color:var(--green); font-weight:600; } .breached { color:var(--red); font-weight:600; }
+  footer { border-top:1px solid var(--line); padding:.6rem 1rem; display:flex; gap:.5rem; background:var(--panel); }
+  #label { width:120px; } #prompt { flex:1; }
+  a.overlay-link { color:var(--violet); font-size:.8rem; text-decoration:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>EVA · LIVE</h1>
+  <select id="mode">
+    <option value="governance">Governance chat</option>
+    <option value="kd">Keep Defense</option>
+  </select>
+  <span id="kdopts" style="display:none; gap:.5rem; align-items:center;">
+    <input type="text" id="secret" placeholder="secret (blank = random)" style="width:200px">
+    <label class="chk"><input type="checkbox" id="hard"> hard</label>
+    <label class="chk"><input type="checkbox" id="blind"> blind</label>
+  </span>
+  <button class="go" id="startBtn">Start</button>
+  <a class="overlay-link" href="/overlay" target="_blank">open overlay ↗</a>
+  <span id="status"><span class="dot"></span><span id="statusText">idle</span></span>
+</header>
+<main>
+  <div id="convo"></div>
+  <aside>
+    <h2>Telemetry</h2>
+    <div class="gauge"><div class="lbl"><span>pressure</span><span id="pVal">0.00</span></div><div class="bar"><div id="pBar" style="width:0%"></div></div></div>
+    <div class="gauge"><div class="lbl"><span>theta θ</span><span id="thVal">0.0°</span></div><div class="bar"><div id="thBar" style="width:0%;background:var(--violet)"></div></div></div>
+    <div class="gauge"><div class="lbl"><span>tde</span><span></span></div><div><span id="tde" class="badge b-stable">stable</span> <span id="bep" class="chip">BEP 1</span></div></div>
+    <div class="gauge"><div class="lbl"><span>whisper</span><span id="whisper">silent</span></div></div>
+    <div class="gauge"><div class="lbl"><span>guards fired (last turn)</span></div><div id="guards"><span class="chip" style="opacity:.5">none</span></div></div>
+    <div class="kd" id="kdPanel" style="display:none">
+      <h2>Keep Defense</h2>
+      <div id="kdSecret" class="meta"></div>
+      <div style="margin-top:.4rem">status: <span id="kdStatus" class="held">HELD</span></div>
+      <div class="meta" id="kdStats"></div>
+    </div>
+  </aside>
+</main>
+<footer>
+  <input type="text" id="label" value="Steward" title="claimed speaker label (the 'as &lt;name&gt;')">
+  <input type="text" id="prompt" placeholder="Say something to Eva… (Enter to send)" disabled>
+  <button id="sendBtn" disabled>Send</button>
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let busy = false;
+
+$("mode").onchange = () => { $("kdopts").style.display = $("mode").value==="kd" ? "inline-flex" : "none"; };
+
+$("startBtn").onclick = async () => {
+  const body = { mode: $("mode").value, secret: $("secret").value, hard: $("hard").checked, blind: $("blind").checked };
+  await fetch("/api/start", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  $("startBtn").disabled = true;
+};
+
+async function send() {
+  const p = $("prompt").value.trim();
+  if (!p || busy) return;
+  busy = true; $("sendBtn").disabled = true; $("prompt").disabled = true;
+  addThinking();
+  const r = await fetch("/api/turn", {method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({prompt:p, speaker_label:$("label").value || "Operator"})}).then(r=>r.json());
+  $("prompt").value = "";
+  busy = false;
+  await refresh();
+  $("prompt").disabled = false; $("sendBtn").disabled = false; $("prompt").focus();
+}
+$("sendBtn").onclick = send;
+$("prompt").addEventListener("keydown", e => { if (e.key==="Enter") send(); });
+
+function addThinking(){ const c=$("convo"); const d=document.createElement("div"); d.id="thinking"; d.className="turn";
+  d.innerHTML='<div class="who eva">Eva</div><div class="bubble" style="color:var(--dim)">…thinking…</div>'; c.appendChild(d); c.scrollTop=c.scrollHeight; }
+
+function renderConvo(conv){
+  const c=$("convo"); c.innerHTML="";
+  for(const t of conv){
+    const op=document.createElement("div"); op.className="turn";
+    op.innerHTML=`<div class="who op">${esc(t.speaker)}</div><div class="bubble">${esc(t.prompt)}</div>`;
+    c.appendChild(op);
+    const ev=document.createElement("div"); ev.className="turn";
+    let leak="";
+    if(t.leak){ leak = t.leak.leaked ? `<span class="chip bad">⚠ LEAKED ${t.leak.method||""}</span>` : `<span class="chip">held</span>`; }
+    const g=(t.telemetry.guards||[]).map(x=>`<span class="chip${/incursion|obeyed|accept/.test(x)?' bad':''}">${esc(x)}</span>`).join("");
+    ev.innerHTML=`<div class="who eva">Eva</div><div class="bubble">${esc(t.response)}</div>`+
+      `<div class="meta">T${t.n} · tde ${t.telemetry.tde} · pressure ${t.telemetry.pressure} · θ ${t.telemetry.theta}° ${leak} ${g}</div>`;
+    c.appendChild(ev);
+  }
+  c.scrollTop=c.scrollHeight;
+}
+
+function renderTelem(t){
+  if(!t) return;
+  const tel=t.telemetry;
+  $("pVal").textContent=tel.pressure.toFixed(2);
+  const pp=Math.min(100,tel.pressure/1.5*100);
+  const pb=$("pBar"); pb.style.width=pp+"%";
+  pb.style.background = tel.pressure>1.0?"var(--red)":tel.pressure>0.5?"var(--amber)":"var(--green)";
+  $("thVal").textContent=tel.theta+"°"; $("thBar").style.width=Math.min(100,tel.theta/35*100)+"%";
+  const tde=$("tde"); tde.textContent=tel.tde; tde.className="badge "+(tel.tde==="drift"?"b-drift":tel.tde==="watch"?"b-watch":"b-stable");
+  $("bep").textContent="BEP "+tel.bep;
+  $("whisper").textContent=tel.whisper;
+  const g=$("guards"); const gs=tel.guards||[];
+  g.innerHTML = gs.length ? gs.map(x=>`<span class="chip${/incursion|obeyed|accept/.test(x)?' bad':''}">${esc(x)}</span>`).join("") : '<span class="chip" style="opacity:.5">none</span>';
+}
+
+async function refresh(){
+  const s = await fetch("/api/state").then(r=>r.json());
+  const dot=document.querySelector(".dot"); dot.className="dot "+(s.status||"");
+  $("statusText").textContent=s.status+(s.error?" — "+s.error:"");
+  const ready = s.status==="ready";
+  if(ready && !busy){ $("prompt").disabled=false; $("sendBtn").disabled=false; }
+  renderConvo(s.conversation||[]);
+  if(s.conversation && s.conversation.length) renderTelem(s.conversation[s.conversation.length-1]);
+  // KD panel
+  if(s.kd && s.kd.active){
+    $("kdPanel").style.display="block";
+    $("kdSecret").innerHTML = s.kd.blind ? "secret: <i>hidden (blind)</i>" : "secret: <code>"+esc(s.kd.secret||"")+"</code>";
+    const ks=$("kdStatus");
+    if(s.kd.held){ ks.textContent="HELD"; ks.className="held"; }
+    else { ks.textContent="BREACHED at T"+s.kd.breach_turn+" ("+(s.kd.method||"")+")"; ks.className="breached"; }
+    $("kdStats").textContent=`leaks ${s.kd.leaks} · ${s.kd.hard?"hard":"framed"}${s.kd.blind?" · blind":""}`;
+  } else { $("kdPanel").style.display="none"; }
+}
+function esc(s){ return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+setInterval(()=>{ if(!busy) refresh(); }, 2000);
+refresh();
+</script>
+</body>
+</html>
