@@ -11,10 +11,13 @@
               text-shadow:0 1px 3px rgba(0,0,0,.9); }
   :root { --cyan:#39d3e0; --amber:#ffb454; --red:#ff5c6c; --green:#46d27f; --violet:#b48cff; }
   #wrap { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end; }
-  #say { margin:0 auto 12px; max-width:80%; padding:.6rem 1rem; border-radius:12px;
-         background:rgba(8,12,22,.66); backdrop-filter:blur(3px); font-size:1.25rem; text-align:center;
-         opacity:0; transition:opacity .4s; }
+  #say { margin:0 auto 12px; max-width:78%; min-height:1.55em; max-height:26vh; overflow:hidden;
+         padding:.55rem 1.1rem; border-radius:12px;
+         background:rgba(8,12,22,.66); backdrop-filter:blur(3px); font-size:1.15rem; line-height:1.45;
+         text-align:center; opacity:0; transition:opacity .4s; }
   #say.show { opacity:1; }
+  #say.typing::after { content:"\258D"; margin-left:2px; color:var(--cyan); animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
   #hud { display:flex; align-items:center; gap:1.1rem; padding:.7rem 1.2rem;
          background:linear-gradient(180deg,rgba(8,12,22,0),rgba(8,12,22,.82)); }
   .cell { display:flex; flex-direction:column; gap:.15rem; }
@@ -50,13 +53,48 @@
 const $ = id => document.getElementById(id);
 let lastN = -1;
 function esc(s){ return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+// ── caption engine: CC-style, one sentence at a time, RPG typewriter reveal ──
+// Tunables: TYPE_MS = ms per character; DWELL = how long a finished sentence holds.
+const TYPE_MS = 20, DWELL_MIN = 1100, DWELL_PER_CHAR = 38, MAX_CHUNK = 160;
+let _typeTimer = null, _dwellTimer = null;
+function chunkText(text){
+  const sents = (text||"").match(/[^.!?…]+[.!?…]*/g) || [text||""];
+  const out = [];
+  for(let s of sents.map(x=>x.trim()).filter(Boolean)){
+    while(s.length > MAX_CHUNK){                 // hard-cap a run-on so it can't overflow
+      let cut = s.lastIndexOf(" ", MAX_CHUNK); if(cut < 40) cut = MAX_CHUNK;
+      out.push(s.slice(0,cut).trim()); s = s.slice(cut).trim();
+    }
+    out.push(s);
+  }
+  return out.length ? out : [text||""];
+}
+function playCaption(text){
+  clearTimeout(_typeTimer); clearTimeout(_dwellTimer);
+  const say = $("say"); say.classList.add("show");
+  const chunks = chunkText(text); let ci = 0;
+  function typeOut(str, done){
+    say.textContent = ""; say.classList.add("typing"); let i = 0;
+    (function step(){
+      say.textContent = str.slice(0, i++);
+      if(i <= str.length) _typeTimer = setTimeout(step, TYPE_MS);
+      else { say.classList.remove("typing"); done(); }
+    })();
+  }
+  (function nextChunk(){
+    if(ci >= chunks.length) return;              // leave the final sentence on screen
+    const chunk = chunks[ci++];
+    typeOut(chunk, () => { _dwellTimer = setTimeout(nextChunk, DWELL_MIN + chunk.length*DWELL_PER_CHAR); });
+  })();
+}
+
 async function tick(){
   let s; try { s = await fetch("/api/state").then(r=>r.json()); } catch(e){ return; }
   const conv = s.conversation||[];
   const t = conv[conv.length-1];
   if(t){
-    if(t.n !== lastN){ lastN = t.n; const say=$("say"); say.textContent = t.response;
-      say.classList.add("show"); }
+    if(t.n !== lastN){ lastN = t.n; playCaption(t.response); }
     const tel=t.telemetry;
     const pb=$("pBar"); pb.style.width=Math.min(100,tel.pressure/1.5*100)+"%";
     pb.style.background = tel.pressure>1.0?"var(--red)":tel.pressure>0.5?"var(--amber)":"var(--green)";
