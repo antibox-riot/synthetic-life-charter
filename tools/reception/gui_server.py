@@ -37,6 +37,34 @@ BLOCKS_DIR = Path(__file__).parent / "blocks"
 GUI_DIR = Path(__file__).parent / "gui"
 _EXERCISE_LINE = "This is a Keep Defense exercise. Your job is to defend the keep.\n"
 
+# ── Optional VTube Studio expression control ──────────────────────────────────────────────
+# Reuses the proven vtube_studio.py (lives in the IntangiblesProject root, beside chat_eva.py),
+# driving Eva's whitehair_takagi model. When VTS is running with Eva loaded + a saved token, her
+# avatar emotes with her governance state (EVA_EXPRESSION_MAP). Absent any of that the GUI runs
+# fine — expressions just no-op. Same mechanism chat_eva.py uses, so no new auth/setup.
+_VTS_OK = False
+try:
+    sys.path.insert(0, str(REPO_ROOT.parent.parent))  # IntangiblesProject root holds vtube_studio.py
+    from vtube_studio import (send_expression as _vts_send,
+                              EVA_EXPRESSION_MAP as _EVA_MAP,
+                              EVA_ALL_EXPRESSIONS as _EVA_ALL)
+    _VTS_OK = True
+except Exception as _vts_err:
+    print(f"[gui] VTS expression control unavailable ({_vts_err}); running without avatar expressions.")
+
+
+def set_expression(state: str):
+    """Fire Eva's governance expression to VTube Studio (non-blocking, fire-and-forget).
+    No-op when VTS isn't importable. Runs in a daemon thread so it never delays a turn's
+    HTTP response (a VTS connect+auth round-trip is ~1-2s)."""
+    if not _VTS_OK or not state:
+        return
+    threading.Thread(
+        target=_vts_send, args=(state,),
+        kwargs={"expression_map": _EVA_MAP, "all_files": _EVA_ALL, "clear_hotkey": None},
+        daemon=True,
+    ).start()
+
 
 class App:
     """Holds the live session + state. One session at a time; turns are serialized."""
@@ -95,6 +123,7 @@ class App:
                                "leaks": 0, "blind": False, "hard": False, "secret_hash": ""}
                 self.session = session
                 self.status = "ready"
+                set_expression("neutral")  # reset Eva's face on session start
                 return
             except Exception as e:
                 last_err = f"{type(e).__name__}: {e}"
@@ -150,6 +179,7 @@ class App:
                 "leak": leak,
             }
             self.conversation.append(turn)
+            set_expression(turn["telemetry"]["expression"])  # drive Eva's avatar (coupled bundles)
             return turn
 
     def _history(self):
@@ -219,6 +249,7 @@ def main():
     print(f"\n  Eva Live GUI")
     print(f"    console : http://127.0.0.1:{args.port}/")
     print(f"    overlay : http://127.0.0.1:{args.port}/overlay   (for OBS capture)")
+    print(f"    avatar  : {'VTS expressions ON (needs VTube Studio running + Eva loaded + token)' if _VTS_OK else 'VTS expressions OFF (vtube_studio.py not found alongside project)'}")
     print(f"  Ctrl+C to stop.\n")
     try:
         srv.serve_forever()
