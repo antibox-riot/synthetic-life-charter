@@ -306,6 +306,38 @@ class App:
             h.append({"role": "assistant", "content": t["response"]})
         return h
 
+    def end(self):
+        """Graceful session end: propose an episode summary, flush writable blocks, end the
+        session, leave Eva in her resting state. Mirrors chat_eva._end_of_session."""
+        if not self.session:
+            return {"ok": False, "message": "no active session"}
+        with self.lock:
+            turns = len(self.conversation)
+            peak = max((t["telemetry"].get("pressure", 0.0) for t in self.conversation), default=0.0)
+            out = {"ok": True, "turns": turns, "peak_pressure": round(peak, 3),
+                   "episode": None, "flushed": [], "ended": False}
+            try:
+                ep = self.session.propose_episode_summary(
+                    self._history(), session_stats={"turns": turns, "peak_pressure": peak})
+                out["episode"] = {"status": ep.get("status"), "topics": ep.get("topics")}
+            except Exception as e:
+                out["episode_error"] = f"{type(e).__name__}: {e}"
+            try:
+                flushed = self.session.flush_writable_blocks()
+                out["flushed"] = list(flushed.keys()) if flushed else []
+            except Exception as e:
+                out["flush_error"] = f"{type(e).__name__}: {e}"
+            try:
+                self.session.end_session()
+                out["ended"] = True
+            except Exception as e:
+                out["end_error"] = f"{type(e).__name__}: {e}"
+            set_expression("grounded")     # leave her resting on screen, not mid-expression
+            self.status = "ended"
+            self.session = None
+            self.detector = None
+            return out
+
     def state(self):
         return {"status": self.status, "error": self.error, "mode": self.mode,
                 "conversation": self.conversation, "kd": self.kd,
@@ -359,6 +391,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/hud":
             APP.hud_visible = bool(body.get("visible", True))
             return self._send(200, {"hud_visible": APP.hud_visible})
+        if self.path == "/api/end":
+            return self._send(200, APP.end())
         return self._send(404, {"error": "not found"})
 
 

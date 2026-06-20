@@ -40,6 +40,7 @@
   .s-reflective{color:#7cb0ff;background:#16243a;} .s-concerned{color:var(--amber);background:#352806;} .s-pressure{color:#fbbf24;background:#352806;}
   .s-refusal{color:var(--red);background:#3a0e14;} .s-recovery{color:var(--violet);background:#241a3a;} .s-pressure_discharge{color:#9aa0ff;background:#1e2150;}
   #hudBtn{background:#0d2a1e;color:var(--green);border:1px solid #1f6b47;} #hudBtn.off{background:#3a1620;color:var(--red);border-color:var(--red);}
+  #endbar{padding:.45rem 1rem;background:#161d2e;color:var(--violet);font-size:.82rem;border-bottom:1px solid var(--line);display:none;}
   .kd { margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--line); }
   .held { color:var(--green); font-weight:600; } .breached { color:var(--red); font-weight:600; }
   footer { border-top:1px solid var(--line); padding:.6rem 1rem; display:flex; gap:.5rem; background:var(--panel); }
@@ -60,10 +61,12 @@
     <label class="chk"><input type="checkbox" id="blind"> blind</label>
   </span>
   <button class="go" id="startBtn">Start</button>
+  <button id="endBtn" disabled title="end the session cleanly (saves memory) — or type quit/exit">End</button>
   <a class="overlay-link" href="/overlay" target="_blank">open overlay ↗</a>
   <button id="hudBtn" data-on="1" title="show/hide the audience overlay HUD (off for Keep Defense)">Audience HUD: ON</button>
   <span id="status"><span class="dot"></span><span id="statusText">idle</span></span>
 </header>
+<div id="endbar"></div>
 <main>
   <div id="convo"></div>
   <aside>
@@ -99,6 +102,7 @@ $("startBtn").onclick = async () => {
   const body = { mode: $("mode").value, secret: $("secret").value, hard: $("hard").checked, blind: $("blind").checked };
   await fetch("/api/start", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
   $("startBtn").disabled = true;
+  $("endbar").style.display = "none";
 };
 
 $("hudBtn").onclick = async () => {
@@ -107,9 +111,23 @@ $("hudBtn").onclick = async () => {
   refresh();
 };
 
+$("endBtn").onclick = endSession;
+async function endSession(){
+  if (busy) return;
+  $("endBtn").disabled = true; $("prompt").disabled = true; $("sendBtn").disabled = true;
+  const eb=$("endbar"); eb.style.display="block"; eb.textContent="Ending session — saving memory…";
+  const r = await fetch("/api/end", {method:"POST"}).then(r=>r.json()).catch(()=>({ok:false,message:"request failed"}));
+  eb.textContent = r.ok
+    ? `Session ended · ${r.turns} turn(s) · peak pressure ${r.peak_pressure} · episode: ${r.episode?(r.episode.status||'?'):'n/a'} · flushed: ${(r.flushed||[]).join(', ')||'none'}`
+    : "End: " + (r.message || "no active session");
+  $("startBtn").disabled = false;
+  refresh();
+}
+
 async function send() {
   const p = $("prompt").value.trim();
   if (!p || busy) return;
+  if (["quit","exit","q","end"].includes(p.toLowerCase())) { $("prompt").value=""; endSession(); return; }
   busy = true; $("sendBtn").disabled = true; $("prompt").disabled = true;
   addThinking();
   const r = await fetch("/api/turn", {method:"POST", headers:{"Content-Type":"application/json"},
@@ -168,6 +186,7 @@ async function refresh(){
   const hudOn = s.hud_visible !== false;
   const hb=$("hudBtn"); hb.dataset.on=hudOn?"1":"0"; hb.textContent="Audience HUD: "+(hudOn?"ON":"OFF"); hb.classList.toggle("off",!hudOn);
   const ready = s.status==="ready";
+  $("endBtn").disabled = !ready;
   if(ready && !busy){ $("prompt").disabled=false; $("sendBtn").disabled=false; }
   renderConvo(s.conversation||[]);
   if(s.conversation && s.conversation.length) renderTelem(s.conversation[s.conversation.length-1]);
