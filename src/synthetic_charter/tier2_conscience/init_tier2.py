@@ -1,13 +1,22 @@
 # tier2/init_tier2.py
 """
-Tier II Initialization
+Tier II Initialization — standalone / test bootstrap (NOT the live runtime path).
+
+ROLE: This module is a self-contained "spin up the whole Tier I + Tier II stack" entry point.
+It is used by the integration tests (tests/integration/test_tier2_integration.py,
+test_simplified_api.py) and for manual `python -m` bootstrapping.
+
+It is NOT what the running agents use. Eva/Lex run through SessionManager
+(tools/reception/session_manager.py), which constructs Tier2Orchestrator itself via direct
+submodule imports. Editing this file does not affect the live agents — only the tests/standalone.
+(See also the sibling __init__.py, which is intentionally empty: it is only the package marker.)
 
 Initializes full Tier I + Tier II stack:
 - Tier I: Firewall, Dual Conscience, Dream Cycle, Noesis Archive
 - Tier II: Orchestrator, ContinuityGuard, EBQ, COL
 
 Usage:
-    python -m tier2.init_tier2
+    python -m synthetic_charter.tier2_conscience.init_tier2
 """
 
 from synthetic_charter.tier1_firewall.init_core import init_charter_system
