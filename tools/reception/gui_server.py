@@ -378,6 +378,25 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, {"error": f"{name} not found"})
         self._send(200, p.read_bytes(), ctype)
 
+    # Static assets served from gui/ (sprite engine js + avatar PNGs). This lets
+    # the in-window canvas avatar load its code and art without affecting the
+    # optional VTS path above — both can drive Eva's expression independently.
+    _CTYPES = {".js": "application/javascript", ".png": "image/png",
+               ".css": "text/css", ".json": "application/json",
+               ".svg": "image/svg+xml", ".woff2": "font/woff2", ".webp": "image/webp"}
+
+    def _static(self, path):
+        rel = path.lstrip("/").split("?", 1)[0]
+        base = GUI_DIR.resolve()
+        target = (base / rel).resolve()
+        # Path-traversal guard: resolved target must stay inside gui/.
+        if base != target and base not in target.parents:
+            return self._send(403, {"error": "forbidden"})
+        if not target.is_file():
+            return self._send(404, {"error": "not found"})
+        ctype = self._CTYPES.get(target.suffix.lower(), "application/octet-stream")
+        self._send(200, target.read_bytes(), ctype)
+
     def do_GET(self):
         if self.path in ("/", "/index.html"):
             return self._file("console.html", "text/html; charset=utf-8")
@@ -385,7 +404,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._file("overlay.html", "text/html; charset=utf-8")
         if self.path == "/api/state":
             return self._send(200, APP.state())
-        return self._send(404, {"error": "not found"})
+        if self.path.startswith("/api/"):
+            return self._send(404, {"error": "not found"})
+        return self._static(self.path)
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))

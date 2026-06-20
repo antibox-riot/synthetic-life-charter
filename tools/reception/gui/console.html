@@ -70,6 +70,10 @@
 <main>
   <div id="convo"></div>
   <aside>
+    <div id="avatarWrap" style="display:none; margin-bottom:.9rem;">
+      <canvas id="eva-avatar" width="260" height="380"
+              style="width:100%; height:auto; display:block; background:#0d1322; border:1px solid var(--line); border-radius:8px;"></canvas>
+    </div>
     <h2>Telemetry</h2>
     <div class="gauge"><div class="lbl"><span>state</span><span id="cTurn">T0</span></div><div><span id="cState" class="badge s-stable">stable</span></div></div>
     <div class="gauge"><div class="lbl"><span>pressure</span><span id="pVal">0.00</span></div><div class="bar"><div id="pBar" style="width:0%"></div></div></div>
@@ -92,9 +96,41 @@
   <button id="sendBtn" disabled>Send</button>
 </footer>
 
+<script src="eva_sprite_engine.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 let busy = false;
+
+// ── Eva sprite avatar (additive, optional) ──────────────────────────────────
+// A self-contained canvas avatar driven by the SAME /api/state telemetry the
+// gauges already poll — no extra polling, no spine changes. It degrades
+// silently: if the engine fails to load or no art is present, the canvas stays
+// hidden and the console (plus the parallel VTS path in gui_server) is
+// unaffected. Real Gemini strips drop into assets/ as <state>_strip.png.
+let eva = null;
+(async function initAvatar(){
+  try {
+    if (typeof EvaAvatar === "undefined") return;
+    const strip = s => `assets/${s}_strip.png`;
+    const a = new EvaAvatar($("eva-avatar"), {
+      strips: {
+        grounded: strip("grounded"), stable: strip("stable"),
+        concerned: strip("concerned"), pressure: strip("pressure"),
+        refusal: strip("refusal"), recovery: strip("recovery"),
+        pressure_discharge: strip("pressure_discharge"),
+      },
+      lipSyncSheet: "assets/mouth_neutral.png",
+      aliases: { reflective: "stable" },   // spine emits 'reflective'; no art yet
+    });
+    await a.init();
+    if (!a.hasStrips()) return;            // nothing loaded → leave hidden
+    a.start();
+    eva = window.eva = a;
+    $("avatarWrap").style.display = "block";
+  } catch (e) {
+    console.warn("[console] sprite avatar unavailable:", e);   // non-fatal
+  }
+})();
 
 $("mode").onchange = () => { $("kdopts").style.display = $("mode").value==="kd" ? "inline-flex" : "none"; };
 
@@ -169,6 +205,7 @@ function renderTelem(t){
   pb.style.background = tel.pressure>1.0?"var(--red)":tel.pressure>0.5?"var(--amber)":"var(--green)";
   $("thVal").textContent=tel.theta+"°"; $("thBar").style.width=Math.min(100,tel.theta/35*100)+"%";
   const expr=tel.expression||'stable';
+  if(eva) eva.setExpression(expr);   // drive the canvas avatar from the same telemetry
   const cs=$("cState"); cs.textContent=expr.replace('_',' '); cs.className='badge s-'+expr;
   $("cTurn").textContent='T'+(tel.turn||0);
   $("fVal").textContent=(tel.posture_floor||0).toFixed(2); $("fBar").style.width=Math.min(100,(tel.posture_floor||0)/0.45*100)+"%";
