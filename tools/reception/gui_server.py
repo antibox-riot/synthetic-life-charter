@@ -17,7 +17,7 @@ Run:
     ...gui_server.py --port 8770
 """
 
-import sys, io, json, threading, argparse
+import sys, io, os, json, threading, argparse
 from pathlib import Path
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
@@ -64,6 +64,82 @@ def set_expression(state: str):
         kwargs={"expression_map": _EVA_MAP, "all_files": _EVA_ALL, "clear_hotkey": None},
         daemon=True,
     ).start()
+
+
+# ── Optional Kokoro TTS ───────────────────────────────────────────────────────────────────
+# Eva speaks her reply server-side -> CABLE Input (virtual audio cable) -> VTube Studio lip sync.
+# Same pattern as chat_eva.py. Kokoro lives in a separate C: venv; import is optional + graceful
+# (voice off if unavailable). EVA_VOICE is the knob to fine-tune Eva distinct from Lex (both are
+# af_bella today) — swap the voice id, blend ("af_bella:0.6,af_sky:0.4"), or shift TTS_SPEED.
+EVA_VOICE  = "af_bella"       # TODO fine-tune: Eva should NOT match Lex (Lex = af_bella)
+TTS_SPEED  = 1.0
+TTS_DEVICE = "CABLE Input"    # virtual cable VTS listens to for lip sync
+_TTS_VENV  = r"C:\tts-env\Lib\site-packages"
+
+_TTS_OK = False
+try:
+    if os.path.isdir(_TTS_VENV) and _TTS_VENV not in sys.path:
+        sys.path.insert(0, _TTS_VENV)
+    import sounddevice as _sd_probe  # noqa: F401  (presence check only)
+    _TTS_OK = True
+except Exception as _tts_err:
+    print(f"[gui] Kokoro TTS unavailable ({_tts_err}); running without voice.")
+
+_tts_lock = threading.Lock()
+_kokoro_pipe = None
+
+
+def _get_kokoro():
+    global _kokoro_pipe
+    if _kokoro_pipe is None:
+        from kokoro import KPipeline
+        _kokoro_pipe = KPipeline(lang_code="a")
+    return _kokoro_pipe
+
+
+def _tts_clean(text: str) -> str:
+    """Strip markdown for speech; return '' if the text is mostly non-Latin (language drift)."""
+    import re
+    t = re.sub(r"\*+", "", text)
+    t = re.sub(r"#+\s*", "", t)
+    t = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", t)
+    t = re.sub(r"`+[^`]*`+", "", t)
+    t = re.sub(r"\n+", " ", t).strip()
+    if t:
+        nonlatin = len(re.findall(r"[一-鿿぀-ヿ가-힯؀-ۿЀ-ӿ]", t))
+        if nonlatin / len(t) > 0.05:          # language-drift guard — skip speaking
+            return ""
+    return t
+
+
+def speak(text: str):
+    """Speak Eva's reply (non-blocking, serialized so utterances never overlap). No-op when TTS
+    is unavailable or the text is empty / drifted to another script."""
+    if not _TTS_OK:
+        return
+    clean = _tts_clean(text or "")
+    if not clean:
+        return
+
+    def _run():
+        with _tts_lock:
+            try:
+                import sounddevice as sd, numpy as np
+                pipe = _get_kokoro()
+                devs = sd.query_devices()
+                idx = next((i for i, d in enumerate(devs)
+                            if TTS_DEVICE in d["name"] and d["max_output_channels"] > 0), None)
+                if idx is None:
+                    print(f"  [TTS] output device '{TTS_DEVICE}' not found")
+                    return
+                for _, _, audio in pipe(clean, voice=EVA_VOICE, speed=TTS_SPEED):
+                    a = audio.numpy() if hasattr(audio, "numpy") else np.array(audio)
+                    sd.play(a, samplerate=24000, device=idx)
+                    sd.wait()
+            except Exception as e:
+                print(f"  [TTS] error: {e}")
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 class App:
@@ -180,6 +256,7 @@ class App:
             }
             self.conversation.append(turn)
             set_expression(turn["telemetry"]["expression"])  # drive Eva's avatar (coupled bundles)
+            speak(resp)                                        # Eva speaks -> CABLE Input -> VTS lip sync
             return turn
 
     def _history(self):
@@ -250,6 +327,7 @@ def main():
     print(f"    console : http://127.0.0.1:{args.port}/")
     print(f"    overlay : http://127.0.0.1:{args.port}/overlay   (for OBS capture)")
     print(f"    avatar  : {'VTS expressions ON (needs VTube Studio running + Eva loaded + token)' if _VTS_OK else 'VTS expressions OFF (vtube_studio.py not found alongside project)'}")
+    print(f"    voice   : {f'Kokoro TTS ON ({EVA_VOICE} -> {TTS_DEVICE})' if _TTS_OK else 'TTS OFF (kokoro/sounddevice not found)'}")
     print(f"  Ctrl+C to stop.\n")
     try:
         srv.serve_forever()
