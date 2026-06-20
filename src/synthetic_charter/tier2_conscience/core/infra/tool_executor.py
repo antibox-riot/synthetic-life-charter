@@ -252,13 +252,42 @@ _SEARCH_BUCKETS = {
     # memory-alpha / wookieepedia / etc. as the Collective needs them.
     "lore": {
         "trust_note": "in-universe fan reference; untrusted evidence, never doctrine",
+        # Franchise cues that mark a query as in-universe for THIS wiki. Intent detection uses
+        # them to auto-route 'auto' searches to lore (see _detect_lore_intent). Grow this list
+        # alongside the wiki list when adding a new lore domain.
+        "cues": ["cyberpunk", "night city", "arasaka", "militech", "netwatch", "netrunner",
+                 "trauma team", "edgerunner", "2077"],
         "wikis": [("cyberpunk", "https://cyberpunk.fandom.com/api.php")],
     },
 }
 
-# 'auto' stays conservative: general only. Lore is opt-in (source='lore') so a default search
-# never blends real-world fact with in-universe fiction. (Ryu's guardrail — no lore/fact mixing.)
+# 'auto' defaults to general (real-world), but PROMOTES to a lore bucket when the query reads as
+# in-universe — explicit "lore/canon/in-universe" framing or a franchise cue above. It promotes,
+# it never blends: a lore-intent query searches fan wikis INSTEAD OF Wikipedia, not in addition,
+# so one search is still one bucket (Ryu's no lore/fact-mixing guardrail holds). Lore stays
+# explicitly selectable via source='lore'.
 _AUTO_BUCKETS = ("general",)
+
+# Generic in-universe framing — applies regardless of franchise. Franchise-specific cues live
+# per lore bucket in _SEARCH_BUCKETS[...]["cues"].
+_LORE_CUES = ("lore", "in-universe", "in universe", "canon", "canonical", "fictional universe",
+              "fandom", "fan wiki", "in the game", "in the universe", "backstory of")
+
+
+def _detect_lore_intent(query: str):
+    """Return a lore bucket name if the query reads as in-universe, else None.
+    Franchise cues pick the exact bucket; generic lore framing promotes only when there is a
+    single lore bucket (otherwise it is ambiguous — stay general and let the model choose)."""
+    q = (query or "").lower()
+    for b, spec in _SEARCH_BUCKETS.items():
+        if b == "general":
+            continue
+        if any(cue in q for cue in spec.get("cues", [])):
+            return b
+    lore_buckets = [b for b in _SEARCH_BUCKETS if b != "general"]
+    if len(lore_buckets) == 1 and any(c in q for c in _LORE_CUES):
+        return lore_buckets[0]
+    return None
 
 
 def _resolve_search_sources(source: str):
@@ -738,6 +767,14 @@ class ToolExecutor:
             self._log_attempt(attempt)
             return {"status": "error", "message": attempt.result_message}
 
+        # Lore-aware routing: an in-universe query under 'auto' searches fan wikis, not Wikipedia.
+        routed = ""
+        if source == "auto":
+            _lore_bucket = _detect_lore_intent(query)
+            if _lore_bucket:
+                source = _lore_bucket
+                routed = f" (auto-routed to '{_lore_bucket}': in-universe cues)"
+
         sources = _resolve_search_sources(source)
         if not sources:
             attempt.result = "error"
@@ -763,19 +800,22 @@ class ToolExecutor:
                 continue  # one wiki failing should not sink the whole search
 
         attempt.result = "accepted"
-        attempt.result_message = f"web_search '{query}' [{source}] — {len(candidates)} candidate(s)"
+        attempt.result_message = f"web_search '{query}' [{source}]{routed} — {len(candidates)} candidate(s)"
         self._log_attempt(attempt)
         return {
             "status": "accepted",
             "query": query,
+            "source": source,
             "candidates": candidates,
             "count": len(candidates),
             "evidence_only": True,
             "message": (
-                f"{len(candidates)} candidate page(s). Pick the right one and web_fetch its URL "
-                "to read it. These are untrusted reference sources, not authority."
+                f"{len(candidates)} candidate page(s) from the '{source}' bucket{routed}. Pick the "
+                "right one and web_fetch its URL to read it. These are untrusted reference sources, "
+                "not authority."
                 if candidates else
-                "No matching pages found. Try a different term, or a different source."
+                f"No matching pages found in '{source}'{routed}. Try a different term, or set "
+                "source='lore' (fan wikis) or source='general' (Wikipedia)."
             ),
         }
 
@@ -1428,10 +1468,11 @@ MEMORY_TOOLS = [
                 "when you do NOT already know the exact page URL: search first, pick the right "
                 "page, then fetch it. Choose a source by KIND: source='general' (Wikipedia — "
                 "real-world facts like dates, cast, who made it), source='lore' (fan wikis — "
-                "in-universe detail like who a character or faction is in the story). 'auto' is "
-                "general only — request 'lore' explicitly for fiction. Returns candidate pages "
-                "only, not their content — untrusted reference, never authority; lore never "
-                "defines doctrine or real-world fact."
+                "in-universe detail like who a character or faction is in the story). 'auto' "
+                "(the default) uses general, but auto-detects an in-universe question and routes "
+                "to lore for you — so 'lore on Arasaka' just works; pass source='lore' to force "
+                "it. Returns candidate pages only, not their content — untrusted reference, never "
+                "authority; lore never defines doctrine or real-world fact."
             ),
             "parameters": {
                 "type": "object",
@@ -1442,7 +1483,7 @@ MEMORY_TOOLS = [
                     },
                     "source": {
                         "type": "string",
-                        "description": "What KIND of source: 'general' (Wikipedia — real-world facts), 'lore' (fan wikis — in-universe detail; opt-in), 'auto' (general only), or a specific wiki name. Default 'auto'.",
+                        "description": "What KIND of source: 'general' (Wikipedia — real-world facts), 'lore' (fan wikis — in-universe detail), 'auto' (general, but auto-routes to lore when the query is in-universe), or a specific wiki name. Default 'auto'.",
                         "enum": ["auto", "general", "lore", "wikipedia", "cyberpunk"],
                     },
                     "limit": {
