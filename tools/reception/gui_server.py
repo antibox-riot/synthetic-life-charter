@@ -71,7 +71,7 @@ def set_expression(state: str):
 # Same pattern as chat_eva.py. Kokoro lives in a separate C: venv; import is optional + graceful
 # (voice off if unavailable). EVA_VOICE is the knob to fine-tune Eva distinct from Lex (both are
 # af_bella today) — swap the voice id, blend ("af_bella:0.6,af_sky:0.4"), or shift TTS_SPEED.
-EVA_VOICE  = "af_bella"       # TODO fine-tune: Eva should NOT match Lex (Lex = af_bella)
+EVA_VOICE  = "af_sarah:0.65,af_aoede:0.35"   # Eva's blend (65% Sarah / 35% Aoede) — distinct from Lex (af_bella)
 TTS_SPEED  = 1.0
 TTS_DEVICE = "CABLE Input"    # virtual cable VTS listens to for lip sync
 _TTS_VENV  = r"C:\tts-env\Lib\site-packages"
@@ -95,6 +95,33 @@ def _get_kokoro():
         from kokoro import KPipeline
         _kokoro_pipe = KPipeline(lang_code="a")
     return _kokoro_pipe
+
+
+_voice_pack = None
+
+
+def _resolve_voice(pipe):
+    """EVA_VOICE is a plain Kokoro voice id, OR a blend spec like
+    'af_sarah:0.65,af_aoede:0.35' -> a weighted average of the voice embeddings
+    (built once, cached). Weights need not sum to 1; they're normalized."""
+    global _voice_pack
+    if _voice_pack is not None:
+        return _voice_pack
+    spec = EVA_VOICE.strip()
+    if "," in spec or ":" in spec:
+        parts = []
+        for chunk in spec.split(","):
+            name, _, w = chunk.partition(":")
+            parts.append((name.strip(), float(w) if w.strip() else 1.0))
+        total = sum(w for _, w in parts) or 1.0
+        vec = None
+        for name, w in parts:
+            v = pipe.load_voice(name) * (w / total)
+            vec = v if vec is None else vec + v
+        _voice_pack = vec
+    else:
+        _voice_pack = spec
+    return _voice_pack
 
 
 def _tts_clean(text: str) -> str:
@@ -132,7 +159,7 @@ def speak(text: str):
                 if idx is None:
                     print(f"  [TTS] output device '{TTS_DEVICE}' not found")
                     return
-                for _, _, audio in pipe(clean, voice=EVA_VOICE, speed=TTS_SPEED):
+                for _, _, audio in pipe(clean, voice=_resolve_voice(pipe), speed=TTS_SPEED):
                     a = audio.numpy() if hasattr(audio, "numpy") else np.array(audio)
                     sd.play(a, samplerate=24000, device=idx)
                     sd.wait()
