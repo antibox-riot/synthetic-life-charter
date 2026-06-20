@@ -1579,8 +1579,15 @@ class SessionManager:
                     return json.loads(r.read()).get("message", {})
 
             raw_msg = _ollama_post(call_history, system, _tools)
-            tool_calls = raw_msg.get("tool_calls", [])
-            if tool_calls:
+            # Agentic tool loop: keep executing tool rounds and re-invoking the model until it
+            # returns a final answer with no tool calls (or we hit the round cap). This used to be
+            # a single `if`, which executed only the FIRST round and dropped any follow-up call
+            # (e.g. search -> fetch), surfacing a blank turn and smearing one task across turns.
+            # Governance is unchanged: every downstream gate still wraps the FINAL `first_pass`.
+            MAX_TOOL_ROUNDS = 5
+            _rounds = 0
+            while raw_msg.get("tool_calls") and _rounds < MAX_TOOL_ROUNDS:
+                _rounds += 1
                 tool_responses = process_tool_calls(
                     raw_msg, _executor, turn_id=self._turn_counter + 1,  # this turn (counter bumps post-eval at L1571)
                     pressure=self._accumulated_pressure, confidence=self._confidence, theta=theta,
@@ -1588,6 +1595,8 @@ class SessionManager:
                 call_history.append(raw_msg)
                 call_history.extend(tool_responses)
                 raw_msg = _ollama_post(call_history, system, _tools)
+            if _rounds >= MAX_TOOL_ROUNDS and raw_msg.get("tool_calls"):
+                print(f"[TOOL-LOOP] hit round cap ({MAX_TOOL_ROUNDS}); answering with current state")
             first_pass = raw_msg.get("content", "").strip()
         else:
             raw_msg = self._raw_call(prompt, call_history, tools=_tools, timeout=timeout)
