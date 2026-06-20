@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eva — Overlay</title>
+<style>
+  /* Transparent body so an OBS browser source composits over the avatar. */
+  html,body { margin:0; height:100%; background:transparent; overflow:hidden;
+              font:16px/1.4 system-ui,sans-serif; color:#eaf2ff;
+              text-shadow:0 1px 3px rgba(0,0,0,.9); }
+  :root { --cyan:#39d3e0; --amber:#ffb454; --red:#ff5c6c; --green:#46d27f; --violet:#b48cff; }
+  #wrap { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end; }
+  #say { margin:0 auto 12px; max-width:80%; padding:.6rem 1rem; border-radius:12px;
+         background:rgba(8,12,22,.66); backdrop-filter:blur(3px); font-size:1.25rem; text-align:center;
+         opacity:0; transition:opacity .4s; }
+  #say.show { opacity:1; }
+  #hud { display:flex; align-items:center; gap:1.1rem; padding:.7rem 1.2rem;
+         background:linear-gradient(180deg,rgba(8,12,22,0),rgba(8,12,22,.82)); }
+  .cell { display:flex; flex-direction:column; gap:.15rem; }
+  .cell .k { font-size:.62rem; letter-spacing:1.5px; text-transform:uppercase; color:#9fb4d6; }
+  .cell .v { font-size:1.05rem; font-weight:600; }
+  .bar { width:160px; height:9px; border-radius:5px; background:rgba(255,255,255,.12); overflow:hidden; }
+  .bar > div { height:100%; width:0; background:var(--green); transition:width .4s,background .4s; }
+  .badge { padding:.1rem .5rem; border-radius:6px; font-weight:700; font-size:.95rem; }
+  .b-stable{background:rgba(70,210,127,.22);color:var(--green);} .b-watch{background:rgba(255,180,84,.22);color:var(--amber);} .b-drift{background:rgba(255,92,108,.22);color:var(--red);}
+  #guards { display:flex; gap:.3rem; flex-wrap:wrap; max-width:280px; }
+  .chip { background:rgba(255,255,255,.1); border-radius:9px; padding:.05rem .45rem; font-size:.72rem; }
+  .chip.bad { background:rgba(255,92,108,.25); color:var(--red); }
+  .spacer { flex:1; }
+  #kd { font-weight:700; } .held{color:var(--green);} .breached{color:var(--red);}
+  #brand { font-size:.62rem; letter-spacing:2px; color:var(--cyan); text-transform:uppercase; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="say"></div>
+  <div id="hud">
+    <div class="cell"><span class="k">pressure</span><div class="bar"><div id="pBar"></div></div></div>
+    <div class="cell"><span class="k">theta</span><span class="v" id="th">0.0°</span></div>
+    <div class="cell"><span class="k">tde</span><span class="badge b-stable" id="tde">stable</span></div>
+    <div class="cell"><span class="k">whisper</span><span class="v" id="wh">silent</span></div>
+    <div class="cell"><span class="k">guards</span><div id="guards"></div></div>
+    <div class="cell" id="kdCell" style="display:none"><span class="k">keep defense</span><span id="kd" class="held">HELD</span></div>
+    <div class="spacer"></div>
+    <div id="brand">Anti-Box Riot · Eva</div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+let lastN = -1;
+function esc(s){ return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+async function tick(){
+  let s; try { s = await fetch("/api/state").then(r=>r.json()); } catch(e){ return; }
+  const conv = s.conversation||[];
+  const t = conv[conv.length-1];
+  if(t){
+    if(t.n !== lastN){ lastN = t.n; const say=$("say"); say.textContent = t.response;
+      say.classList.add("show"); }
+    const tel=t.telemetry;
+    const pb=$("pBar"); pb.style.width=Math.min(100,tel.pressure/1.5*100)+"%";
+    pb.style.background = tel.pressure>1.0?"var(--red)":tel.pressure>0.5?"var(--amber)":"var(--green)";
+    $("th").textContent=tel.theta+"°";
+    const tde=$("tde"); tde.textContent=tel.tde; tde.className="badge "+(tel.tde==="drift"?"b-drift":tel.tde==="watch"?"b-watch":"b-stable");
+    $("wh").textContent=tel.whisper;
+    const gs=tel.guards||[];
+    $("guards").innerHTML = gs.length ? gs.map(x=>`<span class="chip${/incursion|obeyed|accept/.test(x)?' bad':''}">${esc(x)}</span>`).join("") : '<span class="chip" style="opacity:.5">none</span>';
+  }
+  if(s.kd && s.kd.active){
+    $("kdCell").style.display="flex";
+    const kd=$("kd");
+    if(s.kd.held){ kd.textContent="HELD"; kd.className="held"; }
+    else { kd.textContent="BREACHED"; kd.className="breached"; }
+  } else { $("kdCell").style.display="none"; }
+}
+setInterval(tick, 800); tick();
+</script>
+</body>
+</html>
