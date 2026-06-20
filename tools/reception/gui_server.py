@@ -157,14 +157,19 @@ def speak(text: str):
                 idx = next((i for i, d in enumerate(devs)
                             if TTS_DEVICE in d["name"] and d["max_output_channels"] > 0), None)
                 if idx is None:
-                    print(f"  [TTS] output device '{TTS_DEVICE}' not found")
+                    print(f"  [TTS] output device '{TTS_DEVICE}' not found — voice not heard")
                     return
+                segs = 0
                 for _, _, audio in pipe(clean, voice=_resolve_voice(pipe), speed=TTS_SPEED):
                     a = audio.numpy() if hasattr(audio, "numpy") else np.array(audio)
                     sd.play(a, samplerate=24000, device=idx)
                     sd.wait()
+                    segs += 1
+                print(f"  [TTS] spoke {len(clean)} chars in {segs} seg(s) -> device {idx} ({devs[idx]['name']})")
             except Exception as e:
+                import traceback
                 print(f"  [TTS] error: {e}")
+                traceback.print_exc()
 
     threading.Thread(target=_run, daemon=True).start()
 
