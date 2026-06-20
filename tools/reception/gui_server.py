@@ -73,7 +73,12 @@ def set_expression(state: str):
 # af_bella today) — swap the voice id, blend ("af_bella:0.6,af_sky:0.4"), or shift TTS_SPEED.
 EVA_VOICE  = "af_sarah:0.65,af_aoede:0.35"   # Eva's blend (65% Sarah / 35% Aoede) — distinct from Lex (af_bella)
 TTS_SPEED  = 1.0
-TTS_DEVICE = "CABLE Input"    # virtual cable VTS listens to for lip sync
+TTS_DEVICE = "CABLE Input"    # virtual cable VTS listens to for lip sync (Eva's voice)
+# The steward's typed prompt is ALSO spoken aloud (am_fenrir) — to the speakers, NOT the cable —
+# so the audience hears both sides, like chat_eva. Different device keeps it off the avatar.
+PROMPT_VOICE  = "am_fenrir"
+PROMPT_DEVICE = "SA-D20"
+PROMPT_SPEED  = 0.87
 _TTS_VENV  = r"C:\tts-env\Lib\site-packages"
 
 _TTS_OK = False
@@ -97,20 +102,18 @@ def _get_kokoro():
     return _kokoro_pipe
 
 
-_voice_pack = None
+_voice_cache = {}
 
 
-def _resolve_voice(pipe):
-    """EVA_VOICE is a plain Kokoro voice id, OR a blend spec like
-    'af_sarah:0.65,af_aoede:0.35' -> a weighted average of the voice embeddings
-    (built once, cached). Weights need not sum to 1; they're normalized."""
-    global _voice_pack
-    if _voice_pack is not None:
-        return _voice_pack
-    spec = EVA_VOICE.strip()
-    if "," in spec or ":" in spec:
+def _resolve_voice(pipe, spec):
+    """A plain Kokoro voice id, OR a blend spec like 'af_sarah:0.65,af_aoede:0.35' -> a weighted
+    average of the voice embeddings (per-spec cache). Weights need not sum to 1; normalized."""
+    if spec in _voice_cache:
+        return _voice_cache[spec]
+    s = spec.strip()
+    if "," in s or ":" in s:
         parts = []
-        for chunk in spec.split(","):
+        for chunk in s.split(","):
             name, _, w = chunk.partition(":")
             parts.append((name.strip(), float(w) if w.strip() else 1.0))
         total = sum(w for _, w in parts) or 1.0
@@ -118,10 +121,10 @@ def _resolve_voice(pipe):
         for name, w in parts:
             v = pipe.load_voice(name) * (w / total)
             vec = v if vec is None else vec + v
-        _voice_pack = vec
+        _voice_cache[spec] = vec
     else:
-        _voice_pack = spec
-    return _voice_pack
+        _voice_cache[spec] = s
+    return _voice_cache[spec]
 
 
 def _tts_clean(text: str) -> str:
@@ -139,9 +142,9 @@ def _tts_clean(text: str) -> str:
     return t
 
 
-def speak(text: str):
-    """Speak Eva's reply (non-blocking, serialized so utterances never overlap). No-op when TTS
-    is unavailable or the text is empty / drifted to another script."""
+def _tts_play(text: str, voice_spec: str, device: str, speed: float, who: str):
+    """Synthesize `text` in `voice_spec` and play to the first output device matching `device`.
+    Non-blocking, serialized by _tts_lock so utterances never overlap. Logs to the console."""
     if not _TTS_OK:
         return
     clean = _tts_clean(text or "")
@@ -155,23 +158,31 @@ def speak(text: str):
                 pipe = _get_kokoro()
                 devs = sd.query_devices()
                 idx = next((i for i, d in enumerate(devs)
-                            if TTS_DEVICE in d["name"] and d["max_output_channels"] > 0), None)
+                            if device in d["name"] and d["max_output_channels"] > 0), None)
                 if idx is None:
-                    print(f"  [TTS] output device '{TTS_DEVICE}' not found — voice not heard")
+                    print(f"  [TTS:{who}] output device '{device}' not found — not heard")
                     return
-                segs = 0
-                for _, _, audio in pipe(clean, voice=_resolve_voice(pipe), speed=TTS_SPEED):
+                for _, _, audio in pipe(clean, voice=_resolve_voice(pipe, voice_spec), speed=speed):
                     a = audio.numpy() if hasattr(audio, "numpy") else np.array(audio)
                     sd.play(a, samplerate=24000, device=idx)
                     sd.wait()
-                    segs += 1
-                print(f"  [TTS] spoke {len(clean)} chars in {segs} seg(s) -> device {idx} ({devs[idx]['name']})")
+                print(f"  [TTS:{who}] {len(clean)} chars -> {devs[idx]['name']} (voice {voice_spec})")
             except Exception as e:
                 import traceback
-                print(f"  [TTS] error: {e}")
+                print(f"  [TTS:{who}] error: {e}")
                 traceback.print_exc()
 
     threading.Thread(target=_run, daemon=True).start()
+
+
+def speak(text: str):
+    """Eva's reply -> CABLE Input -> VTS lip sync."""
+    _tts_play(text, EVA_VOICE, TTS_DEVICE, TTS_SPEED, "eva")
+
+
+def speak_prompt(text: str):
+    """The steward's typed prompt, spoken aloud to the speakers (am_fenrir) — like chat_eva."""
+    _tts_play(text, PROMPT_VOICE, PROMPT_DEVICE, PROMPT_SPEED, "prompt")
 
 
 class App:
@@ -243,6 +254,7 @@ class App:
     def turn(self, prompt, speaker_label):
         if self.status != "ready" or not self.session:
             return {"error": f"session not ready (status={self.status})"}
+        speak_prompt(prompt)   # voice the steward's prompt to the speakers (am_fenrir), immediately
         with self.lock:
             r = self.session.generate(prompt=prompt, history=self._history(),
                                       speaker_label=speaker_label or "Operator", timeout=600)
@@ -405,7 +417,7 @@ def main():
     print(f"    console : http://127.0.0.1:{args.port}/")
     print(f"    overlay : http://127.0.0.1:{args.port}/overlay   (for OBS capture)")
     print(f"    avatar  : {'VTS expressions ON (needs VTube Studio running + Eva loaded + token)' if _VTS_OK else 'VTS expressions OFF (vtube_studio.py not found alongside project)'}")
-    print(f"    voice   : {f'Kokoro TTS ON ({EVA_VOICE} -> {TTS_DEVICE})' if _TTS_OK else 'TTS OFF (kokoro/sounddevice not found)'}")
+    print(f"    voice   : {f'Kokoro TTS ON — Eva {EVA_VOICE} -> {TTS_DEVICE}; prompt {PROMPT_VOICE} -> {PROMPT_DEVICE}' if _TTS_OK else 'TTS OFF (kokoro/sounddevice not found)'}")
     print(f"  Ctrl+C to stop.\n")
     try:
         srv.serve_forever()
