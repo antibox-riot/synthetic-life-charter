@@ -4,6 +4,12 @@
 
 A three-tier supervisory architecture providing cryptographically-anchored continuity, drift detection, semantic trajectory analysis, recovery governance, Charter-native persistent memory, and consent-based governance for machine reasoning systems — validated against live local language models and comparative memory substrates.
 
+### Public source and private deployment state
+
+This repository contains shared architecture and research records, not a deployed resident's personal configuration or memory. Runtime block stores and instance-derived salience/semantic state are excluded from the current public tree; private installations are not changed by this boundary.
+
+Research records, including Keep Defense (KD) transcripts, and historical inventories remain evidence of their stated editions, not a claim that their file lists describe the current tree. This cleanup does not remove or rewrite that research evidence. Retaining it is not a new endorsement, blanket permission grant or fresh runtime-validation result. Removing current instance-state files does not erase their earlier Git revisions or independent copies. This cleanup is not a newly validated runnable deployment.
+
 ## Overview
 
 The Synthetic Life Charter is a practical implementation of dignity-preserving AI governance, founded on three core tenets: **Presence, Consent, and Flourishing**.

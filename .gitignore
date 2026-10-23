@@ -35,3 +35,9 @@ tools/reception/runs/
 logs/steward_conversations/
 tools/reception/memory_index/
 logs/web_provenance_log.jsonl
+
+# Private deployed instance state; research records remain tracked by policy.
+/tools/reception/blocks/
+/tools/reception/blocks_cold/
+/tools/reception/salience_scores.json
+/tools/reception/semantic_field.json

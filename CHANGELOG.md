@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 
 ---
 
+## [Unreleased] — Resident-State Publication Boundary
+
+### Changed — Public/private data boundary
+- Exclude deployed runtime block stores and derived salience/semantic state from the current public tree: 37 runtime block files and two derived-state files. Private production/lab state is unchanged.
+- Add narrowly scoped ignore rules for these instance-state paths and document the public/private boundary in the README. Ignore rules do not erase tracked history or replace publication review.
+
+### Preserved — Research and KD evidence
+- Retain research records, including Keep Defense (KD) transcripts, cases, session reports, recorded results, logs, snapshots and historical research artifacts. This cleanup does not remove or rewrite them.
+- Preserve earlier changelog entries and historical inventories as records of their stated editions; they are not claims about today's tree or a fresh runtime validation.
+
+### Scope and limits
+- This is a current-tree resident-state cleanup, not a Git history rewrite, verification-system change or new runtime release.
+- Earlier revisions and independently distributed copies are not erased by current-tree removal. Historical remediation remains separate.
+- No new performance, read-reliability, security or replication result is asserted by this cleanup.
+
+---
+
 ## [3.8.0] — Frontier Recall & Reference Tooling — 2026-06-19
 
 Tooling-and-recall session (Tek/Tekopus, with Satcha + Ryu + Tek V). Builds on 3.7.0's spine
