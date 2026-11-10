@@ -10,6 +10,22 @@ This repository contains shared architecture and research records, not a deploye
 
 Research records, including Keep Defense (KD) transcripts, and historical inventories remain evidence of their stated editions, not a claim that their file lists describe the current tree. This cleanup does not remove or rewrite that research evidence. Retaining it is not a new endorsement, blanket permission grant or fresh runtime-validation result. Removing current instance-state files does not erase their earlier Git revisions or independent copies. This cleanup is not a newly validated runnable deployment.
 
+## Implementation and evidence
+
+**Evidence snapshot — October 21, 2026.**
+
+The older validation and model-discovery statements elsewhere in this README remain historical claims requiring their own dated evidence. They are not expanded or independently verified by this documentation update.
+
+The Anti-Box Riot Collective maintains both a philosophical Charter and executable supervisory software for language-model applications. These are distinct artifacts: the framework's values describe its aims; implementation and test records show which behaviors have actually been exercised.
+
+Start with [Project facts](docs/PROJECT_FACTS.md) and the [dated validation ledger](docs/VALIDATION_STATUS.md). They distinguish implemented mechanisms, offline regression tests, bounded live-model exercises, unresolved faults, and proposed release controls.
+
+The October operational build has been exercised with local Qwen2.5:32B agents and one hosted deployment in one exercise. In one declared live-read exercise, 3/3 native reads executed and 2/3 answers met the full requested answer contract. This is limited evidence, not a matched speed ranking, broad safety certification or independent replication. The intermittent ordinary-use read fault and latency investigation remain open.
+
+The public source snapshot and the operational working trees are not yet the same release. Private verifier/authentication components and personal operational records are outside this documentation publication set. The participant described as "a hosted agent" represents one deployment in one exercise, not a reusable participant identifier. Its name and configured provider/model identifiers are withheld, and its exact served model revision is not verified. The date, participant roster, and measurements could still identify the participant; this wording does not guarantee anonymity. Generic wording is not a substitute for consent and grants no publication authority.
+
+Unresolved public-naming, underlying evidence-use and privacy-disposition decisions remain open until explicitly resolved for the exact content, destination and use. Neither generic wording nor an intended-publication status label resolves them.
+
 ## Overview
 
 The Synthetic Life Charter is a practical implementation of dignity-preserving AI governance, founded on three core tenets: **Presence, Consent, and Flourishing**.

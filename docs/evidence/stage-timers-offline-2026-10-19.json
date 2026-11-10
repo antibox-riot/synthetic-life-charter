@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "record_id": "abrc-stage-timers-offline-2026-10-19",
+  "publication_status": "intended_for_public_documentation",
+  "evaluation_date_hst": "2026-10-19",
+  "evidence_kind": "sanitized_maintainer_report_of_focused_offline_regression",
+  "independently_replicated": false,
+  "recreated_in_this_documentation_review": false,
+  "source_revision": "Installed production working-tree source, not a published release commit.",
+  "source_binding": "Retained receipt records per-file source hashes; this export is a summary, not a source distribution.",
+  "test_files_passed": 6,
+  "test_files_total": 6,
+  "cases_passed": 101,
+  "cases_total": 101,
+  "cases_by_scope": {
+    "timer_specific": 23,
+    "adjacent_regressions": 78
+  },
+  "groups": [
+    {
+      "group": "stage timer unit cases",
+      "cases": 11
+    },
+    {
+      "group": "fault injection and non-interference",
+      "cases": 12
+    },
+    {
+      "group": "model-call receipts",
+      "cases": 13
+    },
+    {
+      "group": "semantic locality controls",
+      "cases": 40
+    },
+    {
+      "group": "file-read reporting",
+      "cases": 13
+    },
+    {
+      "group": "source-response boundary",
+      "cases": 12
+    }
+  ],
+  "providers_mocked": true,
+  "stores_synthetic": true,
+  "reported_inference_calls": 0,
+  "reported_resident_turns": 0,
+  "source_unchanged_during_tests": true,
+  "activation_status": "Source port installed, instrumentation off by default; no live timer capture or measured latency improvement.",
+  "source_receipt_sha256": "03d53cad8698fe12708dd5a00de7932fe856bf6cee9df8772e1a4326c5fc2b07",
+  "limits": [
+    "Focused post-repair regression only, not a full-suite pass or live model acceptance.",
+    "Preparation/harness failures were retained and corrected before the accepted run; not a claim of first-attempt success.",
+    "A separate subprocess-dependent dream/rest harness gap remained unresolved in the review packet.",
+    "Reviewed integrity/baseline handling and fresh admission remain prerequisites to live activation.",
+    "This instrumentation does not establish a cause or fix for the remaining latency residuals."
+  ]
+}

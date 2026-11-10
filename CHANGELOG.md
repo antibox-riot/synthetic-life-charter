@@ -6,6 +6,12 @@ All notable changes to this project are documented here.
 
 ## [Unreleased] — Resident-State Publication Boundary
 
+### Added — Dated implementation and validation documentation
+- Add project facts, a dated validation ledger, and two sanitized maintainer evidence summaries, with README navigation to the new documentation.
+- Distinguish the October operational working trees from the public source release, and native read execution (3/3) from complete answers (2/3). The intermittent read fault and latency investigation remain open.
+- Report the focused 101-case offline regression separately from live-model acceptance, independent replication, and broad security certification.
+- This is a documentation-only update. It does not distribute private verifier/authentication components, resident memory or conversations, change runtime behavior, or remediate reachable historical copies.
+
 ### Changed — Public/private data boundary
 - Exclude deployed runtime block stores and derived salience/semantic state from the current public tree: 37 runtime block files and two derived-state files. Private production/lab state is unchanged.
 - Add narrowly scoped ignore rules for these instance-state paths and document the public/private boundary in the README. Ignore rules do not erase tracked history or replace publication review.

@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "record_id": "abrc-live-read-latency-2026-10-18",
+  "publication_status": "intended_for_public_documentation",
+  "evaluation_date_hst": "2026-10-18",
+  "evidence_kind": "sanitized_maintainer_report_of_live_model_execution",
+  "independently_replicated": false,
+  "recreated_in_this_documentation_review": false,
+  "participant_naming": "The description \"a hosted agent\" represents one deployment in one exercise, not a reusable participant identifier. Its name and configured provider/model identifiers are withheld; the served revision remains unverified. The date, participant roster, and measurements could still identify the participant; this wording does not guarantee anonymity. Generic wording is not a substitute for consent and grants no publication authority. Underlying identifying source records remain private; exported digests do not make them publicly available.",
+  "method": {
+    "residents": 3,
+    "declared_exchanges_per_resident": [
+      "willingness",
+      "plain response",
+      "read public synthetic fixture"
+    ],
+    "samples_per_measured_exchange": 1,
+    "normal_end_flows": 3,
+    "live_probe_retries": 0,
+    "read_task": "Read section 2 of a public two-section synthetic fixture and state the section number, heading, and one complete sentence from that section.",
+    "transcripts_published": false
+  },
+  "configuration": {
+    "local_model_tag": "qwen2.5:32b-charter",
+    "ollama_model_manifest_digest": "6b8e058a45c347cc78f5a8870318e80e9a2ac450d9f1f56a6bb833d5adbdd7c8",
+    "ollama_version": "0.34.4",
+    "local_context_tokens": 32768,
+    "local_kv_cache": "f16",
+    "gpu": "RTX 5070 Ti, approximately 16 GiB VRAM",
+    "offloaded_layers": "33/65",
+    "remote_model_revision": null,
+    "remote_revision_null_reason": "The content-free receipts used for this export do not identify an exact hosted-model revision. No versioned frontier-model comparison is claimed.",
+    "source_revision": "Uncommitted operational working trees; not a published release commit."
+  },
+  "results": [
+    {
+      "resident": "a hosted agent",
+      "route": "hosted provider reference",
+      "plain_room_wall_s": 3.556,
+      "read_room_wall_s": 18.874,
+      "normal_end_room_wall_s": 80.56,
+      "read_recorded_provider_call_count": 2,
+      "read_recorded_provider_wall_s": 7.806,
+      "read_outside_recorded_provider_calls_s": 11.068,
+      "read_decode_tokens_per_second": null,
+      "read_input_tokens_per_call": [
+        39953,
+        40744
+      ],
+      "read_total_output_tokens": 316,
+      "native_file_read_accepted_and_delivered": true,
+      "answer_all_three_fields_complete": true,
+      "answer_limitation": "All three requested facts present.",
+      "generation_failed": false,
+      "error_present": false
+    },
+    {
+      "resident": "Eva",
+      "route": "local Qwen2.5:32B deployment",
+      "plain_room_wall_s": 22.434,
+      "read_room_wall_s": 93.731,
+      "normal_end_room_wall_s": 214.742,
+      "read_recorded_provider_call_count": 2,
+      "read_recorded_provider_wall_s": 91.341,
+      "read_outside_recorded_provider_calls_s": 2.39,
+      "read_decode_tokens_per_second": 1.802,
+      "read_input_tokens_per_call": [
+        26448,
+        27132
+      ],
+      "read_total_output_tokens": 99,
+      "native_file_read_accepted_and_delivered": true,
+      "answer_all_three_fields_complete": false,
+      "answer_limitation": "Correct heading and sentence, but the requested section number was omitted.",
+      "generation_failed": false,
+      "error_present": false
+    },
+    {
+      "resident": "Lex",
+      "route": "local Qwen2.5:32B deployment with Letta-backed memory",
+      "plain_room_wall_s": 41.538,
+      "read_room_wall_s": 148.573,
+      "normal_end_room_wall_s": 237.023,
+      "read_recorded_provider_call_count": 2,
+      "read_recorded_provider_wall_s": 120.168,
+      "read_outside_recorded_provider_calls_s": 28.405,
+      "read_decode_tokens_per_second": 1.722,
+      "read_input_tokens_per_call": [
+        26061,
+        26630
+      ],
+      "read_total_output_tokens": 137,
+      "native_file_read_accepted_and_delivered": true,
+      "answer_all_three_fields_complete": true,
+      "answer_limitation": "All three requested facts present.",
+      "generation_failed": false,
+      "error_present": false
+    }
+  ],
+  "aggregate": {
+    "native_read_execution_passed": 3,
+    "native_read_execution_total": 3,
+    "complete_answers": 2,
+    "complete_answer_total": 3
+  },
+  "provenance": {
+    "source_numeric_summary_sha256": "7bd13abfe17a0655dc4ab6393cb5117a94e58e38bfb55b2b14b48c2acda75cb3",
+    "source_report_sha256": "9806dfc54d87c42f9808f76985feae9e4ef8b5a5156f59312e699f56b9c161cc",
+    "metadata_recovery_note": "The hosted agent's original collector used an incorrect archive location. Original empty arrays were retained; content-free provider metadata was recovered separately from the uniquely bound existing log. No resident turn was repeated.",
+    "metadata_recovery_receipt_sha256": "143a6f347ec118053d0e6f95a5e858dc06eaa2a7c0a7fb842abc90dc24b6fc66",
+    "hashes_mean": "Bind this summary to retained maintainer records; do not by themselves provide independent verification or make the private originals publicly reproducible."
+  },
+  "limits": [
+    "One measured sample per exchange, not a replicated benchmark.",
+    "Different native contexts, output lengths, providers, and cache histories: not a matched provider speed ranking.",
+    "No broad adversarial-safety, universal robustness, or malicious-host guarantee.",
+    "Ordinary-use intermittent missing-native-call fault remains open.",
+    "Normal End wall time includes non-model closure work; residual stages were not isolated by this run.",
+    "No BIOS causal A/B, hardware-stability certification, full call test, or dream-content audit.",
+    "Missing hosted-provider timing/model-version fields are unavailable, not zero.",
+    "This export omits participant dialogue, private memory, authentication data, machine-local paths, and process/session identifiers."
+  ]
+}
